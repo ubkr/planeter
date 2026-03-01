@@ -63,7 +63,7 @@ The MVP answers one question: **"Which planets can I see from my location right 
 
 ## Phase-by-Phase Execution
 
-## Phase 1: Project Setup — [ ]
+## Phase 1: Project Setup — ✅
 
 **Depends on**: none
 **Parallelisable with**: none
@@ -90,7 +90,7 @@ The project directory exists in its final shape. The backend starts (uvicorn) an
 
 ---
 
-## Phase 2: Planet Calculation Engine — [ ]
+## Phase 2: Planet Calculation Engine — ✅
 
 **Depends on**: Phase 1
 **Parallelisable with**: Phase 3
@@ -113,7 +113,7 @@ A single function call with a latitude, longitude, and datetime returns a fully 
 
 ---
 
-## Phase 3: Weather and Utility Integration — [ ]
+## Phase 3: Weather and Utility Integration — ✅
 
 **Depends on**: Phase 1
 **Parallelisable with**: Phase 2
@@ -140,7 +140,7 @@ All weather service files, utility modules, and the cache service are present an
 
 ---
 
-## Phase 4: Visibility Scoring — [ ]
+## Phase 4: Visibility Scoring — ✅
 
 **Depends on**: Phase 2, Phase 3
 **Parallelisable with**: Phase 6 (frontend scaffolding can begin)
@@ -168,7 +168,7 @@ Given a list of planet positions plus weather and solar data, the scoring module
 
 ---
 
-## Phase 5: API Layer — [ ]
+## Phase 5: API Layer — ✅
 
 **Depends on**: Phase 4
 **Parallelisable with**: none
@@ -197,7 +197,7 @@ All three planet endpoints are reachable and return valid JSON. The `/visible` e
 
 ---
 
-## Phase 6: Frontend — [ ]
+## Phase 6: Frontend — ✅
 
 **Depends on**: Phase 5
 **Parallelisable with**: Phase 4 (scaffolding and static layout can begin before Phase 5 is done)
@@ -233,7 +233,7 @@ Opening `index.html` in a browser shows the full planet visibility UI. All five 
 
 ---
 
-## Phase 7: Testing — [ ]
+## Phase 7: Testing — ⬜
 
 **Depends on**: Phase 1, Phase 2, Phase 3, Phase 4, Phase 5, Phase 6
 **Parallelisable with**: none
@@ -286,6 +286,87 @@ Hovering over the visibility text on any planet card (e.g. "Ej synlig" or "Synli
 - [ ] Planets with a high score and no active penalties show no tooltip, or the tooltip states "Goda observationsförhållanden"
 - [ ] Tooltip is keyboard-accessible (visible on focus) and dismissed on blur or mouse-leave
 - [ ] No JavaScript errors are thrown when `visibility_reasons` is an empty array
+
+---
+
+## Phase 9: Scoring Accuracy and Scale Calibration — ⬜
+
+**Depends on**: Phase 4, Phase 6
+**Parallelisable with**: Phase 10, Phase 11
+
+### Tasks
+
+- **Fix the `is_visible` twilight threshold** in `backend/app/services/scoring.py` `apply_scores()`. Change `sun_altitude < -6` to `sun_altitude < -12` so that `is_visible` requires nautical twilight or darker, matching the specification in ARCHITECTURE.md ("twilight phase is nautical twilight or darker"). The existing inline comment on the `is_visible` condition already labels the threshold "nautical twilight or darker", which is correct for −12°; once the threshold value is fixed to −12, no other comment change is needed.
+- **Recalibrate scoring component weights** so the full 0–100 range is reachable. The current components (altitude 0–30, magnitude 0–20, cloud cover 0–30) sum to at most 80. Adjust the positive components to: altitude 0–40, magnitude 0–25, cloud cover 0–35, totalling 100. Update `score_planet()` in `backend/app/services/scoring.py` accordingly. Update the scoring table in `ARCHITECTURE.md` to match.
+- **Fix visible-planet count in sky summary** in `frontend/js/components/sky-summary.js`. Change `planets.filter(p => p.is_visible)` to `planets.filter(p => p.visibility_score > 50)` so the count matches the Phase 6 Definition of Done ("planets with score above 50").
+- **Update `scoreToLevel` tier boundaries** in `frontend/js/utils.js` if the recalibrated scale shifts where "good" and "excellent" begin. Ensure "excellent" is reachable under realistic best-case conditions (clear sky, planet at 45+ degrees altitude, full darkness).
+
+### Intended Outcome
+The visibility score accurately reflects real-world observing conditions for every planet. The full 0–100 scale is reachable: a planet under ideal conditions (clear sky, high altitude, full darkness) scores at least 90. The `is_visible` flag only flips true when it is genuinely dark enough to observe, and the sky summary correctly counts planets with a score above 50. The score is the single most important number the app produces — it drives the `is_visible` flag, the sky summary, the card colours, and the tooltip reasons. The three problems addressed here (twilight threshold, unreachable scale ceiling, wrong visible-count criterion) are corrections to existing modules, not new features; fixing them together ensures the number a user sees genuinely reflects what they would experience outside.
+
+### Definition of Done
+
+- [ ] `apply_scores()` sets `is_visible = False` for a planet when the sun altitude is -8 degrees (between civil and nautical twilight), even if the planet is above the horizon with a positive score
+- [ ] `apply_scores()` sets `is_visible = True` for a planet when the sun altitude is -14 degrees (nautical twilight), the planet is at 30 degrees altitude, cloud cover is 0%, and the score exceeds 15
+- [ ] A planet at 45 degrees altitude with magnitude −4.0, 0% cloud cover, sun at −20 degrees, and no moon proximity penalty produces a score of 100 (all positive components are at maximum and all penalties are zero)
+- [ ] The `scoreToLevel` function returns `"excellent"` for a score of 95
+- [ ] The sky summary visible count shows 0 when all five planets have scores between 16 and 50 (previously would have shown them as visible via the `is_visible` flag)
+- [ ] The ARCHITECTURE.md scoring table matches the new component weights in `score_planet()`
+- [ ] No existing Phase 8 tooltip behaviour is broken — `visibility_reasons` still populates correctly
+
+---
+
+## Phase 10: Backend Cleanup — Dead Code and Redundant Computation — ⬜
+
+**Depends on**: Phase 5, Phase 6
+**Parallelisable with**: Phase 9, Phase 11
+
+### Tasks
+
+- **Remove the unused `penalty_pts` return value from `calculate_moon_penalty()`** in `backend/app/utils/moon.py`. The scorer computes its own moon proximity penalty via `get_moon_angular_separation()` and never reads `penalty_pts`. Remove the `penalty_pts` computation and drop it from the returned dict. Audit all callers (`scoring.py` `apply_scores()`, `planets.py` `_build_moon_info()`) to confirm none read the field.
+- **Eliminate the double sun/moon computation in the `/visible` endpoint** in `backend/app/api/routes/planets.py`. Currently `apply_scores()` calls `calculate_sun_penalty()` and `calculate_moon_penalty()` internally, and then the route handler calls `_build_sun_info()` and `_build_moon_info()` which call the same two functions again. Refactor so the sun and moon data are computed once and passed through. Preferred approach: compute sun/moon data in the route handler first, then pass it into `apply_scores()`, keeping `apply_scores()` a pure scoring function. Apply the same fix to the `/tonight` and `/{name}` endpoints.
+- **Mark `fetchTonightPlanets()` as reserved for a future phase** in `frontend/js/api.js`. Add a clear comment on the function explaining that it is not called by the current UI and why — the backend `/tonight` endpoint has sophisticated night-window sampling that the current UI does not yet consume.
+
+### Intended Outcome
+The backend has no dead code or duplicate computation. Each request triggers exactly one sun calculation and one moon calculation regardless of which endpoint is called. `frontend/js/api.js` no longer contains a live function that silently calls an endpoint whose results are never used. This phase addresses two kinds of waste inherited from the rapid copy-and-build process: dead code that misleads anyone reading the module, and redundant computation that calls the same `ephem` functions twice per request. Cleaning these up now — before Phase 7 (Testing) writes assertions against the current interfaces — prevents dead code from being enshrined in tests. Note: Phase 10 must be completed before Phase 7 writes its `scoring.py` unit tests, because Phase 10 changes the internal signature of `apply_scores()` and tests written against the old signature would require immediate rework. This phase is refactoring only: no new features, no API changes, no frontend changes.
+
+### Definition of Done
+
+- [ ] `calculate_moon_penalty()` no longer contains a `penalty_pts` key in its returned dict
+- [ ] `_build_moon_info()` still constructs a valid `MoonInfo` object after the `penalty_pts` key is removed
+- [ ] The `/visible` endpoint makes exactly one call to `calculate_sun_penalty()` and one call to `calculate_moon_penalty()` per request
+- [ ] The `/tonight` and `/{name}` endpoints also avoid double computation
+- [ ] `fetchTonightPlanets()` in `frontend/js/api.js` carries a clear comment marking it as reserved for a future phase and explaining why it is not called by the current UI
+- [ ] All three API endpoints (`/visible`, `/tonight`, `/{name}`) return identical response shapes as before — no fields added, removed, or renamed
+- [ ] `GET /api/v1/health` still returns HTTP 200
+
+---
+
+## Phase 11: Frontend Cleanup — Dead CSS and Coordinate Formatting — ⬜
+
+**Depends on**: Phase 6
+**Parallelisable with**: Phase 9, Phase 10
+
+### Tasks
+
+- **Remove dead norrsken grid selectors from `frontend/css/layout.css`**. Delete the `.score-section`, `.data-grid-section`, and `.chart-section` rules. These selectors targeted norrsken's dashboard layout and have no corresponding elements in planeter's `index.html`. After removing those three rules, audit every remaining rule in the `@media (min-width: 900px)` block by cross-referencing each selector against `frontend/index.html`. Remove any additional rules whose selectors have no corresponding element in the planeter DOM. Leave the `@media` block intact if other rules inside it are still needed; remove the entire block if it becomes empty.
+- **Fix `formatLocation()` hemisphere labels** in `frontend/js/utils.js`. Currently the fallback format always appends "N" and "O" regardless of the sign of lat/lon. Change it to append "N"/"S" based on the sign of latitude and "Ö"/"V" (Öst/Väst in Swedish) based on the sign of longitude. Use the absolute value of the coordinate for display so that negative signs do not appear alongside the hemisphere letter.
+
+### Intended Outcome
+`frontend/css/layout.css` contains only rules that apply to elements present in planeter's DOM. `formatLocation()` in `frontend/js/utils.js` produces correct hemisphere labels for any coordinate on Earth, not just the positive-lat/positive-lon case that covers Sweden. Two issues carried over from the norrsken copy are resolved: layout CSS targeting selectors that do not exist in planeter's DOM (which adds noise to the stylesheet and would confuse anyone reading the grid layout), and a coordinate formatter that hardcodes Northern and Eastern hemisphere labels (a bug invisible for Sweden but wrong for any location outside the positive-lat/positive-lon quadrant). This phase is cleanup only: no new features, no backend changes.
+
+### Definition of Done
+
+- [ ] Confirm that `index.html` contains no elements with class `score-section`, `data-grid-section`, or `chart-section` before removing the CSS rules (search `frontend/index.html` for these class names)
+- [ ] `layout.css` contains no rules targeting `.score-section`, `.data-grid-section`, or `.chart-section`
+- [ ] The `@media (min-width: 900px)` block in `layout.css` either contains only planeter-relevant rules or is removed entirely
+- [ ] `formatLocation({ lat: 55.7, lon: 13.4 })` returns `"55.70°N, 13.40°Ö"` (unchanged for Swedish positive-coordinate case)
+- [ ] `formatLocation({ lat: -33.9, lon: 18.4 })` returns `"33.90°S, 18.40°Ö"` (southern hemisphere)
+- [ ] `formatLocation({ lat: 40.7, lon: -74.0 })` returns `"40.70°N, 74.00°V"` (western hemisphere)
+- [ ] `formatLocation({ lat: -34.6, lon: -58.4 })` returns `"34.60°S, 58.40°V"` (southern and western)
+- [ ] `formatLocation({ lat: 55.7, lon: 13.4, name: "Södra Sandby" })` returns `"Södra Sandby"` (name takes precedence, unchanged)
+- [ ] Page renders correctly at 375px and 1200px viewport widths with no layout regressions from the CSS removal
+- [ ] No JavaScript console errors on initial page load
 
 ---
 
