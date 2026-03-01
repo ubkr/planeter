@@ -1,0 +1,175 @@
+/* ==========================================================================
+   Planeter — Main CSS Aggregator
+   Imports all stylesheets in dependency order.
+   ========================================================================== */
+
+@import 'tokens.css';
+@import 'base.css';
+@import 'layout.css';
+@import 'components/modal.css';
+@import 'components/planet-cards.css';
+
+
+/* ==========================================================================
+   Sky Summary Banner
+   Full-width overview showing tonight's overall visibility score and
+   planet count. Sits at the top of the main content area.
+   ========================================================================== */
+
+.sky-summary {
+    width: 100%;
+    background: var(--color-bg-surface);
+    border: var(--border-width) solid var(--border-color);
+    border-bottom: 2px solid color-mix(in srgb, var(--color-accent-primary) 30%, transparent);
+    border-radius: var(--radius-lg);
+    padding: var(--space-md) var(--space-lg);
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-xl);
+    box-shadow: var(--shadow-sm), 0 4px 20px rgba(245, 200, 66, 0.05);
+}
+
+@media (max-width: 640px) {
+    .sky-summary {
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--space-md);
+        padding: var(--space-md);
+    }
+}
+
+/* --- Score Block --- */
+
+.sky-summary__score-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex-shrink: 0;
+    min-width: 5rem;
+}
+
+.sky-summary__score {
+    font-size: var(--font-size-3xl);
+    font-weight: 700;
+    font-family: var(--font-family-mono);
+    line-height: 1;
+}
+
+.sky-summary__score[data-score-level="poor"] {
+    color: var(--color-status-poor);
+}
+
+.sky-summary__score[data-score-level="fair"] {
+    color: var(--color-status-fair);
+}
+
+.sky-summary__score[data-score-level="good"] {
+    color: var(--color-status-good);
+}
+
+.sky-summary__score[data-score-level="excellent"] {
+    color: var(--color-status-excellent);
+}
+
+.sky-summary__label {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+    margin-top: var(--space-2xs);
+    text-align: center;
+    white-space: nowrap;
+}
+
+/* --- Info Column --- */
+
+.sky-summary__info {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    flex: 1;
+    min-width: 0;
+}
+
+.sky-summary__info-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+}
+
+.sky-summary__info-item strong,
+.sky-summary__info-item .sky-summary__value {
+    color: var(--color-text-primary);
+    font-weight: 500;
+}
+
+.sky-summary__planet-count {
+    font-size: var(--font-size-md);
+    font-weight: 600;
+    color: var(--color-accent-primary);
+}
+
+/* --- Skeleton Loading --- */
+
+.sky-summary--loading .sky-summary__score,
+.sky-summary--loading .sky-summary__label,
+.sky-summary--loading .sky-summary__info-item,
+.sky-summary--loading .sky-summary__planet-count {
+    color: transparent;
+    background: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0.04) 0%,
+        rgba(255, 255, 255, 0.08) 50%,
+        rgba(255, 255, 255, 0.04) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.8s ease-in-out infinite;
+    border-radius: var(--radius-sm);
+    min-height: 1em;
+}
+
+.sky-summary--loading .sky-summary__score {
+    min-width: 4rem;
+    min-height: 3rem;
+}
+
+
+/* ==========================================================================
+   Error Banner
+   Red-tinted notification bar for API errors.
+   Note: .error-banner base styles are in layout.css.
+   These extend with dismiss interaction and hidden state.
+   ========================================================================== */
+
+/* .error-banner and .error-banner-dismiss are defined in layout.css */
+/* .hidden is defined in base.css */
+
+
+/* ==========================================================================
+   App Footer
+   Note: .app-footer base styles are in layout.css.
+   ========================================================================== */
+
+/* .app-footer is defined in layout.css */
+
+
+/* ==========================================================================
+   Last Update Timestamp
+   Small muted text showing when data was last fetched.
+   ========================================================================== */
+
+.last-update {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    text-align: center;
+}
+
+.last-update[data-stale="true"] {
+    color: var(--color-status-fair);
+}
+
+.last-update[data-stale="true"]::after {
+    content: ' \26A0';
+    font-size: 0.85em;
+}

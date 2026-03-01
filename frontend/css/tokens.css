@@ -1,0 +1,92 @@
+:root {
+    /* Colors - Deep Space Theme */
+    --color-bg-deep: #050814;
+    --color-bg-surface: #0f1322;
+    --color-bg-surface-hover: #161b33;
+    --color-bg-overlay: rgba(5, 8, 20, 0.8);
+
+    /* Planetary Accents */
+    --color-accent-primary: #f5c842;    /* Warm Gold */
+    --color-accent-secondary: #3b82f6;  /* Deep Blue */
+    --color-accent-tertiary: #00b3ff;   /* Bright Blue */
+
+    /* Status Colors */
+    --color-status-excellent: #00ffc8;
+    --color-status-good: #a6ff00;
+    --color-status-fair: #ffcc00;
+    --color-status-poor: #ff3366;
+
+    /* Text Colors */
+    --color-text-primary: #ffffff;
+    --color-text-secondary: #8e9bb3;
+    --color-text-muted: #53627d;
+    --color-text-inverse: #050814;
+
+    /* Metrics Colors */
+    --color-metric-planet: #f5c842;
+    --color-metric-clouds: #4d96ff;
+    --color-metric-visibility: #6bcb77;
+    --color-metric-precip: #ff6b6b;
+    --color-moon-penalty: #c084fc;
+    --color-sun-penalty: #f59e0b;
+
+    /* Planet accent colors */
+    --color-planet-mercury: #9ca3af;
+    --color-planet-venus: #fbbf24;
+    --color-planet-mars: #ef4444;
+    --color-planet-jupiter: #f59e0b;
+    --color-planet-saturn: #d4a017;
+
+    /* Typography */
+    --font-family-base: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    --font-family-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+    --font-size-xs: 0.75rem;
+    --font-size-sm: 0.875rem;
+    --font-size-md: 1rem;
+    --font-size-lg: 1.25rem;
+    --font-size-xl: 1.5rem;
+    --font-size-2xl: 2rem;
+    --font-size-3xl: 3rem;
+    --font-size-4xl: 4rem;
+
+    /* Spacing */
+    --space-2xs: 0.25rem;
+    --space-xs: 0.5rem;
+    --space-sm: 0.75rem;
+    --space-md: 1rem;
+    --space-lg: 1.5rem;
+    --space-xl: 2rem;
+    --space-2xl: 3rem;
+
+    /* Borders & Radius */
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 16px;
+    --radius-xl: 24px;
+    --radius-full: 9999px;
+
+    --border-width: 1px;
+    --border-color: rgba(255, 255, 255, 0.1);
+    --border-color-hover: rgba(255, 255, 255, 0.2);
+
+    /* Shadows & Glows */
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.2);
+    --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.4);
+
+    --glow-accent: 0 0 20px rgba(245, 200, 66, 0.15), 0 0 40px rgba(59, 130, 246, 0.1);
+    --glow-text: 0 0 10px rgba(255, 255, 255, 0.3);
+
+    /* Transitions */
+    --transition-fast: 150ms ease;
+    --transition-normal: 300ms ease;
+    --transition-slow: 500ms ease;
+
+    /* Z-Index */
+    --z-background: -1;
+    --z-default: 1;
+    --z-sticky: 100;
+    --z-modal: 1000;
+    --z-tooltip: 1100;
+}

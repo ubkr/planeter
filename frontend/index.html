@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Se vilka planeter som är synliga just nu från din plats i Sverige.">
+  <meta name="theme-color" content="#0f1117">
+  <title>Planeter – Planetsynlighet i Sverige</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪐</text></svg>">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+        crossorigin="">
+  <link rel="stylesheet" href="css/main.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+          crossorigin="" defer></script>
+</head>
+<body>
+  <div class="app-container">
+
+    <header class="app-header">
+      <div class="header-top">
+        <h1 class="app-title">🪐 Planeter</h1>
+        <button class="settings-trigger settings-btn" id="settingsTrigger" aria-label="Öppna inställningar" title="Inställningar">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </button>
+      </div>
+      <div class="header-info">
+        <p id="locationDisplay" class="location-display">Hämtar plats...</p>
+        <p id="lastUpdate" class="last-update"></p>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <!-- Sky summary banner -->
+      <section id="skySummary"></section>
+
+      <!-- Error banner (hidden by default) -->
+      <div id="errorBanner" class="error-banner hidden" role="alert">
+        <span id="errorMessage">Ett fel uppstod.</span>
+        <button class="error-banner-dismiss" id="errorDismiss" aria-label="Stäng">&#10005;</button>
+      </div>
+
+      <!-- Planet cards grid -->
+      <div id="planetCards"></div>
+    </main>
+
+    <footer class="app-footer">
+      <p>Planeter – Astronomiska beräkningar med <a href="https://rhodesmill.org/pyephem/" target="_blank" rel="noopener">ephem</a> · Väderdata från <a href="https://api.met.no/" target="_blank" rel="noopener">Met.no</a></p>
+    </footer>
+
+    <!-- Settings modal container -->
+    <div id="settingsModalContainer"></div>
+  </div>
+
+  <!-- Tooltip (non-module, self-initializing) - load if it exists -->
+  <script src="js/components/tooltip.js" onerror="this.remove()"></script>
+  <!-- Main app module -->
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
