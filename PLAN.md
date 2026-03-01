@@ -261,6 +261,34 @@ Running `pytest` from the backend directory executes all tests and they pass. Te
 
 ---
 
+## Phase 8: Visibility Reason Tooltips — [ ]
+
+**Depends on**: Phase 4, Phase 5, Phase 6
+**Parallelisable with**: Phase 7
+
+### Tasks
+- Extend `backend/app/models/planet.py` — add a `visibility_reasons: list[str]` field to `PlanetData`; reasons are short machine-readable keys, e.g. `"below_horizon"`, `"dagsljus"`, `"molnighet"`, `"månljus"`, `"atmosfärisk_dämpning"`
+- Extend `backend/app/services/scoring.py` — collect the active penalty factors during scoring and populate `visibility_reasons` on the returned object; a planet with a zero score should carry at least one reason
+- Update `backend/app/api/routes/planets.py` — confirm that `visibility_reasons` is included in all three endpoint responses (`/visible`, `/tonight`, `/{name}`)
+- Extend `frontend/js/components/planet-cards.js` — attach a tooltip (via the existing `tooltip.js` component) to the visibility-status text on each planet card; the tooltip content is built from `visibility_reasons` and rendered in Swedish
+- Add Swedish reason-label lookup in `frontend/js/utils.js` — map each reason key to a human-readable Swedish string, e.g. `"below_horizon"` → `"Planeten är under horisonten"`, `"dagsljus"` → `"För ljust – solen är uppe"`, `"molnighet"` → `"Molnen blockerar sikten"`, `"månljus"` → `"Månens sken stör observationen"`, `"atmosfärisk_dämpning"` → `"Atmosfärisk dämpning vid låg höjd"`
+- Update `frontend/css/components/planet-cards.css` — style the visibility-status text with a dashed underline to signal that it is hoverable
+
+### Intended Outcome
+Hovering over the visibility text on any planet card (e.g. "Ej synlig" or "Synlig") opens a small tooltip listing in plain Swedish why the planet is or is not observable. All relevant factors — cloud cover, daylight, moon interference, horizon obstruction, and atmospheric extinction — can appear independently or in combination.
+
+### Definition of Done
+- [ ] `PlanetData` includes a non-empty `visibility_reasons` list for every planet whose score is below 100
+- [ ] A planet below the horizon always carries the reason `"below_horizon"` and never a positive score
+- [ ] A planet hidden by cloud cover carries `"molnighet"` regardless of its altitude or score
+- [ ] Hovering the visibility text in the browser shows a tooltip with at least one Swedish-language reason string
+- [ ] Multiple simultaneous factors (e.g. low altitude + partial cloud cover) each appear as separate lines in the tooltip
+- [ ] Planets with a high score and no active penalties show no tooltip, or the tooltip states "Goda observationsförhållanden"
+- [ ] Tooltip is keyboard-accessible (visible on focus) and dismissed on blur or mouse-leave
+- [ ] No JavaScript errors are thrown when `visibility_reasons` is an empty array
+
+---
+
 ## Confirmed Decisions
 
 | Question | Decision |
