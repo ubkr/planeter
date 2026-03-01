@@ -261,7 +261,7 @@ Running `pytest` from the backend directory executes all tests and they pass. Te
 
 ---
 
-## Phase 8: Visibility Reason Tooltips — [ ]
+## Phase 8: Visibility Reason Tooltips — ✅
 
 **Depends on**: Phase 4, Phase 5, Phase 6
 **Parallelisable with**: Phase 7

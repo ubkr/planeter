@@ -173,3 +173,59 @@
     content: ' \26A0';
     font-size: 0.85em;
 }
+
+
+/* ==========================================================================
+   Tooltip
+   Floating tooltip shown by TooltipManager on hover/focus of .info-icon
+   elements. Positioned with JS (fixed); visibility toggled via .is-visible.
+   ========================================================================== */
+
+.info-icon {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    cursor: help;
+    transition: color var(--transition-fast);
+}
+
+.info-icon:hover,
+.info-icon:focus-visible {
+    color: var(--color-text-primary);
+}
+
+.info-icon:focus-visible {
+    outline: 2px solid var(--color-accent-secondary);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+}
+
+.tooltip {
+    position: fixed;
+    top: 0;
+    left: 0;
+    max-width: 280px;
+    padding: var(--space-xs) var(--space-sm);
+    background: var(--color-bg-surface);
+    color: var(--color-text-primary);
+    border: var(--border-width) solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    font-size: var(--font-size-xs);
+    line-height: 1.4;
+    white-space: pre-line;
+    z-index: var(--z-tooltip);
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(4px);
+    transition:
+        opacity var(--transition-fast),
+        transform var(--transition-fast),
+        visibility var(--transition-fast);
+}
+
+.tooltip.is-visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}

@@ -15,6 +15,43 @@ export function formatLocation(location) {
 }
 
 /**
+ * Maps backend visibility reason keys to Swedish display strings.
+ * Keys that are not present here are considered unknown and silently ignored
+ * by formatVisibilityReasons.
+ */
+export const VISIBILITY_REASON_LABELS = {
+  below_horizon:           'Planeten är under horisonten',
+  dagsljus:                'För ljust – solen är uppe',
+  molnighet:               'Molnen blockerar sikten',
+  månljus:                 'Månens sken stör observationen',
+  atmosfärisk_dämpning:    'Atmosfärisk dämpning vid låg höjd',
+  goda_förhållanden:       'Goda observationsförhållanden',
+};
+
+/**
+ * Converts an array of backend reason keys into a newline-separated string of
+ * Swedish labels. Unknown keys are skipped with a console.warn.
+ *
+ * @param {string[]|null|undefined} reasons - Array of reason key strings.
+ * @returns {string} Swedish labels joined by '\n', or '' for empty/null input.
+ */
+export function formatVisibilityReasons(reasons) {
+  if (!reasons || reasons.length === 0) return '';
+
+  const lines = reasons
+    .map((key) => {
+      const label = VISIBILITY_REASON_LABELS[key];
+      if (label === undefined) {
+        console.warn('[planeter] Unknown visibility reason key:', key);
+      }
+      return label;
+    })
+    .filter((label) => label !== undefined);
+
+  return lines.join('\n');
+}
+
+/**
  * Map a visibility score (0–100) to a display level string.
  *
  * Tiers:

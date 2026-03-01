@@ -51,6 +51,21 @@ class PlanetPosition(BaseModel):
     # Filled by Phase 4 scoring module; None until scoring has been applied.
     visibility_score: Optional[int] = Field(None, ge=0, le=100, description="0–100 visibility score; None before scoring")
     is_visible: Optional[bool] = Field(None, description="True when the planet is practically observable; None before scoring")
+    # Filled by the scoring module alongside visibility_score.
+    # Known reason keys: "below_horizon", "dagsljus", "molnighet",
+    # "månljus", "atmosfärisk_dämpning", "goda_förhållanden".
+    visibility_reasons: List[str] = Field(
+        default_factory=list,
+        description=(
+            "Ordered list of reason keys explaining the visibility score. "
+            "Possible keys: 'below_horizon' (planet below horizon), "
+            "'dagsljus' (too much daylight), "
+            "'molnighet' (cloud cover too high), "
+            "'månljus' (moonlight interference), "
+            "'atmosfärisk_dämpning' (atmospheric dampening near horizon), "
+            "'goda_förhållanden' (good observing conditions)."
+        ),
+    )
 
     class Config:
         json_schema_extra = {
@@ -68,6 +83,7 @@ class PlanetPosition(BaseModel):
                 "is_above_horizon": True,
                 "visibility_score": 85,
                 "is_visible": True,
+                "visibility_reasons": [],
             }
         }
 

@@ -6,7 +6,7 @@ a 0–100 integer visibility score for each planet and an aggregate tonight scor
 """
 
 from datetime import datetime
-from typing import List
+from typing import List, Tuple
 
 from ..models.planet import PlanetPosition
 from ..utils.sun import calculate_sun_penalty
@@ -19,16 +19,26 @@ def score_planet(
     cloud_cover: float,
     moon_illumination: float,
     moon_separation: float,
-) -> int:
+) -> Tuple[int, List[str]]:
     """
-    Compute a 0–100 visibility score for a single planet.
+    Compute a 0–100 visibility score for a single planet, with reason keys.
 
-    Returns 0 immediately when:
-      - the planet is at or below the horizon,
-      - cloud cover is 75 % or higher (matches the ">75% → 0 pts" cloud table
-        boundary; at ≥75% the cloud component is already 0, so the total score
-        can only ever be 0 or negative),
-      - the sun is above the horizon (sun_penalty_pts == 50.0, i.e. daylight).
+    Collects ALL applicable hard-zero conditions before returning early, so
+    a planet that is both below the horizon and in daylight will report both
+    "below_horizon" and "dagsljus".
+
+    Hard-zero conditions (score is forced to 0):
+      - planet altitude <= 0  → "below_horizon"
+      - cloud cover >= 75 %   → "molnighet"
+      - sun_penalty_pts >= 50 (daylight) → "dagsljus"
+
+    Partial-penalty reason keys (collected when score > 0):
+      - cloud cover in [25, 75) → "molnighet"
+      - any sun/twilight penalty (0 < sun_penalty_pts < 50) → "dagsljus"
+      - atmospheric extinction active (altitude < 10°) → "atmosfärisk_dämpning"
+      - moon proximity penalty active → "månljus"
+
+    Good-conditions fallback: "goda_förhållanden" when no reason was collected.
 
     Args:
         planet:            Computed position data for the planet.
@@ -39,19 +49,25 @@ def score_planet(
         moon_separation:   Angular separation between moon and planet in degrees.
 
     Returns:
-        Integer score in range 0–100.
+        Tuple of (score, reasons) where score is an integer in range 0–100 and
+        reasons is a list of string reason keys.
     """
+    reasons: List[str] = []
+
+    # --- Collect ALL hard-zero conditions before deciding to return early ---
     if planet.altitude_deg <= 0:
-        return 0
+        reasons.append("below_horizon")
 
-    # Cloud cover ≥75 % maps to 0 pts in the cloud table, so the total can only
-    # be 0 or negative — return early for consistency.
     if cloud_cover >= 75:
-        return 0
+        reasons.append("molnighet")
 
-    # Daytime is a hard zero: no planet observation is possible.
+    # Daytime is a hard zero: sun_penalty_pts == 50 means the sun is above the
+    # horizon.  (calculate_sun_penalty caps the penalty at 50.)
     if sun_penalty_pts >= 50:
-        return 0
+        reasons.append("dagsljus")
+
+    if reasons:
+        return (0, reasons)
 
     # --- Altitude component (0–30 pts) ---
     # Linear ramp: 0 pts at 0°, 30 pts at 45°; clamped to 30 above 45°.
@@ -72,7 +88,7 @@ def score_planet(
     elif cloud_cover < 75:
         cloud_score = 10.0
     else:
-        cloud_score = 0.0
+        cloud_score = 0.0  # unreachable here; handled by hard-zero above
 
     # --- Sun penalty (-50 to 0) ---
     # sun_penalty_pts is a positive number (0–50) supplied by the caller;
@@ -103,7 +119,27 @@ def score_planet(
         + moon_penalty
     )
 
-    return int(max(0, min(100, round(total))))
+    score = int(max(0, min(100, round(total))))
+
+    # --- Collect partial-penalty reason keys ---
+    if cloud_cover >= 25:
+        # cloud_cover < 75 is guaranteed here (hard-zero already handled >=75)
+        reasons.append("molnighet")
+
+    if sun_penalty_pts > 0:
+        # sun_penalty_pts < 50 is guaranteed here (hard-zero already handled >=50)
+        reasons.append("dagsljus")
+
+    if extinction_penalty < 0:
+        reasons.append("atmosfärisk_dämpning")
+
+    if moon_penalty < 0:
+        reasons.append("månljus")
+
+    if not reasons:
+        reasons.append("goda_förhållanden")
+
+    return (score, reasons)
 
 
 def score_tonight(planets: List[PlanetPosition]) -> int:
@@ -146,7 +182,8 @@ def apply_scores(
 
     Retrieves sun and moon data for the given location and time, then calls
     score_planet() for each planet.  Mutates each PlanetPosition in place by
-    setting visibility_score and is_visible, then returns the list.
+    setting visibility_score, is_visible, and visibility_reasons, then returns
+    the list.
 
     A planet is declared visible when:
         - altitude_deg > 0
@@ -161,7 +198,8 @@ def apply_scores(
         dt:          UTC datetime for sun/moon calculations.  Defaults to now.
 
     Returns:
-        The same list with visibility_score and is_visible populated on each item.
+        The same list with visibility_score, is_visible, and visibility_reasons
+        populated on each item.
     """
     sun_data = calculate_sun_penalty(lat, lon, dt)
     sun_altitude = sun_data["elevation_deg"]
@@ -180,7 +218,7 @@ def apply_scores(
             planet.altitude_deg,
         )
 
-        score = score_planet(
+        score, reasons = score_planet(
             planet,
             sun_penalty_pts=sun_penalty_pts,
             cloud_cover=cloud_cover,
@@ -189,6 +227,7 @@ def apply_scores(
         )
 
         planet.visibility_score = score
+        planet.visibility_reasons = reasons
         planet.is_visible = (
             planet.altitude_deg > 0
             and score > 15

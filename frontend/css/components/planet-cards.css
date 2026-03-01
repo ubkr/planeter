@@ -251,6 +251,15 @@
     color: var(--color-text-muted);
 }
 
+/* Dashed underline hint when the badge carries a hoverable tooltip */
+.planet-card__visibility.info-icon {
+    text-decoration: underline;
+    text-decoration-style: dashed;
+    text-decoration-color: currentColor;
+    text-underline-offset: 2px;
+    cursor: help;
+}
+
 /* --- Skeleton Loading State --- */
 
 .planet-card--skeleton {

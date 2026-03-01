@@ -6,7 +6,7 @@
  * altitude_deg, azimuth_deg, direction, magnitude, constellation, rise_time, transit_time, set_time.
  */
 
-import { scoreToLevel } from '../utils.js';
+import { scoreToLevel, formatVisibilityReasons } from '../utils.js';
 
 // Number of skeleton cards to show while loading.
 const PLANET_COUNT = 5;
@@ -103,10 +103,31 @@ function buildCard(planet) {
                 <span class="planet-card__time-value">${formatTime(planet.set_time)}</span>
             </span>
         </div>
-        <div class="planet-card__visibility" data-visible="${isVisible}">
-            ${isVisible ? 'Synlig' : 'Ej synlig'}
-        </div>
     `;
+
+    // Build the visibility pill imperatively to avoid XSS via attribute injection.
+    // TooltipManager watches for .info-icon and reads the `title` property.
+    //
+    // "goda_förhållanden" is excluded from the tooltip-trigger decision: a planet
+    // with no active penalties is clearly good, so the dashed-underline affordance
+    // would be confusing rather than informative. The backend still reports the
+    // reason for API consumers; we just don't surface it as a tooltip in the UI.
+    const actionableReasons = (planet.visibility_reasons ?? []).filter(
+        (r) => r !== 'goda_förhållanden'
+    );
+    const tooltipText = formatVisibilityReasons(actionableReasons);
+
+    const visibilityEl = document.createElement('div');
+    visibilityEl.className = tooltipText
+        ? 'planet-card__visibility info-icon'
+        : 'planet-card__visibility';
+    visibilityEl.dataset.visible = isVisible;
+    visibilityEl.textContent = isVisible ? 'Synlig' : 'Ej synlig';
+    if (tooltipText) {
+        visibilityEl.tabIndex = 0;
+        visibilityEl.title = tooltipText;
+    }
+    card.appendChild(visibilityEl);
 
     return card;
 }
