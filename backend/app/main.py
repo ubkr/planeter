@@ -1,0 +1,31 @@
+import os
+
+from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from .config import settings
+from .api.routes import health, geocode, planets
+
+FRONTEND_DIR = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "frontend")
+)
+
+app = FastAPI(
+    title=settings.api_title,
+    version=settings.api_version,
+    description=settings.api_description,
+)
+
+# Register routes — must all be added before the static files catch-all mount.
+app.include_router(health.router)
+app.include_router(geocode.router)
+app.include_router(planets.router)
+
+
+@app.get("/")
+async def root():
+    """Serve frontend index page."""
+    return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
+
+
+app.mount("/", StaticFiles(directory=FRONTEND_DIR), name="frontend")
