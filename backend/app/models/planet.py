@@ -92,6 +92,7 @@ class SunInfo(BaseModel):
     """Current sun position and twilight state."""
 
     elevation_deg: float = Field(..., description="Sun elevation above horizon in degrees")
+    azimuth_deg: float = Field(..., ge=0, lt=360, description="Sun azimuth from North in degrees, half-open interval [0, 360)")
     twilight_phase: str = Field(..., description="Twilight phase label: daylight, civil_twilight, nautical_twilight, astronomical_twilight, or darkness")
 
 
@@ -134,7 +135,7 @@ class PlanetsResponse(BaseModel):
             "example": {
                 "timestamp": "2026-02-28T22:00:00Z",
                 "location": {"lat": 55.7, "lon": 13.4, "name": "Södra Sandby"},
-                "sun": {"elevation_deg": -25.3, "twilight_phase": "darkness"},
+                "sun": {"elevation_deg": -25.3, "azimuth_deg": 185.0, "twilight_phase": "darkness"},
                 "moon": {"illumination": 0.45, "elevation_deg": 32.1, "azimuth_deg": 180.0},
                 "weather": {"cloud_cover": 15.0, "source": "met_no"},
                 "planets": [],

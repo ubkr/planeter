@@ -245,6 +245,7 @@ export class SkyMap {
         this.container = containerEl;
         // Idempotency flag: set to true after the first successful render.
         this._rendered = false;
+        this._pendingPlanets = null;
     }
 
     /**
@@ -264,6 +265,7 @@ export class SkyMap {
         const svg = svgEl('svg');
         setAttrs(svg, {
             viewBox: `0 0 ${VIEW_SIZE} ${VIEW_SIZE}`,
+            overflow: 'visible',
             role: 'img',
             'aria-label': 'Stjärnkarta – polär projektion med horisontringar och väderstrecksmarkeringar',
         });
@@ -301,5 +303,193 @@ export class SkyMap {
 
         this.container.appendChild(svg);
         this._rendered = true;
+
+        // If plotBodies() was called before render() completed, replay it now.
+        if (this._pendingPlanets !== null) {
+            this.plotBodies(this._pendingPlanets, this._pendingSun, this._pendingMoon);
+        }
+    }
+
+    /**
+     * Plot celestial bodies (planets, Sun, Moon) onto the sky map.
+     *
+     * Safe to call before render() — the data is stored and replayed once the
+     * SVG grid is ready. Safe to call multiple times — the body layer is fully
+     * rebuilt on every call so stale dots are never left behind.
+     *
+     * @param {Object[]} planets - Array of planet objects from the API.
+     *   Each object must have: name, name_sv, altitude_deg, azimuth_deg,
+     *   direction, magnitude.
+     * @param {Object} sun - Sun object with elevation_deg and azimuth_deg.
+     * @param {Object} moon - Moon object with elevation_deg, azimuth_deg,
+     *   and illumination (0–1 float).
+     */
+    plotBodies(planets, sun, moon) {
+        // Defer if the SVG grid has not been rendered yet.
+        if (!this._rendered || !this.container.querySelector('svg')) {
+            this._pendingPlanets = planets;
+            this._pendingSun = sun;
+            this._pendingMoon = moon;
+            return;
+        }
+
+        if (!Array.isArray(planets)) return;
+
+        // Clear pending state — we are rendering now.
+        this._pendingPlanets = null;
+        this._pendingSun = undefined;
+        this._pendingMoon = undefined;
+
+        const svg = this.container.querySelector('svg');
+
+        // Reuse or create the body layer group. Clear it so each call is
+        // idempotent: old dots and labels are removed before rebuilding.
+        let bodiesGroup = svg.querySelector('.sky-map-bodies');
+        if (!bodiesGroup) {
+            bodiesGroup = svgEl('g');
+            bodiesGroup.setAttribute('class', 'sky-map-bodies');
+            svg.appendChild(bodiesGroup);
+        } else {
+            while (bodiesGroup.firstChild) {
+                bodiesGroup.removeChild(bodiesGroup.firstChild);
+            }
+        }
+
+        // --- Planets ---
+        for (const planet of planets) {
+            const { x, y } = altAzToXY(
+                planet.altitude_deg,
+                planet.azimuth_deg,
+                CENTER_X,
+                CENTER_Y,
+                HORIZON_RADIUS,
+            );
+
+            // Radius scales inversely with magnitude: brighter (lower mag) → larger dot.
+            const radius = Math.max(4, Math.min(12, 8 - planet.magnitude));
+
+            const belowHorizon = planet.altitude_deg < 0;
+            const opacityAttr = belowHorizon ? '0.3' : '1';
+
+            const tooltipText =
+                `${planet.name_sv}\n` +
+                `Höjd: ${planet.altitude_deg.toFixed(1)}°\n` +
+                `Riktning: ${planet.direction}\n` +
+                `Magnitud: ${planet.magnitude.toFixed(1)}`;
+
+            const dot = svgEl('circle');
+            setAttrs(dot, {
+                cx: x,
+                cy: y,
+                r: radius,
+                class: `sky-map-body sky-map-body--${planet.name.toLowerCase()} info-icon`,
+                opacity: opacityAttr,
+                'aria-label': planet.name_sv,
+                tabindex: '0',
+                role: 'img',
+            });
+            dot.dataset.tooltipTitle = tooltipText;
+            bodiesGroup.appendChild(dot);
+
+            const label = svgEl('text');
+            setAttrs(label, {
+                x: x + radius + 3,
+                y: y - radius,
+                class: 'sky-map-body-label',
+                opacity: opacityAttr,
+                'pointer-events': 'none',
+            });
+            label.textContent = planet.name_sv;
+            bodiesGroup.appendChild(label);
+        }
+
+        // --- Sun ---
+        if (sun) {
+            const { x, y } = altAzToXY(
+                sun.elevation_deg,
+                sun.azimuth_deg,
+                CENTER_X,
+                CENTER_Y,
+                HORIZON_RADIUS,
+            );
+
+            const belowHorizon = sun.elevation_deg < 0;
+            const opacityAttr = belowHorizon ? '0.3' : '1';
+            const sunRadius = 10;
+
+            const tooltipText =
+                `Solen\n` +
+                `Höjd: ${sun.elevation_deg.toFixed(1)}°`;
+
+            const dot = svgEl('circle');
+            setAttrs(dot, {
+                cx: x,
+                cy: y,
+                r: sunRadius,
+                class: 'sky-map-body sky-map-body--sun info-icon',
+                opacity: opacityAttr,
+                'aria-label': 'Solen',
+                tabindex: '0',
+                role: 'img',
+            });
+            dot.dataset.tooltipTitle = tooltipText;
+            bodiesGroup.appendChild(dot);
+
+            const label = svgEl('text');
+            setAttrs(label, {
+                x: x + sunRadius + 3,
+                y: y - sunRadius,
+                class: 'sky-map-body-label',
+                opacity: opacityAttr,
+                'pointer-events': 'none',
+            });
+            label.textContent = 'Solen';
+            bodiesGroup.appendChild(label);
+        }
+
+        // --- Moon ---
+        if (moon) {
+            const { x, y } = altAzToXY(
+                moon.elevation_deg,
+                moon.azimuth_deg,
+                CENTER_X,
+                CENTER_Y,
+                HORIZON_RADIUS,
+            );
+
+            const belowHorizon = moon.elevation_deg < 0;
+            const opacityAttr = belowHorizon ? '0.3' : '1';
+            const moonRadius = 8;
+
+            const tooltipText =
+                `Månen\n` +
+                `Höjd: ${moon.elevation_deg.toFixed(1)}°\n` +
+                `Belysning: ${Math.round(moon.illumination * 100)}%`;
+
+            const dot = svgEl('circle');
+            setAttrs(dot, {
+                cx: x,
+                cy: y,
+                r: moonRadius,
+                class: 'sky-map-body sky-map-body--moon info-icon',
+                opacity: opacityAttr,
+                'aria-label': 'Månen',
+                tabindex: '0',
+                role: 'img',
+            });
+            dot.dataset.tooltipTitle = tooltipText;
+            bodiesGroup.appendChild(dot);
+
+            const label = svgEl('text');
+            setAttrs(label, {
+                x: x + moonRadius + 3,
+                y: y - moonRadius,
+                class: 'sky-map-body-label',
+                opacity: opacityAttr,
+                'pointer-events': 'none',
+            });
+            label.textContent = 'Månen';
+            bodiesGroup.appendChild(label);
+        }
     }
 }

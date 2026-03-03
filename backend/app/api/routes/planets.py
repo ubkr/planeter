@@ -41,6 +41,7 @@ def _build_sun_info(sun_data: dict) -> SunInfo:
     """Construct a SunInfo model from a pre-computed sun data dict."""
     return SunInfo(
         elevation_deg=sun_data["elevation_deg"],
+        azimuth_deg=sun_data["azimuth_deg"],
         twilight_phase=sun_data["twilight_phase"],
     )
 

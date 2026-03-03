@@ -60,3 +60,32 @@
     text-anchor: middle;
     dominant-baseline: central;
 }
+
+/* --- Sky map celestial bodies --- */
+
+.sky-map-body {
+    cursor: pointer;
+    transition: opacity var(--transition-fast);
+}
+
+.sky-map-body:hover {
+    filter: brightness(1.25);
+}
+
+.sky-map-body--mercury { fill: var(--color-planet-mercury); }
+.sky-map-body--venus   { fill: var(--color-planet-venus); }
+.sky-map-body--mars    { fill: var(--color-planet-mars); }
+.sky-map-body--jupiter { fill: var(--color-planet-jupiter); }
+.sky-map-body--saturn  { fill: var(--color-planet-saturn); }
+.sky-map-body--sun     { fill: var(--color-sun-penalty); }
+.sky-map-body--moon    { fill: var(--color-moon-penalty); }
+
+/* --- Celestial body labels --- */
+
+.sky-map-body-label {
+    font-family: var(--font-family-base);
+    font-size: var(--font-size-xs);
+    fill: var(--color-text-secondary);
+    pointer-events: none;
+    user-select: none;
+}

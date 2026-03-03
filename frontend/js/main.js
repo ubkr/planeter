@@ -93,6 +93,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             skySummary.render(data);
             planetCards.render(data.planets);
+            skyMap.plotBodies(data.planets, data.sun, data.moon);
 
             const timeString = new Intl.DateTimeFormat('sv-SE', {
                 hour: '2-digit',
