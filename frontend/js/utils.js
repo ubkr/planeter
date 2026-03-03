@@ -11,7 +11,12 @@ export function formatLocation(location) {
   if (location.name) {
     return location.name;
   }
-  return `${location.lat.toFixed(2)}\u00b0N, ${location.lon.toFixed(2)}\u00b0\u00d6`;
+  const absLat = Math.abs(location.lat);
+  const absLon = Math.abs(location.lon);
+  const latHemi = location.lat >= 0 ? 'N' : 'S';
+  // Swedish convention: Ö = Öster (East), V = Väster (West)
+  const lonHemi = location.lon >= 0 ? '\u00d6' : 'V';
+  return `${absLat.toFixed(2)}\u00b0${latHemi}, ${absLon.toFixed(2)}\u00b0${lonHemi}`;
 }
 
 /**

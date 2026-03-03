@@ -342,7 +342,7 @@ The backend has no dead code or duplicate computation. Each request triggers exa
 
 ---
 
-## Phase 11: Frontend Cleanup — Dead CSS and Coordinate Formatting — ⬜
+## Phase 11: Frontend Cleanup — Dead CSS and Coordinate Formatting — ✅
 
 **Depends on**: Phase 6
 **Parallelisable with**: Phase 9, Phase 10
