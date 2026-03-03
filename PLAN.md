@@ -384,10 +384,123 @@ The backend has no dead code or duplicate computation. Each request triggers exa
 ## Future Roadmap
 
 ### Phase A: Sky Map
-- Interactive sky map showing planet positions on a hemispherical projection
-- Use HTML5 Canvas or SVG to render the sky dome
-- Show cardinal directions, horizon line, zenith
-- Plot planets with size proportional to brightness
+
+#### Phase A1: Sky Map Tab Shell and Navigation — ⬜
+
+**Depends on:** Phase 6 (Frontend)
+
+**Intended Outcome**
+
+The app gains a tab bar below the header with two tabs: "Planeter" (the existing default view) and "Stjärnkarta" (sky map). Clicking "Stjärnkarta" hides the planet cards and sky summary and shows an empty sky map container with a placeholder message. Clicking "Planeter" restores the original view with the active tab visually indicated. The entire existing UI continues to work exactly as before when the "Planeter" tab is active.
+
+**Definition of Done**
+- [ ] A tab bar renders below the header with exactly two tabs labelled "Planeter" and "Stjärnkarta"
+- [ ] On initial page load the "Planeter" tab is active and the planet cards and sky summary are visible
+- [ ] Clicking "Stjärnkarta" hides `#skySummary` and `#planetCards` and shows `#skyMapContainer`
+- [ ] Clicking "Planeter" hides `#skyMapContainer` and shows `#skySummary` and `#planetCards`
+- [ ] The active tab uses `--color-accent-primary` as its visual indicator
+- [ ] Tab bar is usable on a 375 px mobile viewport with no horizontal overflow
+- [ ] Switching tabs does not trigger an API re-fetch; both views share the same data
+- [ ] No JavaScript console errors when switching tabs rapidly
+- [ ] `aria-selected` and `role="tab"` / `role="tabpanel"` attributes are set correctly for accessibility
+- [ ] Tab bar and container use existing design tokens for colours, spacing, borders, and typography
+
+**Key files**
+- Modify `frontend/index.html` — add tab bar markup and `#skyMapContainer` section
+- Create `frontend/js/components/tab-nav.js` — tab switching logic and event dispatch
+- Create `frontend/css/components/tab-nav.css` — tab bar styling
+- Modify `frontend/css/main.css` — import `components/tab-nav.css`
+- Modify `frontend/js/main.js` — initialise `TabNav`, wire tab switching to show/hide content panels
+
+---
+
+#### Phase A2: SVG Polar Projection Grid — ⬜
+
+**Depends on:** Phase A1
+
+**Intended Outcome**
+
+The sky map tab shows a circular SVG chart where the zenith is at the centre and the horizon is the outer edge. Concentric altitude rings at 0°, 30°, and 60° are drawn and labelled. Swedish cardinal direction labels (N, O, S, V) and intermediate tick marks (NO, SO, SV, NV) are placed around the horizon ring. The chart background matches the app's deep-space theme and scales responsively from 375 px to 1200 px, always maintaining a square aspect ratio. No astronomical data is plotted yet — this phase establishes the reusable coordinate system.
+
+**Definition of Done**
+- [ ] An SVG element renders inside `#skyMapContainer` when the sky map tab is active
+- [ ] The SVG uses a `viewBox` attribute and scales responsively with no fixed pixel width or height
+- [ ] Three concentric circles are drawn at altitudes 0° (horizon), 30°, and 60°
+- [ ] Each altitude ring is labelled with its degree value using `--color-text-muted`
+- [ ] Cardinal labels N, O, S, V are placed at the four cardinal positions around the horizon
+- [ ] Intermediate tick marks (NO, SO, SV, NV) are drawn at 45° intervals
+- [ ] North (azimuth 0°) is at the top of the chart; East (90°) is to the right
+- [ ] `altAzToXY(altitude_deg, azimuth_deg)` is exported as a pure function testable in isolation
+- [ ] Grid lines use `--border-color`; labels use `--color-text-secondary`; background uses `--color-bg-surface`
+- [ ] The SVG maintains a 1:1 aspect ratio on both 375 px and 1200 px viewports
+- [ ] No JavaScript console errors when switching to the sky map tab
+
+**Key files**
+- Create `frontend/js/components/sky-map.js` — `SkyMap` class with `altAzToXY()` projection and grid rendering
+- Create `frontend/css/components/sky-map.css` — container sizing, aspect-ratio constraint, SVG defaults
+- Modify `frontend/css/main.css` — import `components/sky-map.css`
+- Modify `frontend/js/main.js` — instantiate `SkyMap` and render it when the sky map tab is activated
+
+---
+
+#### Phase A3: Planet, Sun, and Moon Plotting — ⬜
+
+**Depends on:** Phase A2
+
+**Intended Outcome**
+
+All five naked-eye planets, the Sun, and the Moon are plotted on the sky map at their correct altitude/azimuth positions using data already returned by the `/api/v1/planets/visible` endpoint. Planet dot size scales with apparent brightness; each planet uses its per-planet colour token. Bodies below the horizon are rendered at reduced opacity outside the horizon ring. Hovering or tapping any body shows a tooltip (via the existing `tooltip.js`) with the body's Swedish name, altitude, azimuth direction, and magnitude. The sky map re-renders automatically whenever new API data arrives.
+
+**Definition of Done**
+- [ ] All five planets appear on the sky map at positions matching their `altitude_deg` and `azimuth_deg` from the API response
+- [ ] Planet dot radius varies with apparent magnitude: Venus (mag ≈ −4) is visibly larger than Saturn (mag ≈ +1)
+- [ ] Each planet dot uses its per-planet colour from `tokens.css` (e.g. Mars uses `--color-planet-mars`)
+- [ ] Planets with `altitude_deg < 0` are rendered at 0.3 opacity outside the horizon ring
+- [ ] Planet labels (Swedish name) are rendered next to each dot
+- [ ] The Sun is plotted as a golden circle using `--color-sun-penalty` at its correct altitude/azimuth position
+- [ ] The Moon is plotted using `moon.elevation_deg` and `moon.azimuth_deg` from the API response
+- [ ] Hovering a planet dot shows a tooltip with: Swedish name, altitude (e.g. "Höjd: 25.3°"), direction (e.g. "Riktning: VSV"), and magnitude
+- [ ] Sun tooltip shows "Solen" and its elevation; Moon tooltip shows "Månen" and its illumination percentage
+- [ ] The tooltip reuses the existing `tooltip.js` component
+- [ ] The sky map re-renders when `loadData()` completes without requiring a tab switch
+- [ ] No JavaScript console errors when the map contains planets both above and below the horizon
+- [ ] Backend: `SunInfo` model includes `azimuth_deg` field populated from `calculate_sun_penalty()` or equivalent
+
+**Key files**
+- Modify `frontend/js/components/sky-map.js` — add `plotBodies(planets, sun, moon)` method
+- Modify `frontend/js/main.js` — pass API response data to `SkyMap.plotBodies()` after each render
+- Modify `backend/app/models/planet.py` — add `azimuth_deg: float` field to `SunInfo`
+- Modify `backend/app/utils/sun.py` — return sun azimuth alongside elevation
+- Modify `backend/app/api/routes/planets.py` — populate `SunInfo.azimuth_deg` in the response builder
+
+---
+
+#### Phase A4: Constellation Lines — ⬜
+
+**Depends on:** Phase A3
+
+**Intended Outcome**
+
+The sky map displays constellation stick-figure lines for all constellations with stars above the horizon. Constellation data is embedded as a static JSON file (< 150 KB, sourced from Stellarium under GPL-2.0-or-later) — no external CDN or runtime download. A client-side JavaScript module converts star RA/Dec coordinates to alt/az using sidereal time, keeping all astronomical projection math consistent without adding a new backend endpoint. Lines are drawn in a subtle muted colour behind planet dots; each visible constellation is labelled with its IAU three-letter abbreviation. The map degrades gracefully if the data file fails to load.
+
+**Definition of Done**
+- [ ] `frontend/data/constellations.json` exists, is < 150 KB uncompressed, and contains at least the 30 most prominent constellations visible from Sweden's latitude range (55°–70° N)
+- [ ] `THIRD_PARTY_LICENSES.md` (or equivalent) documents the Stellarium data source, its GPL-2.0-or-later licence, and the URL of the original file
+- [ ] `frontend/js/astro-projection.js` exports `raDecToAltAz(ra_deg, dec_deg, lat, lon, utc_timestamp)` as a pure function
+- [ ] Constellation lines render as SVG elements with stroke colour `--color-text-muted` at 0.25 opacity
+- [ ] Constellation lines are drawn in an SVG `<g>` group layered behind the planet/sun/moon group
+- [ ] Each visible constellation has its IAU three-letter label rendered near its geometric centre using `--font-size-xs` and `--color-text-muted`
+- [ ] Constellations entirely below the horizon (all stars at altitude < 0°) are not rendered
+- [ ] The constellation layer updates when data refreshes (location change or auto-refresh)
+- [ ] If `constellations.json` fails to load, the sky map renders planets and grid without constellation lines and logs a warning — no JavaScript errors thrown
+- [ ] `raDecToAltAz()` is unit-tested for at least two known star positions (e.g. Polaris at lat 59° N should appear near azimuth 0°, altitude ≈ 59°)
+
+**Key files**
+- Create `frontend/data/constellations.json` — embedded Stellarium constellation line data (RA/Dec pairs + IAU abbreviation per constellation)
+- Create `frontend/js/astro-projection.js` — pure `raDecToAltAz()` function with sidereal time calculation
+- Modify `frontend/js/components/sky-map.js` — add `plotConstellations(data, lat, lon, timestamp)` method; load JSON; create SVG line groups
+- Modify `frontend/js/main.js` — load constellation data once on startup; pass to `SkyMap` on each render
+- Create `THIRD_PARTY_LICENSES.md` (project root) — document Stellarium GPL-2.0-or-later licence
 
 ### Phase B: Observation Tips
 - Best viewing times for each planet (when highest above horizon in darkness)
