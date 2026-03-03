@@ -15,6 +15,8 @@
  *   SkyMap     - class that renders the SVG grid into a container element
  */
 
+import { raDecToAltAz } from '../astro-projection.js';
+
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
 // Fixed SVG coordinate space. All grid math works in these units; CSS scales
@@ -246,6 +248,7 @@ export class SkyMap {
         // Idempotency flag: set to true after the first successful render.
         this._rendered = false;
         this._pendingPlanets = null;
+        this._pendingConstellations = null;
     }
 
     /**
@@ -304,9 +307,147 @@ export class SkyMap {
         this.container.appendChild(svg);
         this._rendered = true;
 
+        // If plotConstellations() was called before render() completed, replay it now.
+        // Constellations are replayed before bodies so layering is correct.
+        if (this._pendingConstellations !== null) {
+            const { constellationData, lat, lon, utcTimestamp } = this._pendingConstellations;
+            this.plotConstellations(constellationData, lat, lon, utcTimestamp);
+        }
+
         // If plotBodies() was called before render() completed, replay it now.
         if (this._pendingPlanets !== null) {
             this.plotBodies(this._pendingPlanets, this._pendingSun, this._pendingMoon);
+        }
+    }
+
+    /**
+     * Plot constellations onto the sky map as line segments with IAU labels.
+     *
+     * Safe to call before render() — arguments are stored and replayed once
+     * the SVG grid is ready. Safe to call multiple times — the constellation
+     * layer is fully rebuilt on every call.
+     *
+     * Constellations whose every vertex lies below the horizon (altitude < 0)
+     * are skipped entirely and not rendered.
+     *
+     * The constellation group is inserted before the bodies group (.sky-map-bodies)
+     * so constellations render behind planets, the Sun, and the Moon.
+     *
+     * @param {Object[]} constellationData - Parsed JSON array from constellations.json.
+     *   Each entry has:
+     *     iau   {string}    - IAU three-letter abbreviation (e.g. 'UMa').
+     *     name  {string}    - Full Latin name.
+     *     lines {number[][]} - Array of [ra1, dec1, ra2, dec2] segments in degrees.
+     * @param {number} lat          - Observer latitude in degrees (positive North).
+     * @param {number} lon          - Observer longitude in degrees (positive East).
+     * @param {Date|number} utcTimestamp - UTC instant as a JS Date or Unix ms.
+     */
+    plotConstellations(constellationData, lat, lon, utcTimestamp) {
+        // Defer if the SVG grid has not been rendered yet.
+        if (!this._rendered || !this.container.querySelector('svg')) {
+            this._pendingConstellations = { constellationData, lat, lon, utcTimestamp };
+            return;
+        }
+
+        if (!Array.isArray(constellationData)) return;
+
+        // Clear pending state — we are rendering now.
+        this._pendingConstellations = null;
+
+        const svg = this.container.querySelector('svg');
+
+        // Reuse or create the constellation layer group. Clear it so each call
+        // is idempotent: old lines and labels are removed before rebuilding.
+        let consGroup = svg.querySelector('.sky-map-constellations');
+        if (!consGroup) {
+            consGroup = document.createElementNS(SVG_NS, 'g');
+            consGroup.setAttribute('class', 'sky-map-constellations');
+
+            // Insert before .sky-map-bodies if it already exists, otherwise
+            // append. This guarantees constellations paint behind the bodies.
+            const bodiesGroup = svg.querySelector('.sky-map-bodies');
+            if (bodiesGroup) {
+                svg.insertBefore(consGroup, bodiesGroup);
+            } else {
+                svg.appendChild(consGroup);
+            }
+        } else {
+            while (consGroup.firstChild) {
+                consGroup.removeChild(consGroup.firstChild);
+            }
+        }
+
+        for (const constellation of constellationData) {
+            const { iau, lines } = constellation;
+
+            if (!Array.isArray(lines) || lines.length === 0) continue;
+
+            // Convert every unique vertex (RA/Dec pair) to alt/az. A vertex
+            // appears twice in different segments so we process per-segment.
+            // Collect projected endpoints for all segments; track which are
+            // above the horizon for the visibility test and label placement.
+            const segments = [];
+            let allBelowHorizon = true;
+
+            for (const segment of lines) {
+                const [ra1, dec1, ra2, dec2] = segment;
+
+                const { altitude_deg: alt1, azimuth_deg: az1 } =
+                    raDecToAltAz(ra1, dec1, lat, lon, utcTimestamp);
+                const { altitude_deg: alt2, azimuth_deg: az2 } =
+                    raDecToAltAz(ra2, dec2, lat, lon, utcTimestamp);
+
+                const xy1 = altAzToXY(alt1, az1, CENTER_X, CENTER_Y, HORIZON_RADIUS);
+                const xy2 = altAzToXY(alt2, az2, CENTER_X, CENTER_Y, HORIZON_RADIUS);
+
+                segments.push({ xy1, xy2, alt1, alt2 });
+
+                // If at least one endpoint is above the horizon, the
+                // constellation is considered partially visible.
+                if (alt1 >= 0 || alt2 >= 0) {
+                    allBelowHorizon = false;
+                }
+            }
+
+            // Skip constellations that are entirely below the horizon.
+            if (allBelowHorizon) continue;
+
+            // Draw each line segment.
+            for (const { xy1, xy2 } of segments) {
+                const line = document.createElementNS(SVG_NS, 'line');
+                setAttrs(line, {
+                    x1: xy1.x,
+                    y1: xy1.y,
+                    x2: xy2.x,
+                    y2: xy2.y,
+                    class: 'sky-map-constellation-line',
+                });
+                consGroup.appendChild(line);
+            }
+
+            // Compute the geometric centre from endpoints that are above the
+            // horizon. This keeps the label inside the visible sky dome.
+            let sumX = 0;
+            let sumY = 0;
+            let count = 0;
+
+            for (const { xy1, xy2, alt1, alt2 } of segments) {
+                if (alt1 >= 0) { sumX += xy1.x; sumY += xy1.y; count++; }
+                if (alt2 >= 0) { sumX += xy2.x; sumY += xy2.y; count++; }
+            }
+
+            // count is guaranteed > 0 because allBelowHorizon is false.
+            const labelX = sumX / count;
+            const labelY = sumY / count;
+
+            const label = document.createElementNS(SVG_NS, 'text');
+            setAttrs(label, {
+                x: labelX,
+                y: labelY,
+                class: 'sky-map-constellation-label',
+            });
+            label.textContent = iau;
+            consGroup.appendChild(label);
         }
     }
 

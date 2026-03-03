@@ -89,3 +89,28 @@
     pointer-events: none;
     user-select: none;
 }
+
+/* --- Constellation overlays --- */
+
+.sky-map-constellations {
+    /* Group wrapper for all constellation elements; no visual styles needed. */
+}
+
+.sky-map-constellation-line {
+    stroke: var(--color-text-muted);
+    stroke-width: 0.8;
+    opacity: 0.25;
+    fill: none;
+    stroke-linecap: round;
+}
+
+.sky-map-constellation-label {
+    font-family: var(--font-family-base);
+    font-size: var(--font-size-xs);
+    fill: var(--color-text-muted);
+    opacity: 0.25;
+    text-anchor: middle;
+    dominant-baseline: central;
+    pointer-events: none;
+    user-select: none;
+}

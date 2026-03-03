@@ -385,7 +385,7 @@ The backend has no dead code or duplicate computation. Each request triggers exa
 
 ### Phase A: Sky Map
 
-#### Phase A1: Sky Map Tab Shell and Navigation — ⬜
+#### Phase A1: Sky Map Tab Shell and Navigation — ✅
 
 **Depends on:** Phase 6 (Frontend)
 
@@ -414,7 +414,7 @@ The app gains a tab bar below the header with two tabs: "Planeter" (the existing
 
 ---
 
-#### Phase A2: SVG Polar Projection Grid — ⬜
+#### Phase A2: SVG Polar Projection Grid — ✅
 
 **Depends on:** Phase A1
 
@@ -443,7 +443,7 @@ The sky map tab shows a circular SVG chart where the zenith is at the centre and
 
 ---
 
-#### Phase A3: Planet, Sun, and Moon Plotting — ⬜
+#### Phase A3: Planet, Sun, and Moon Plotting — ✅
 
 **Depends on:** Phase A2
 
@@ -475,7 +475,7 @@ All five naked-eye planets, the Sun, and the Moon are plotted on the sky map at 
 
 ---
 
-#### Phase A4: Constellation Lines — ⬜
+#### Phase A4: Constellation Lines — ✅
 
 **Depends on:** Phase A3
 

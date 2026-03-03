@@ -17,6 +17,23 @@ import { formatLocation } from './utils.js';
 /** Auto-refresh interval in milliseconds. */
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
+/**
+ * Constellation line data loaded once at startup from data/constellations.json.
+ * Null if the fetch failed or has not completed yet.
+ *
+ * @type {Object[]|null}
+ */
+let constellationData = null;
+
+/**
+ * Most recent successful API response. Retained so the constellation fetch
+ * callback can immediately paint constellations when constellations.json
+ * arrives after the planet data (resolving the parallel-fetch race condition).
+ *
+ * @type {Object|null}
+ */
+let lastApiData = null;
+
 document.addEventListener('DOMContentLoaded', () => {
     // --- DOM references ---
     const planetCardsEl = document.getElementById('planetCards');
@@ -91,9 +108,15 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const data = await fetchVisiblePlanets(location.lat, location.lon);
 
+            lastApiData = data;
+
             skySummary.render(data);
             planetCards.render(data.planets);
             skyMap.plotBodies(data.planets, data.sun, data.moon);
+
+            if (constellationData !== null) {
+                skyMap.plotConstellations(constellationData, location.lat, location.lon, new Date(data.timestamp));
+            }
 
             const timeString = new Intl.DateTimeFormat('sv-SE', {
                 hour: '2-digit',
@@ -129,5 +152,21 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Initial load ---
     currentLocation = locationManager.getCurrentLocation();
     locationDisplayEl.textContent = formatLocation(currentLocation);
+
+    // Fetch constellation data and the initial planet data in parallel.
+    // The constellation fetch is fire-and-forget: failures are logged and
+    // the app continues normally without constellation lines.
+    fetch('data/constellations.json')
+        .then((response) => response.json())
+        .then((parsed) => {
+            constellationData = parsed;
+            if (lastApiData !== null) {
+                skyMap.plotConstellations(constellationData, currentLocation.lat, currentLocation.lon, new Date(lastApiData.timestamp));
+            }
+        })
+        .catch((err) => {
+            console.warn('Sky map: failed to load constellation data, running without constellation lines', err);
+        });
+
     loadData(currentLocation);
 });
