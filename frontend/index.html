@@ -34,18 +34,49 @@
       </div>
     </header>
 
-    <main class="main-content">
-      <!-- Sky summary banner -->
-      <section id="skySummary"></section>
+    <div class="tab-nav" role="tablist" aria-label="Huvudnavigering" id="tabNav">
+      <button class="tab-nav__tab tab-nav__tab--active"
+              role="tab"
+              id="tabPlaneter"
+              data-tab="planeter"
+              aria-selected="true"
+              aria-controls="panelPlaneter"
+              tabindex="0">
+        Planeter
+      </button>
+      <button class="tab-nav__tab"
+              role="tab"
+              id="tabSkyMap"
+              data-tab="skymap"
+              aria-selected="false"
+              aria-controls="panelSkyMap"
+              tabindex="-1">
+        Stj&auml;rnkarta
+      </button>
+    </div>
 
-      <!-- Error banner (hidden by default) -->
+    <main class="main-content">
+      <!-- Error banner (hidden by default, global – visible in all tabs) -->
       <div id="errorBanner" class="error-banner hidden" role="alert">
         <span id="errorMessage">Ett fel uppstod.</span>
         <button class="error-banner-dismiss" id="errorDismiss" aria-label="Stäng">&#10005;</button>
       </div>
 
-      <!-- Planet cards grid -->
-      <div id="planetCards"></div>
+      <!-- Planeter tab panel -->
+      <div id="panelPlaneter" role="tabpanel" aria-labelledby="tabPlaneter">
+        <!-- Sky summary banner -->
+        <section id="skySummary"></section>
+
+        <!-- Planet cards grid -->
+        <div id="planetCards"></div>
+      </div>
+
+      <!-- Stjärnkarta tab panel (hidden by default) -->
+      <div id="panelSkyMap" role="tabpanel" aria-labelledby="tabSkyMap" class="tab-panel--hidden">
+        <div id="skyMapContainer" class="sky-map-container">
+          <p class="sky-map-placeholder">Stj&auml;rnkartan kommer snart...</p>
+        </div>
+      </div>
     </main>
 
     <footer class="app-footer">

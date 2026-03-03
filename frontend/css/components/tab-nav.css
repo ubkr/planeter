@@ -1,0 +1,83 @@
+/* ==========================================================================
+   Tab Navigation Component
+   Horizontal tab bar for switching between content panels (e.g. planet
+   list vs. sky map). Placed below the header.
+   ========================================================================== */
+
+/* --- Tab Bar Container --- */
+
+.tab-nav {
+    display: flex;
+    border-bottom: var(--border-width) solid var(--border-color);
+    padding: 0;
+}
+
+/* --- Individual Tab Button --- */
+
+.tab-nav__tab {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--color-text-secondary);
+    font-family: var(--font-family-base);
+    font-size: var(--font-size-sm);
+    padding: var(--space-sm) var(--space-lg);
+    cursor: pointer;
+    transition:
+        color var(--transition-fast),
+        border-color var(--transition-fast);
+}
+
+/* --- Active Tab --- */
+
+.tab-nav__tab--active {
+    color: var(--color-accent-primary);
+    border-bottom-color: var(--color-accent-primary);
+    /* Pull the tab down by 1px so its 2px underline overpaints the container's
+       1px bottom border instead of stacking below it. */
+    margin-bottom: -1px;
+}
+
+/* --- Hover State (non-active only) --- */
+
+.tab-nav__tab:hover:not(.tab-nav__tab--active) {
+    color: var(--color-text-primary);
+}
+
+/* --- Keyboard Focus Ring --- */
+
+.tab-nav__tab:focus-visible {
+    outline: 2px solid var(--color-accent-secondary);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+}
+
+/* --- Mobile: equal-width tabs --- */
+
+@media (max-width: 640px) {
+    .tab-nav__tab {
+        flex: 1;
+    }
+}
+
+
+/* ==========================================================================
+   Tab Panel Utilities
+   ========================================================================== */
+
+/* Hidden panel (inactive tab content) */
+.tab-panel--hidden {
+    display: none;
+}
+
+
+/* ==========================================================================
+   Sky Map Placeholder
+   Temporary "coming soon" message shown in the sky map panel.
+   ========================================================================== */
+
+.sky-map-placeholder {
+    text-align: center;
+    color: var(--color-text-secondary);
+    padding: var(--space-2xl) var(--space-lg);
+}
