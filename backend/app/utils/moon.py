@@ -10,18 +10,10 @@ def calculate_moon_penalty(lat: float, lon: float, dt: datetime = None) -> dict:
     Uses the ephem library (Jean Meeus algorithm) to compute moon illumination
     and elevation at the given location and time.
 
-    Formula:
-        Moon_Factor = Illumination_Fraction * max(0, sin(Moon_Elevation_radians))
-        penalty_pts  = min(15, round(Moon_Factor * 15, 1))
-
-    A full moon directly overhead contributes the maximum 15-point deduction.
-    When the moon is below the horizon (elevation < 0) the penalty is 0.
-
     Returns a dict with:
         illumination  – fraction 0.0–1.0 (0 = new moon, 1 = full moon)
         elevation_deg – degrees above (+) or below (-) horizon
         azimuth_deg   – azimuth in degrees [0, 360)
-        penalty_pts   – points deducted from total score (0–15)
     """
     if dt is None:
         dt = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -51,14 +43,10 @@ def calculate_moon_penalty(lat: float, lon: float, dt: datetime = None) -> dict:
     # moon.az is the azimuth in radians; normalise to [0, 360)
     azimuth_deg = math.degrees(float(moon.az)) % 360.0
 
-    moon_factor = illumination * max(0.0, math.sin(elevation_rad))
-    penalty_pts = min(15.0, round(moon_factor * 15.0, 1))
-
     return {
         "illumination": round(illumination, 3),
         "elevation_deg": round(elevation_deg, 1),
         "azimuth_deg": round(azimuth_deg, 1),
-        "penalty_pts": penalty_pts,
     }
 
 

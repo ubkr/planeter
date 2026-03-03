@@ -163,7 +163,7 @@ transit_time  = observer.next_transit(mars)
 
 **Total** = clamp(0, 100, altitude + magnitude + clouds − sun_penalty − extinction − moon_proximity)
 
-A planet is declared **"visible"** when: altitude > 0°, total score > 15, and twilight phase is nautical twilight or darker.
+A planet is declared **"visible"** when: altitude > 0°, total score > 15, and sun elevation < -6°.
 
 ### Key Astronomical Concepts
 

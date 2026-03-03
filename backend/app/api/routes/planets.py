@@ -37,22 +37,20 @@ def _utc_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _build_sun_info(lat: float, lon: float, dt: datetime = None) -> SunInfo:
-    """Call calculate_sun_penalty and convert its dict to a SunInfo model."""
-    data = calculate_sun_penalty(lat, lon, dt)
+def _build_sun_info(sun_data: dict) -> SunInfo:
+    """Construct a SunInfo model from a pre-computed sun data dict."""
     return SunInfo(
-        elevation_deg=data["elevation_deg"],
-        twilight_phase=data["twilight_phase"],
+        elevation_deg=sun_data["elevation_deg"],
+        twilight_phase=sun_data["twilight_phase"],
     )
 
 
-def _build_moon_info(lat: float, lon: float, dt: datetime = None) -> MoonInfo:
-    """Call calculate_moon_penalty and convert its dict to a MoonInfo model."""
-    data = calculate_moon_penalty(lat, lon, dt)
+def _build_moon_info(moon_data: dict) -> MoonInfo:
+    """Construct a MoonInfo model from a pre-computed moon data dict."""
     return MoonInfo(
-        illumination=data["illumination"],
-        elevation_deg=data["elevation_deg"],
-        azimuth_deg=data["azimuth_deg"],
+        illumination=moon_data["illumination"],
+        elevation_deg=moon_data["elevation_deg"],
+        azimuth_deg=moon_data["azimuth_deg"],
     )
 
 
@@ -178,10 +176,13 @@ async def get_visible_planets(
     planets = calculate_planet_positions(lat, lon)
     weather_data = await get_weather(lat, lon)
 
-    planets = apply_scores(planets, lat, lon, weather_data.cloud_cover)
+    sun_data = calculate_sun_penalty(lat, lon)
+    moon_data = calculate_moon_penalty(lat, lon)
 
-    sun_info = _build_sun_info(lat, lon)
-    moon_info = _build_moon_info(lat, lon)
+    planets = apply_scores(planets, sun_data, moon_data, weather_data.cloud_cover)
+
+    sun_info = _build_sun_info(sun_data)
+    moon_info = _build_moon_info(moon_data)
 
     logger.info(
         f"Visibility computed for ({lat}, {lon}): "
@@ -232,9 +233,10 @@ async def get_tonight_planets(
         # the sun is up, so this naturally yields the correct result without
         # duplicating scoring logic here.
         logger.info(f"No tonight window for ({lat}, {lon}); returning zero scores.")
-        mid_dt = datetime.now(timezone.utc)
+        sun_data = calculate_sun_penalty(lat, lon)
+        moon_data = calculate_moon_penalty(lat, lon)
         planets = calculate_planet_positions(lat, lon)
-        planets = apply_scores(planets, lat, lon, weather_data.cloud_cover)
+        planets = apply_scores(planets, sun_data, moon_data, weather_data.cloud_cover)
         tonight = 0
     else:
         sample_times = _sample_times(window_start, window_end, _TONIGHT_SAMPLE_INTERVAL_HOURS)
@@ -249,7 +251,10 @@ async def get_tonight_planets(
         # Score using the midpoint of the night for sun/moon context.
         mid_dt = window_start + (window_end - window_start) / 2
 
-        planets = apply_scores(planets, lat, lon, weather_data.cloud_cover, dt=mid_dt)
+        sun_data = calculate_sun_penalty(lat, lon, mid_dt)
+        moon_data = calculate_moon_penalty(lat, lon, mid_dt)
+
+        planets = apply_scores(planets, sun_data, moon_data, weather_data.cloud_cover)
         tonight = score_tonight(planets)
 
         logger.info(
@@ -258,10 +263,10 @@ async def get_tonight_planets(
             f"samples={len(sample_times)}"
         )
 
-    # Use mid_dt so sun/moon metadata reflects the same moment used for scoring,
-    # not the wall-clock time of the HTTP request.
-    sun_info = _build_sun_info(lat, lon, dt=mid_dt)
-    moon_info = _build_moon_info(lat, lon, dt=mid_dt)
+    # Use the pre-computed sun/moon data so metadata reflects the same moment
+    # used for scoring, not the wall-clock time of the HTTP request.
+    sun_info = _build_sun_info(sun_data)
+    moon_info = _build_moon_info(moon_data)
 
     return PlanetsResponse(
         timestamp=timestamp,
@@ -304,7 +309,11 @@ async def get_planet(
 
     planets = calculate_planet_positions(lat, lon)
     weather_data = await get_weather(lat, lon)
-    planets = apply_scores(planets, lat, lon, weather_data.cloud_cover)
+
+    sun_data = calculate_sun_penalty(lat, lon)
+    moon_data = calculate_moon_penalty(lat, lon)
+
+    planets = apply_scores(planets, sun_data, moon_data, weather_data.cloud_cover)
 
     # Planet names from the calculator are title-cased English names.
     for planet in planets:

@@ -70,6 +70,15 @@ export async function fetchVisiblePlanets(lat, lon) {
 /**
  * Fetch planet visibility data for tonight from the given coordinates.
  *
+ * NOTE: This function is NOT currently called by the UI. The backend
+ * `/tonight` endpoint performs sophisticated night-window sampling —
+ * it steps through the astronomical night in discrete intervals and
+ * scores each planet across the full window rather than at a single
+ * instant. The current UI only consumes the simpler `/visible`
+ * (real-time) endpoint via fetchVisiblePlanets(). fetchTonightPlanets
+ * is retained here for the planned future "tonight view" feature, which
+ * will display per-planet visibility forecasts across the entire night.
+ *
  * @param {number} lat - Latitude in decimal degrees.
  * @param {number} lon - Longitude in decimal degrees.
  * @returns {Promise<Object>} Full PlanetsResponse JSON object.

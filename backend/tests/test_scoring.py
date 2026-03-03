@@ -25,6 +25,8 @@ import pytest
 from app.models.planet import PlanetPosition
 from app.services.scoring import apply_scores, score_planet
 from app.services.planets.calculator import calculate_planet_positions
+from app.utils.sun import calculate_sun_penalty
+from app.utils.moon import calculate_moon_penalty
 
 
 # ---------------------------------------------------------------------------
@@ -409,13 +411,9 @@ def test_apply_scores_populates_fields():
     a non-empty list.
     """
     planets = calculate_planet_positions(LAT, LON, dt=NOON_DT)
-    result = apply_scores(
-        planets,
-        lat=LAT,
-        lon=LON,
-        cloud_cover=0.0,
-        dt=NOON_DT,
-    )
+    sun_data = calculate_sun_penalty(LAT, LON, dt=NOON_DT)
+    moon_data = calculate_moon_penalty(LAT, LON, dt=NOON_DT)
+    result = apply_scores(planets, sun_data, moon_data, 0.0)
 
     assert len(result) == 5, "apply_scores must return all five planets"
 
@@ -447,13 +445,9 @@ def test_apply_scores_daytime_dagsljus_reason():
     'dagsljus' in its visibility_reasons regardless of cloud cover.
     """
     planets = calculate_planet_positions(LAT, LON, dt=NOON_DT)
-    result = apply_scores(
-        planets,
-        lat=LAT,
-        lon=LON,
-        cloud_cover=0.0,
-        dt=NOON_DT,
-    )
+    sun_data = calculate_sun_penalty(LAT, LON, dt=NOON_DT)
+    moon_data = calculate_moon_penalty(LAT, LON, dt=NOON_DT)
+    result = apply_scores(planets, sun_data, moon_data, 0.0)
 
     for planet in result:
         assert "dagsljus" in planet.visibility_reasons, (
@@ -465,13 +459,9 @@ def test_apply_scores_daytime_dagsljus_reason():
 def test_apply_scores_daytime_score_is_zero():
     """At noon every planet's daytime hard-zero must produce score == 0."""
     planets = calculate_planet_positions(LAT, LON, dt=NOON_DT)
-    result = apply_scores(
-        planets,
-        lat=LAT,
-        lon=LON,
-        cloud_cover=0.0,
-        dt=NOON_DT,
-    )
+    sun_data = calculate_sun_penalty(LAT, LON, dt=NOON_DT)
+    moon_data = calculate_moon_penalty(LAT, LON, dt=NOON_DT)
+    result = apply_scores(planets, sun_data, moon_data, 0.0)
 
     for planet in result:
         # A planet below the horizon also scores 0, so this assertion is safe
@@ -484,5 +474,7 @@ def test_apply_scores_daytime_score_is_zero():
 def test_apply_scores_returns_same_list():
     """apply_scores must mutate and return the same list object."""
     planets = calculate_planet_positions(LAT, LON, dt=NOON_DT)
-    result = apply_scores(planets, lat=LAT, lon=LON, cloud_cover=0.0, dt=NOON_DT)
+    sun_data = calculate_sun_penalty(LAT, LON, dt=NOON_DT)
+    moon_data = calculate_moon_penalty(LAT, LON, dt=NOON_DT)
+    result = apply_scores(planets, sun_data, moon_data, 0.0)
     assert result is planets

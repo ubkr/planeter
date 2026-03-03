@@ -5,12 +5,10 @@ Combines planet position data with sun/moon state and cloud cover to produce
 a 0–100 integer visibility score for each planet and an aggregate tonight score.
 """
 
-from datetime import datetime
 from typing import List, Tuple
 
 from ..models.planet import PlanetPosition
-from ..utils.sun import calculate_sun_penalty
-from ..utils.moon import calculate_moon_penalty, get_moon_angular_separation
+from ..utils.moon import get_moon_angular_separation
 
 
 def score_planet(
@@ -172,18 +170,18 @@ def score_tonight(planets: List[PlanetPosition]) -> int:
 
 def apply_scores(
     planets: List[PlanetPosition],
-    lat: float,
-    lon: float,
+    sun_data: dict,
+    moon_data: dict,
     cloud_cover: float,
-    dt: datetime = None,
 ) -> List[PlanetPosition]:
     """
     Compute and attach visibility scores to every planet in the list.
 
-    Retrieves sun and moon data for the given location and time, then calls
-    score_planet() for each planet.  Mutates each PlanetPosition in place by
-    setting visibility_score, is_visible, and visibility_reasons, then returns
-    the list.
+    Accepts pre-computed sun and moon data dicts (as returned by
+    calculate_sun_penalty() and calculate_moon_penalty() respectively) and
+    calls score_planet() for each planet.  Mutates each PlanetPosition in
+    place by setting visibility_score, is_visible, and visibility_reasons,
+    then returns the list.
 
     A planet is declared visible when:
         - altitude_deg > 0
@@ -192,20 +190,19 @@ def apply_scores(
 
     Args:
         planets:     List of PlanetPosition objects from calculate_planet_positions().
-        lat:         Observer latitude in decimal degrees.
-        lon:         Observer longitude in decimal degrees.
+        sun_data:    Dict returned by calculate_sun_penalty(), containing at
+                     minimum "elevation_deg" and "penalty_pts".
+        moon_data:   Dict returned by calculate_moon_penalty(), containing at
+                     minimum "illumination", "elevation_deg", and "azimuth_deg".
         cloud_cover: Cloud cover percentage 0–100.
-        dt:          UTC datetime for sun/moon calculations.  Defaults to now.
 
     Returns:
         The same list with visibility_score, is_visible, and visibility_reasons
         populated on each item.
     """
-    sun_data = calculate_sun_penalty(lat, lon, dt)
     sun_altitude = sun_data["elevation_deg"]
     sun_penalty_pts = sun_data["penalty_pts"]
 
-    moon_data = calculate_moon_penalty(lat, lon, dt)
     moon_illumination = moon_data["illumination"]
     moon_alt_deg = moon_data["elevation_deg"]
     moon_az_deg = moon_data["azimuth_deg"]
