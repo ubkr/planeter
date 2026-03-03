@@ -1,0 +1,62 @@
+/* ==========================================================================
+   Sky Map
+   Circular SVG sky-dome showing planet positions relative to the horizon.
+   Container enforces a 1:1 aspect ratio and caps width at 600px.
+   ========================================================================== */
+
+/* --- Container --- */
+
+.sky-map-container {
+    width: 100%;
+    max-width: 600px;
+    aspect-ratio: 1 / 1;
+    margin-inline: auto;
+}
+
+/* --- SVG root --- */
+
+.sky-map-container > svg {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+/* --- Background circle (sky dome fill) --- */
+
+.sky-map-bg {
+    fill: var(--color-bg-surface);
+}
+
+/* --- Altitude rings & grid lines --- */
+
+.sky-map-ring {
+    fill: none;
+    stroke: var(--border-color);
+    stroke-width: 1;
+}
+
+/* --- Cardinal-direction labels (N, S, E, W) --- */
+
+.sky-map-label {
+    font-family: var(--font-family-base);
+    font-size: var(--font-size-sm);
+    fill: var(--color-text-secondary);
+    text-anchor: middle;
+    dominant-baseline: central;
+}
+
+/* --- Zenith dot at the chart centre --- */
+
+.sky-map-zenith {
+    fill: var(--color-text-secondary);
+}
+
+/* --- Muted labels (altitude values, intermediate ticks NE, NW, etc.) --- */
+
+.sky-map-label--muted {
+    font-family: var(--font-family-base);
+    font-size: var(--font-size-xs);
+    fill: var(--color-text-muted);
+    text-anchor: middle;
+    dominant-baseline: central;
+}

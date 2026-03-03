@@ -10,6 +10,7 @@ import { SettingsModal } from './components/settings-modal.js';
 import { PlanetCards } from './components/planet-cards.js';
 import { SkySummary } from './components/sky-summary.js';
 import { TabNav } from './components/tab-nav.js';
+import { SkyMap } from './components/sky-map.js';
 import { fetchVisiblePlanets } from './api.js';
 import { formatLocation } from './utils.js';
 
@@ -36,6 +37,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const planetCards = new PlanetCards(planetCardsEl);
     const skySummary = new SkySummary(skySummaryEl);
     const tabNav = new TabNav();
+    const skyMap = new SkyMap(document.getElementById('skyMapContainer'));
+
+    // --- SkyMap tab-switch listener ---
+    window.addEventListener('tabChanged', (event) => {
+        if (event.detail.tabId === 'skymap') {
+            skyMap.render();
+        }
+    });
 
     // --- Interval tracking ---
     /** @type {number|null} */
