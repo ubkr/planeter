@@ -154,16 +154,16 @@ transit_time  = observer.next_transit(mars)
 
 | Component | Max Points | Logic |
 |---|---|---|
-| Altitude | 30 | 0 pts at horizon; peaks at ~45° (30 pts); slight decrease toward zenith |
-| Magnitude | 20 | Venus at −4.5 → 20 pts; Saturn at +1 → ~10 pts; scaled inversely |
-| Cloud cover | 30 | <25% → 30 pts; 25–50% → 20 pts; 50–75% → 10 pts; >75% → 0 pts |
+| Altitude | 40 | 0 pts at horizon; linear ramp to 40 pts at 45°; clamped at 40 pts for higher altitudes |
+| Magnitude | 25 | Venus at −4.5 → 25 pts; Saturn at +1 → ~10 pts; scaled inversely |
+| Cloud cover | 35 | <25% → 35 pts; 25–50% → 23 pts; 50–75% → 12 pts; ≥75% → 0 pts |
 | Sun penalty | −50 to 0 | Same twilight bands as norrsken's `sun.py` |
 | Atmospheric extinction | −10 to 0 | Progressive penalty below 10° altitude |
 | Moon proximity | −10 to 0 | Bright, nearby Moon reduces planet contrast |
 
 **Total** = clamp(0, 100, altitude + magnitude + clouds − sun_penalty − extinction − moon_proximity)
 
-A planet is declared **"visible"** when: altitude > 0°, total score > 15, and sun elevation < -6°.
+A planet is declared **"visible"** when: altitude > 0°, total score > 15, and sun elevation < -12°.
 
 ### Key Astronomical Concepts
 

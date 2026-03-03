@@ -106,7 +106,7 @@ export class SkySummary {
                 : computeOverallScore(planets);
 
         const level = scoreToLevel(overallScore);
-        const visibleCount = planets.filter(p => p.is_visible).length;
+        const visibleCount = planets.filter(p => p.visibility_score > 50).length;
         const midnightSun = isMidnightSun(planets, sun);
 
         const summaryLabel = midnightSun

@@ -192,9 +192,9 @@ def test_daytime_penalty_reason_present():
 # ---------------------------------------------------------------------------
 
 def test_excellent_conditions_high_score():
-    # altitude=45 → altitude_score=30; mag=-4.5 → mag_score=20;
-    # cloud=0 → cloud_score=30; no sun, extinction, or moon penalties.
-    # Expected total = 80.
+    # altitude=45 → altitude_score=40; mag=-4.5 → mag_score=25;
+    # cloud=0 → cloud_score=35; no sun, extinction, or moon penalties.
+    # Expected total = 100.
     planet = _make_planet(altitude_deg=45.0, magnitude=-4.5)
     score, reasons = score_planet(
         planet,
@@ -203,11 +203,11 @@ def test_excellent_conditions_high_score():
         moon_illumination=0.0,
         moon_separation=90.0,
     )
-    assert score > 70
+    assert score > 90
 
 
 def test_excellent_conditions_exact_score():
-    # Verify the arithmetic: 30 + 20 + 30 + 0 + 0 + 0 = 80
+    # Verify the arithmetic: 40 + 25 + 35 + 0 + 0 + 0 = 100
     planet = _make_planet(altitude_deg=45.0, magnitude=-4.5)
     score, _reasons = score_planet(
         planet,
@@ -216,7 +216,7 @@ def test_excellent_conditions_exact_score():
         moon_illumination=0.0,
         moon_separation=90.0,
     )
-    assert score == 80
+    assert score == 100
 
 
 def test_excellent_conditions_reason_is_good():
@@ -478,3 +478,56 @@ def test_apply_scores_returns_same_list():
     moon_data = calculate_moon_penalty(LAT, LON, dt=NOON_DT)
     result = apply_scores(planets, sun_data, moon_data, 0.0)
     assert result is planets
+
+
+# ---------------------------------------------------------------------------
+# 9. Twilight threshold: sun must be below -12° for is_visible = True
+# ---------------------------------------------------------------------------
+
+def test_nautical_twilight_sun_altitude_minus_8_not_visible():
+    """
+    A planet above the horizon with sun_altitude=-8 (nautical twilight,
+    between -6 and -12) must have is_visible = False because the
+    is_visible threshold requires sun_altitude < -12.
+
+    Uses a directly constructed planet so the planet is unambiguously above
+    the horizon at altitude=30°.  This ensures the sole cause of
+    is_visible=False is the -12° sun-altitude threshold, not an accidental
+    below-horizon position returned by the live ephem calculator.
+    """
+    # sun_altitude=-8 falls in nautical_twilight: penalty_pts=20.
+    sun_data = {"elevation_deg": -8.0, "twilight_phase": "nautical_twilight", "penalty_pts": 20.0}
+    moon_data = {"illumination": 0.0, "elevation_deg": -30.0, "azimuth_deg": 0.0}
+
+    planet = _make_planet(altitude_deg=30.0)
+    result = apply_scores([planet], sun_data, moon_data, 0.0)
+    scored = result[0]
+
+    assert scored.is_visible is False, (
+        f"Expected is_visible=False when sun_altitude=-8, "
+        f"got is_visible={scored.is_visible} (score={scored.visibility_score})"
+    )
+
+
+def test_astronomical_twilight_sun_altitude_minus_14_bright_planet_visible():
+    """
+    A planet above the horizon with sun_altitude=-14 (past nautical twilight,
+    below the -12 threshold), 0% cloud cover, and no moon interference must
+    have is_visible = True if its score exceeds the threshold.
+
+    Uses a fixed known-above-horizon planet (Venus) by constructing it
+    directly, bypassing the live ephem calculation.
+    """
+    # sun_altitude=-14 falls in astronomical_twilight: penalty_pts=8.
+    # altitude=45, magnitude=-4.5, cloud=0 → score = 40+25+35-8 = 92 > 15.
+    sun_data = {"elevation_deg": -14.0, "twilight_phase": "astronomical_twilight", "penalty_pts": 8.0}
+    moon_data = {"illumination": 0.0, "elevation_deg": -30.0, "azimuth_deg": 0.0}
+
+    planet = _make_planet(altitude_deg=45.0, magnitude=-4.5)
+    result = apply_scores([planet], sun_data, moon_data, 0.0)
+    scored = result[0]
+
+    assert scored.is_visible is True, (
+        f"Expected is_visible=True when sun_altitude=-14 and score={scored.visibility_score}, "
+        f"got is_visible={scored.is_visible}"
+    )

@@ -67,24 +67,24 @@ def score_planet(
     if reasons:
         return (0, reasons)
 
-    # --- Altitude component (0–30 pts) ---
-    # Linear ramp: 0 pts at 0°, 30 pts at 45°; clamped to 30 above 45°.
-    altitude_score = min(30.0, (planet.altitude_deg / 45.0) * 30.0)
+    # --- Altitude component (0–40 pts) ---
+    # Linear ramp: 0 pts at 0°, 40 pts at 45°; clamped to 40 above 45°.
+    altitude_score = min(40.0, (planet.altitude_deg / 45.0) * 40.0)
 
-    # --- Magnitude component (0–20 pts) ---
-    # -4.5 → 20 pts; +1.0 → 10 pts; linear interpolation; clamp to [0, 20].
-    # Slope: (20 - 10) / (-4.5 - 1.0) = 10 / -5.5 ≈ -1.818 pts per magnitude unit
-    # At mag = -4.5: pts = 20; at mag = 1.0: pts = 10; dimmer scales down further.
-    mag_score = 20.0 + (planet.magnitude - (-4.5)) * (10.0 - 20.0) / (1.0 - (-4.5))
-    mag_score = max(0.0, min(20.0, mag_score))
+    # --- Magnitude component (0–25 pts) ---
+    # -4.5 → 25 pts; +1.0 → 10 pts; linear interpolation; clamp to [0, 25].
+    # Slope: (25 - 10) / (-4.5 - 1.0) = 15 / -5.5 ≈ -2.727 pts per magnitude unit
+    # At mag = -4.5: pts = 25; at mag = 1.0: pts = 10; dimmer scales down further.
+    mag_score = 25.0 + (planet.magnitude - (-4.5)) * (10.0 - 25.0) / (1.0 - (-4.5))
+    mag_score = max(0.0, min(25.0, mag_score))
 
-    # --- Cloud cover component (0–30 pts) ---
+    # --- Cloud cover component (0–35 pts) ---
     if cloud_cover < 25:
-        cloud_score = 30.0
+        cloud_score = 35.0
     elif cloud_cover < 50:
-        cloud_score = 20.0
+        cloud_score = 23.0
     elif cloud_cover < 75:
-        cloud_score = 10.0
+        cloud_score = 12.0
     else:
         cloud_score = 0.0  # unreachable here; handled by hard-zero above
 
@@ -186,7 +186,7 @@ def apply_scores(
     A planet is declared visible when:
         - altitude_deg > 0
         - visibility_score > 15
-        - sun_altitude < -6  (nautical twilight or darker)
+        - sun_altitude < -12  (nautical twilight or darker)
 
     Args:
         planets:     List of PlanetPosition objects from calculate_planet_positions().
@@ -228,7 +228,7 @@ def apply_scores(
         planet.is_visible = (
             planet.altitude_deg > 0
             and score > 15
-            and sun_altitude < -6
+            and sun_altitude < -12
         )
 
     return planets

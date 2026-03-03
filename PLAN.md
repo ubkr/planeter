@@ -233,7 +233,7 @@ Opening `index.html` in a browser shows the full planet visibility UI. All five 
 
 ---
 
-## Phase 7: Testing — ⬜
+## Phase 7: Testing — ✅
 
 **Depends on**: Phase 1, Phase 2, Phase 3, Phase 4, Phase 5, Phase 6
 **Parallelisable with**: none
@@ -289,7 +289,7 @@ Hovering over the visibility text on any planet card (e.g. "Ej synlig" or "Synli
 
 ---
 
-## Phase 9: Scoring Accuracy and Scale Calibration — ⬜
+## Phase 9: Scoring Accuracy and Scale Calibration — ✅
 
 **Depends on**: Phase 4, Phase 6
 **Parallelisable with**: Phase 10, Phase 11
@@ -316,7 +316,7 @@ The visibility score accurately reflects real-world observing conditions for eve
 
 ---
 
-## Phase 10: Backend Cleanup — Dead Code and Redundant Computation — ⬜
+## Phase 10: Backend Cleanup — Dead Code and Redundant Computation — ✅
 
 **Depends on**: Phase 5, Phase 6
 **Parallelisable with**: Phase 9, Phase 11
