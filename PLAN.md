@@ -503,10 +503,135 @@ The sky map displays constellation stick-figure lines for all constellations wit
 - Create `THIRD_PARTY_LICENSES.md` (project root) — document Stellarium GPL-2.0-or-later licence
 
 ### Phase B: Observation Tips
-- Best viewing times for each planet (when highest above horizon in darkness)
-- "What to look for" descriptions (colour, brightness, nearby stars)
-- Telescope vs. binocular vs. naked-eye guidance
-- Conjunction and opposition alerts
+
+#### Phase B1: Best Viewing Times
+
+**Depends on:** Phase 5 (API Layer), Phase 6 (Frontend)
+**Parallelisable with:** Phase B2, Phase B3
+
+**Intended Outcome**
+
+Each planet card gains a "Bästa observationstid" section showing the optimal viewing window during tonight's darkness. The backend computes, for each planet, the time interval when the planet is above 10° altitude while the sun is below −12° (nautical twilight or darker), and identifies the moment of peak altitude within that window. The `/visible` and `/tonight` endpoints both include this data so the UI always shows it. Planets that never enter the dark window display "Ej synlig ikväll" instead of a time range.
+
+**Definition of Done**
+- [ ] `PlanetPosition` model includes `best_time: Optional[str]` (UTC ISO 8601 timestamp of the planet's **peak altitude** within the dark window), `dark_rise_time: Optional[str]`, and `dark_set_time: Optional[str]`
+- [ ] The `/visible` endpoint response includes non-null `best_time` for a planet that is above 10° altitude during tonight's dark window
+- [ ] A planet that sets before nautical twilight begins has `best_time: null`, `dark_rise_time: null`, `dark_set_time: null`
+- [ ] During midnight sun conditions (no dark window), all planets have null best-time fields
+- [ ] The planet card shows "Bästa tid: HH:MM–HH:MM" (in Europe/Stockholm time) beneath the existing rise/transit/set row when `dark_rise_time` and `dark_set_time` are non-null
+- [ ] The peak time within the window is visually emphasised (bold or accent colour)
+- [ ] When all three best-time fields are null, the card shows "Ej synlig ikväll" in `--color-text-muted`
+- [ ] The `/tonight` endpoint also populates the best-time fields using its existing night-window sampling logic
+- [ ] No regressions in existing planet card layout on 375 px and 1200 px viewports
+- [ ] No new API endpoints are introduced; the fields are added to the existing response schema
+- [ ] `dark_rise_time`, `dark_set_time`, and `best_time` are stored as UTC ISO 8601 strings, consistent with all other time fields; the existing `formatTime()` helper in `planet-cards.js` handles conversion to Europe/Stockholm for display — no backend timezone conversion is added
+
+**Key files**
+- Modify `backend/app/models/planet.py` — add `best_time`, `dark_rise_time`, `dark_set_time` optional string fields to `PlanetPosition`
+- Modify `backend/app/api/routes/planets.py` — compute per-planet dark window using existing `_compute_tonight_window()` and `_sample_times()`; find peak altitude time within the window; populate the three new fields on each `PlanetPosition` before returning. For the `/visible` endpoint specifically (which currently computes only an instantaneous snapshot), B1 adds a single call to `_compute_tonight_window()` once per request (not per planet), then for each planet samples its altitude at 15-minute intervals within that window to find the dark rise/set/peak — estimated latency impact is approximately 7 samples × 5 planets ≈ 35 additional `ephem` calls, well under 50 ms
+- Modify `frontend/js/components/planet-cards.js` — add "Bästa observationstid" row to `buildCard()` showing the dark window and peak time, or "Ej synlig ikväll" when fields are null
+- Modify `frontend/css/components/planet-cards.css` — style the new best-time row, including accent treatment for the peak time
+
+---
+
+#### Phase B2: Observation Descriptions ("What to Look For")
+
+**Depends on:** Phase 6 (Frontend)
+**Parallelisable with:** Phase B1, Phase B3
+
+**Intended Outcome**
+
+Each planet card gains a collapsible "Vad ska man leta efter?" section containing a short Swedish-language description of the planet's visual appearance: characteristic colour, typical brightness compared to nearby stars, and how to distinguish it from stars (steady light vs. twinkling). The descriptions are static factual content stored in a frontend data file — no backend changes are needed. The section is collapsed by default to keep cards compact and can be expanded by clicking a toggle.
+
+**Definition of Done**
+- [ ] `frontend/js/data/planet-descriptions.js` exists and exports an object keyed by English planet name (Mercury, Venus, Mars, Jupiter, Saturn)
+- [ ] Each entry contains at minimum: `color_sv` (string, e.g. "Gulvit"), `appearance_sv` (1–2 sentence description), `identification_tip_sv` (1–2 sentences on how to spot the planet)
+- [ ] Each planet card renders a "Vad ska man leta efter?" toggle below the visibility pill
+- [ ] Clicking the toggle expands a section showing the planet's colour, appearance, and identification tip
+- [ ] Clicking again collapses the section
+- [ ] The toggle uses a chevron icon (▸ collapsed, ▾ expanded) and the expanded state is visually distinct
+- [ ] The section is collapsed by default on page load
+- [ ] Descriptions use correct Swedish astronomical terminology (e.g. "magnitud", "stjärnbild", "fast sken")
+- [ ] Descriptions are factually accurate for the current epoch (2020s)
+- [ ] Cards for planets below the horizon still show the description toggle (the information is useful regardless of current visibility)
+- [ ] No backend changes are required
+- [ ] No JavaScript console errors when toggling descriptions rapidly
+
+**Key files**
+- Create `frontend/js/data/planet-descriptions.js` — static object with Swedish descriptions for each planet
+- Modify `frontend/js/components/planet-cards.js` — import descriptions; add collapsible section to `buildCard()`; wire toggle click handler
+- Modify `frontend/css/components/planet-cards.css` — style the collapsible description section, toggle button, and transition animation
+
+---
+
+#### Phase B3: Equipment Guidance
+
+**Depends on:** Phase 6 (Frontend)
+**Parallelisable with:** Phase B1, Phase B2
+
+**Intended Outcome**
+
+Each visible planet card displays a small equipment badge indicating whether the planet is best observed with the naked eye, binoculars, or a small telescope under current conditions. The recommendation is computed entirely in the frontend from the planet's current magnitude and altitude — no backend changes. Mercury at faint magnitudes or any planet at very low altitude (5°–10°) gets a "Kikare rekommenderas" badge. All other visible planets get "Blotta ögat". Planets below the horizon or with score 0 do not show an equipment badge.
+
+**Definition of Done**
+- [ ] `frontend/js/utils.js` exports a `getEquipmentRecommendation(planet)` function returning `null`, `"naked_eye"`, `"binoculars"`, or `"telescope"`
+- [ ] The function returns `null` when `planet.is_above_horizon` is false or `planet.visibility_score` is 0
+- [ ] The function returns `"binoculars"` when `planet.altitude_deg` is between 5 and 10 (atmospheric extinction zone)
+- [ ] The function returns `"binoculars"` when `planet.name === "Mercury"` and `planet.magnitude > 1.5`
+- [ ] The function returns `"naked_eye"` for all other visible planets
+- [ ] Each planet card renders a badge with the Swedish label: "Blotta ögat" (naked_eye), "Kikare rekommenderas" (binoculars), or "Teleskop" (telescope)
+- [ ] The badge uses an appropriate icon or emoji (👁 for naked eye, 🔭 for binoculars/telescope) or a simple text pill
+- [ ] The badge is not rendered for planets where the function returns `null`
+- [ ] Badge styling uses `--color-text-secondary` background with `--color-text-primary` text, consistent with existing card design tokens
+- [ ] No backend changes are required
+- [ ] No JavaScript console errors on page load or data refresh
+
+**Key files**
+- Modify `frontend/js/utils.js` — add `getEquipmentRecommendation(planet)` function
+- Modify `frontend/js/components/planet-cards.js` — import and call `getEquipmentRecommendation()`; render equipment badge in `buildCard()` when result is non-null
+- Modify `frontend/css/components/planet-cards.css` — style the equipment badge pill
+
+---
+
+#### Phase B4: Conjunction and Opposition Alerts
+
+**Depends on:** Phase 5 (API Layer) and Phase 6 (Frontend) for backend event detection and the frontend alert banner; Phase A3 (Sky Map plotting) additionally required for sky-map conjunction line and opposition glow rendering only — backend and banner work can proceed without A3
+**Parallelisable with:** Phase B2, Phase B3
+
+**Intended Outcome**
+
+The app detects and displays notable astronomical events: conjunctions (two planets or a planet and the Moon within 5° of each other) and oppositions (a superior planet's elongation exceeding 170°). A new `events` array in the API response lists current and upcoming events for the next 7 days. The frontend renders an event alert banner above the planet cards (and below the sky summary) when any events are active or imminent. Each alert includes a Swedish description, the date, and the involved bodies. On the sky map, bodies involved in an active conjunction are connected with a highlighted dashed line, and opposition planets are shown with a subtle glow.
+
+**Definition of Done**
+- [ ] `backend/app/models/planet.py` includes a new `AstronomicalEvent` Pydantic model with fields: `event_type` ("conjunction" or "opposition"), `bodies` (list of body names), `date` (ISO 8601 string), `separation_deg` (float, for conjunctions), `elongation_deg` (float, for oppositions), `description_sv` (Swedish description string)
+- [ ] `PlanetsResponse` includes `events: List[AstronomicalEvent]` (default empty list)
+- [ ] A new `backend/app/services/planets/events.py` module exports `detect_events(lat, lon, start_dt, end_dt) -> List[AstronomicalEvent]`
+- [ ] `detect_events` uses `ephem.separation()` to check all pairwise planet separations and each planet's separation from the Moon
+- [ ] `detect_events` uses the `.elong` attribute on superior planet bodies (Mars, Jupiter, Saturn) to detect oppositions
+- [ ] Conjunction threshold is 5° (configurable constant); opposition threshold is elongation > 170°
+- [ ] The function scans at daily intervals from `start_dt` to `end_dt` (7 days forward by default)
+- [ ] Each event includes a Swedish description, e.g. "Venus och Jupiter i konjunktion (2,3° separation)" or "Mars i opposition (elongation 178°)"
+- [ ] The `/visible` and `/tonight` endpoints call `detect_events()` and include the results in the response
+- [ ] `frontend/js/components/event-alerts.js` renders a banner for each event in the `events` array
+- [ ] Active events (happening today) use `--color-status-excellent` styling; upcoming events use `--color-status-fair`
+- [ ] The banner is not rendered when the `events` array is empty
+- [ ] On the sky map, bodies involved in an active conjunction are connected with a dashed line in `--color-accent-primary`
+- [ ] Opposition events are indicated on the sky map by a subtle glow effect on the planet dot
+- [ ] The event detection adds less than 100 ms to API response time (7 daily samples × 15 separation checks ≈ 105 `ephem` calls at ~1 ms each)
+- [ ] Mercury and Venus never generate opposition events (they are inferior planets)
+- [ ] The `/{name}` single-planet endpoint is intentionally excluded — it returns `PlanetPosition`, not `PlanetsResponse`, and therefore does not carry the `events` field; no changes are needed for that route
+- [ ] No regressions in existing endpoint response schemas — `events` is an additive field with a default empty list
+
+**Key files**
+- Create `backend/app/services/planets/events.py` — `detect_events()` function using `ephem.separation()` and `.elong`
+- Modify `backend/app/models/planet.py` — add `AstronomicalEvent` model; add `events` field to `PlanetsResponse`
+- Modify `backend/app/api/routes/planets.py` — call `detect_events()` in `/visible` and `/tonight` handlers; include events in response
+- Create `frontend/js/components/event-alerts.js` — event alert banner component
+- Create `frontend/css/components/event-alerts.css` — styling for event alert banners
+- Modify `frontend/css/main.css` — import `components/event-alerts.css`
+- Modify `frontend/index.html` — add `#eventAlerts` container between sky summary and planet cards
+- Modify `frontend/js/main.js` — instantiate `EventAlerts`; pass `data.events` to it after each API fetch
+- Modify `frontend/js/components/sky-map.js` — add conjunction line rendering and opposition glow effect in `plotBodies()`
 
 ### Phase C: Extended Bodies
 - Add Uranus and Neptune (telescope targets)
