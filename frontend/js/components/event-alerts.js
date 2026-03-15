@@ -41,8 +41,9 @@ function formatEventDate(dateStr, daysAway) {
         return 'imorgon';
     }
     if (dateStr) {
-        // Parse YYYY-MM-DD without timezone conversion.
-        const parts = dateStr.split('-');
+        // Take only the first 10 characters ("YYYY-MM-DD") before splitting, so
+        // that full ISO timestamps ("YYYY-MM-DDTHH:MM:SSZ") are handled correctly.
+        const parts = dateStr.slice(0, 10).split('-');
         const day = parseInt(parts[2], 10);
         const monthIndex = parseInt(parts[1], 10) - 1;
         return `${day}\u00a0${MONTHS_SV[monthIndex]}`;

@@ -35,15 +35,19 @@ function iconForEventType(eventType) {
 }
 
 /**
- * Parse an event_date string ("YYYY-MM-DD") into a local Date object.
+ * Parse an event_date string into a UTC Date object.
  *
- * Using noon UTC avoids date-boundary issues caused by timezone offsets
- * when only the calendar date matters.
+ * If dateStr is already a full ISO timestamp (contains "T"), use it directly.
+ * If dateStr is a bare "YYYY-MM-DD" string, append T12:00:00Z so that noon UTC
+ * is used, avoiding date-boundary issues from timezone offsets.
  *
- * @param {string} dateStr - "YYYY-MM-DD"
+ * @param {string} dateStr - "YYYY-MM-DD" or full ISO 8601 timestamp
  * @returns {Date}
  */
 function parseDateStr(dateStr) {
+    if (dateStr.includes('T')) {
+        return new Date(dateStr);
+    }
     return new Date(`${dateStr}T12:00:00Z`);
 }
 
