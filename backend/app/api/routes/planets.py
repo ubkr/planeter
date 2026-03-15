@@ -1,8 +1,9 @@
 """Planet visibility API endpoints."""
 
 import ephem
+import math
 from datetime import datetime, timezone, timedelta
-from typing import List
+from typing import List, Optional, Tuple
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -30,6 +31,12 @@ _VALID_PLANET_NAMES = {"mercury", "venus", "mars", "jupiter", "saturn"}
 
 # How many hours to sample across the night window for the /tonight endpoint.
 _TONIGHT_SAMPLE_INTERVAL_HOURS = 1
+
+# Minimum planet altitude in degrees for "useful" viewing during the dark window.
+_MIN_ALTITUDE_DEG = 10
+
+# Sampling interval in minutes for best-viewing-time calculations.
+_BEST_TIME_SAMPLE_INTERVAL_MINUTES = 15
 
 
 def _utc_iso() -> str:
@@ -104,6 +111,156 @@ def _compute_tonight_window(lat: float, lon: float) -> tuple:
         end = start + timedelta(hours=24)
 
     return start, end
+
+
+def _compute_nautical_dark_window(
+    lat: float, lon: float
+) -> Tuple[Optional[datetime], Optional[datetime]]:
+    """
+    Compute the nautical-darkness window as (start_utc, end_utc).
+
+    Nautical darkness is the period when the sun is below -12° altitude.
+    Returns a tuple of (start, end) timezone-naive UTC datetime objects,
+    following the same conventions as _compute_tonight_window().
+
+    Edge cases:
+      - ephem.AlwaysUpError: midnight sun / sun never dips below -12° —
+        returns (None, None) to signal no dark window.
+      - ephem.NeverUpError: polar night / sun always below -12° —
+        returns a 24-hour window starting from now.
+    """
+    now_naive = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    observer = ephem.Observer()
+    observer.lat = str(lat)
+    observer.lon = str(lon)
+    observer.date = now_naive
+    observer.pressure = 0
+    # Nautical twilight threshold: sun 12° below horizon.
+    observer.horizon = "-12"
+
+    try:
+        sunset_ephem = observer.next_setting(ephem.Sun(), use_center=True)
+        start = ephem.Date(sunset_ephem).datetime()
+    except ephem.AlwaysUpError:
+        # Sun never dips below -12° — no nautical dark window (midnight sun).
+        logger.info(
+            f"Sun never below -12° at ({lat}, {lon}); no nautical dark window."
+        )
+        return None, None
+    except ephem.NeverUpError:
+        # Sun always below -12° (deep polar night); treat 24h from now as valid.
+        logger.info(
+            f"Sun always below -12° at ({lat}, {lon}); using 24h dark window."
+        )
+        start = now_naive
+
+    # Reset observer to the start of darkness to find when it ends.
+    observer.date = start
+    try:
+        sunrise_ephem = observer.next_rising(ephem.Sun(), use_center=True)
+        end = ephem.Date(sunrise_ephem).datetime()
+    except ephem.AlwaysUpError:
+        # Degenerate case: sun pops back up almost immediately.
+        end = start + timedelta(hours=24)
+    except ephem.NeverUpError:
+        # Polar night: sun never climbs above -12° — dark for a full day.
+        end = start + timedelta(hours=24)
+
+    return start, end
+
+
+def _compute_best_viewing_times(
+    planets: List[PlanetPosition],
+    lat: float,
+    lon: float,
+    dark_start: datetime,
+    dark_end: datetime,
+) -> None:
+    """
+    Populate best_time, dark_rise_time, and dark_set_time on each PlanetPosition.
+
+    Samples planet altitudes at _BEST_TIME_SAMPLE_INTERVAL_MINUTES intervals
+    across the nautical dark window [dark_start, dark_end].  For each planet,
+    qualifying sample times are those where altitude exceeds _MIN_ALTITUDE_DEG.
+
+    If qualifying samples exist:
+      - dark_rise_time: first qualifying sample (ISO 8601 UTC string)
+      - dark_set_time:  last qualifying sample (ISO 8601 UTC string)
+      - best_time:      sample with the highest altitude (ISO 8601 UTC string)
+
+    If no qualifying samples exist, all three fields remain None.
+
+    Mutates the PlanetPosition objects in-place.  dark_start and dark_end must
+    be timezone-naive UTC datetimes (as returned by _compute_nautical_dark_window).
+
+    Args:
+        planets:    List of PlanetPosition objects to annotate.
+        lat:        Observer latitude in decimal degrees.
+        lon:        Observer longitude in decimal degrees.
+        dark_start: Start of the nautical dark window (naive UTC).
+        dark_end:   End of the nautical dark window (naive UTC).
+    """
+    interval = timedelta(minutes=_BEST_TIME_SAMPLE_INTERVAL_MINUTES)
+
+    # Build the list of sample datetimes.
+    sample_times: List[datetime] = []
+    current = dark_start
+    while current <= dark_end:
+        sample_times.append(current)
+        current += interval
+
+    if not sample_times:
+        return
+
+    # Build a mapping from planet name to index so we can update in-place.
+    planet_index = {p.name: i for i, p in enumerate(planets)}
+
+    # Per-planet accumulators: list of (altitude_deg, sample_datetime).
+    planet_samples: dict = {p.name: [] for p in planets}
+
+    # Ephem observer for altitude lookups — pressure=0 for geometric altitude,
+    # matching the convention used in calculate_planet_positions.
+    observer = ephem.Observer()
+    observer.lat = str(lat)
+    observer.lon = str(lon)
+    observer.pressure = 0
+
+    planet_classes = {
+        "Mercury": ephem.Mercury,
+        "Venus": ephem.Venus,
+        "Mars": ephem.Mars,
+        "Jupiter": ephem.Jupiter,
+        "Saturn": ephem.Saturn,
+    }
+
+    for sample_dt in sample_times:
+        observer.date = sample_dt
+        for name, planet_cls in planet_classes.items():
+            if name not in planet_index:
+                # Planet not present in the input list; skip.
+                continue
+            body = planet_cls()
+            body.compute(observer)
+            alt_deg = math.degrees(float(body.alt))
+            if alt_deg > _MIN_ALTITUDE_DEG:
+                planet_samples[name].append((alt_deg, sample_dt))
+
+    # Annotate each PlanetPosition with the computed window times.
+    for planet in planets:
+        qualifying = planet_samples.get(planet.name, [])
+        if not qualifying:
+            # No qualifying samples — leave best_time/dark_rise_time/dark_set_time as None.
+            continue
+
+        dark_rise_dt = qualifying[0][1]
+        dark_set_dt = qualifying[-1][1]
+        best_dt = max(qualifying, key=lambda t: t[0])[1]
+
+        fmt = "%Y-%m-%dT%H:%M:%SZ"
+        planet.dark_rise_time = dark_rise_dt.strftime(fmt)
+        planet.dark_set_time = dark_set_dt.strftime(fmt)
+        planet.best_time = best_dt.strftime(fmt)
 
 
 def _sample_times(start: datetime, end: datetime, interval_hours: int) -> List[datetime]:
@@ -182,6 +339,11 @@ async def get_visible_planets(
 
     planets = apply_scores(planets, sun_data, moon_data, weather_data.cloud_cover)
 
+    # Compute best viewing times within the nautical dark window.
+    dark_start, dark_end = _compute_nautical_dark_window(lat, lon)
+    if dark_start is not None:
+        _compute_best_viewing_times(planets, lat, lon, dark_start, dark_end)
+
     sun_info = _build_sun_info(sun_data)
     moon_info = _build_moon_info(moon_data)
 
@@ -257,6 +419,11 @@ async def get_tonight_planets(
 
         planets = apply_scores(planets, sun_data, moon_data, weather_data.cloud_cover)
         tonight = score_tonight(planets)
+
+        # Compute best viewing times within the nautical dark window.
+        dark_start, dark_end = _compute_nautical_dark_window(lat, lon)
+        if dark_start is not None:
+            _compute_best_viewing_times(planets, lat, lon, dark_start, dark_end)
 
         logger.info(
             f"Tonight scored for ({lat}, {lon}): tonight_score={tonight}, "

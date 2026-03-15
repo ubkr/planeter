@@ -105,6 +105,36 @@ function buildCard(planet) {
         </div>
     `;
 
+    // Build the best-observation-time row imperatively so that formatTime() is
+    // called at runtime rather than inlined into the template string above.
+    // This keeps the logic readable and avoids a deeply nested ternary in HTML.
+    const bestTimeEl = document.createElement('div');
+    if (planet.dark_rise_time != null && planet.dark_set_time != null) {
+        bestTimeEl.className = 'planet-card__best-time';
+
+        const labelEl = document.createElement('span');
+        labelEl.className = 'planet-card__best-time-label';
+        labelEl.textContent = 'B\u00e4sta tid:';
+
+        const windowEl = document.createElement('span');
+        windowEl.className = 'planet-card__best-time-window';
+        windowEl.textContent = `${formatTime(planet.dark_rise_time)}\u2013${formatTime(planet.dark_set_time)}`;
+
+        bestTimeEl.appendChild(labelEl);
+        bestTimeEl.appendChild(windowEl);
+
+        if (planet.best_time != null) {
+            const peakEl = document.createElement('span');
+            peakEl.className = 'planet-card__best-time-peak';
+            peakEl.textContent = `(topp ${formatTime(planet.best_time)})`;
+            bestTimeEl.appendChild(peakEl);
+        }
+    } else {
+        bestTimeEl.className = 'planet-card__best-time planet-card__best-time--none';
+        bestTimeEl.textContent = 'Ej synlig ikv\u00e4ll';
+    }
+    card.appendChild(bestTimeEl);
+
     // Build the visibility pill imperatively to avoid XSS via attribute injection.
     // TooltipManager watches for .info-icon and reads the `title` property.
     //
@@ -157,6 +187,7 @@ function buildSkeletonCard() {
             <span class="planet-card__detail-value">&nbsp;</span>
         </div>
         <div class="planet-card__times">&nbsp;</div>
+        <div class="planet-card__best-time planet-card__best-time--skeleton">&nbsp;</div>
         <div class="planet-card__visibility">&nbsp;</div>
     `;
     return card;

@@ -289,3 +289,67 @@
 .planet-card--skeleton .planet-card__score-bar::after {
     display: none;
 }
+
+/* --- Best Observation Time Row --- */
+
+.planet-card__best-time {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-xs);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    line-height: 1.4;
+}
+
+.planet-card__best-time-label {
+    color: var(--color-text-muted);
+    white-space: nowrap;
+}
+
+.planet-card__best-time-window {
+    font-weight: 500;
+}
+
+.planet-card__best-time-peak {
+    color: var(--color-accent-primary);
+    font-weight: 700;
+}
+
+/* Modifier: no best time available */
+
+.planet-card__best-time--none {
+    color: var(--color-text-muted);
+    font-style: italic;
+}
+
+/* Modifier: skeleton loading state */
+
+.planet-card__best-time--skeleton {
+    width: 60%;
+    height: 1.25em;
+    color: transparent;
+    background: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0.04) 0%,
+        rgba(255, 255, 255, 0.08) 50%,
+        rgba(255, 255, 255, 0.04) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.8s ease-in-out infinite;
+    border-radius: var(--radius-sm);
+}
+
+/* Include best-time in the card-level skeleton reset */
+
+.planet-card--skeleton .planet-card__best-time {
+    color: transparent;
+    background: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0.04) 0%,
+        rgba(255, 255, 255, 0.08) 50%,
+        rgba(255, 255, 255, 0.04) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.8s ease-in-out infinite;
+    border-radius: var(--radius-sm);
+}

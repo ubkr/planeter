@@ -21,6 +21,8 @@ for values outside [-90, 90] and [-180, 180] respectively.
 """
 
 import pytest
+from datetime import datetime, timezone
+from unittest.mock import patch, MagicMock
 
 # Coordinates for Malmö, Sweden — well within the valid lat/lon ranges.
 LAT = 55.6
@@ -162,3 +164,107 @@ async def test_missing_lon_returns_422(async_client, mock_weather):
         params={"lat": LAT},
     )
     assert response.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# Phase B1 — best_time / dark_rise_time / dark_set_time fields
+# ---------------------------------------------------------------------------
+
+# Stockholm coordinates used for Phase B1 tests.  These are far enough south
+# that a nautical dark window exists year-round (no midnight-sun issue).
+_STOCKHOLM_LAT = 59.33
+_STOCKHOLM_LON = 18.07
+
+# Keys that every PlanetPosition must carry after Phase B1.
+_DARK_WINDOW_KEYS = {"best_time", "dark_rise_time", "dark_set_time"}
+
+
+# ---------------------------------------------------------------------------
+# 11. GET /visible — Phase B1 fields present on every planet
+# ---------------------------------------------------------------------------
+
+async def test_visible_includes_phase_b1_fields(async_client, mock_weather):
+    # Every planet dict in the /visible response must contain the three new
+    # dark-window fields.  Values may be null (None) — that is expected when a
+    # planet stays below _MIN_ALTITUDE_DEG all night — but the keys must exist.
+    response = await async_client.get(
+        "/api/v1/planets/visible",
+        params={"lat": _STOCKHOLM_LAT, "lon": _STOCKHOLM_LON},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    for planet in body["planets"]:
+        missing = _DARK_WINDOW_KEYS - planet.keys()
+        assert not missing, (
+            f"Planet '{planet.get('name')}' is missing Phase B1 keys: {missing}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# 12. GET /tonight — Phase B1 fields present on every planet
+# ---------------------------------------------------------------------------
+
+async def test_tonight_includes_phase_b1_fields(async_client, mock_weather):
+    # Same expectation as /visible — all three dark-window keys must be present
+    # on every planet object in the /tonight response, even if null.
+    response = await async_client.get(
+        "/api/v1/planets/tonight",
+        params={"lat": _STOCKHOLM_LAT, "lon": _STOCKHOLM_LON},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    for planet in body["planets"]:
+        missing = _DARK_WINDOW_KEYS - planet.keys()
+        assert not missing, (
+            f"Planet '{planet.get('name')}' is missing Phase B1 keys: {missing}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# 13. GET /{name} — Phase B1 fields present and null
+# ---------------------------------------------------------------------------
+
+async def test_planet_by_name_includes_phase_b1_fields_as_null(async_client, mock_weather):
+    # The /{name} endpoint returns a bare PlanetPosition and never invokes
+    # _compute_best_viewing_times, so the three dark-window fields must exist
+    # on the model but must be null (None → JSON null).
+    response = await async_client.get(
+        "/api/v1/planets/jupiter",
+        params={"lat": _STOCKHOLM_LAT, "lon": _STOCKHOLM_LON},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    missing = _DARK_WINDOW_KEYS - body.keys()
+    assert not missing, f"Missing Phase B1 keys: {missing}"
+    for key in _DARK_WINDOW_KEYS:
+        assert body[key] is None, (
+            f"Expected '{key}' to be null from /{'{name}'} endpoint, got {body[key]!r}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# 14. Unit test — _compute_nautical_dark_window returns (None, None) during
+#     midnight sun (sun never drops below -12° at lat=70, lon=25 in June)
+# ---------------------------------------------------------------------------
+
+def test_compute_nautical_dark_window_midnight_sun():
+    # Import the private helper directly so we can test it without HTTP.
+    from app.api.routes.planets import _compute_nautical_dark_window
+
+    # Midsummer date at which the sun never dips below -12° near Tromsø.
+    midsummer = datetime(2025, 6, 21, 12, 0, 0, tzinfo=timezone.utc)
+
+    # Patch datetime.now inside the route module so that the helper treats the
+    # current time as midsummer 2025 rather than the real wall-clock time.
+    mock_dt = MagicMock(wraps=datetime)
+    mock_dt.now = MagicMock(return_value=midsummer)
+
+    with patch("app.api.routes.planets.datetime", mock_dt):
+        dark_start, dark_end = _compute_nautical_dark_window(lat=70.0, lon=25.0)
+
+    assert dark_start is None, (
+        f"Expected dark_start=None for midnight sun, got {dark_start!r}"
+    )
+    assert dark_end is None, (
+        f"Expected dark_end=None for midnight sun, got {dark_end!r}"
+    )
