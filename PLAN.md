@@ -564,7 +564,7 @@ Each planet card gains a collapsible "Vad ska man leta efter?" section containin
 
 ---
 
-#### Phase B3: Equipment Guidance
+#### Phase B3: Equipment Guidance — ✅
 
 **Depends on:** Phase 6 (Frontend)
 **Parallelisable with:** Phase B1, Phase B2

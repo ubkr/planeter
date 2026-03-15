@@ -6,7 +6,7 @@
  * altitude_deg, azimuth_deg, direction, magnitude, constellation, rise_time, transit_time, set_time.
  */
 
-import { scoreToLevel, formatVisibilityReasons } from '../utils.js';
+import { scoreToLevel, formatVisibilityReasons, getEquipmentRecommendation } from '../utils.js';
 import PLANET_DESCRIPTIONS from '../data/planet-descriptions.js';
 
 // Number of skeleton cards to show while loading.
@@ -160,6 +160,20 @@ function buildCard(planet) {
     }
     card.appendChild(visibilityEl);
 
+    // Build the equipment recommendation badge if an equipment level applies.
+    const EQUIPMENT_LABELS = {
+        naked_eye:  'Blotta ögat',
+        binoculars: 'Kikare rekommenderas',
+        telescope:  'Teleskop',
+    };
+    const equipment = getEquipmentRecommendation(planet);
+    if (equipment !== null) {
+        const equipmentEl = document.createElement('div');
+        equipmentEl.className = 'planet-card__equipment';
+        equipmentEl.textContent = EQUIPMENT_LABELS[equipment];
+        card.appendChild(equipmentEl);
+    }
+
     // Build the collapsible "Vad ska man leta efter?" description section.
     // Skip entirely if no description data exists for this planet name.
     const desc = PLANET_DESCRIPTIONS[planet.name];
@@ -240,6 +254,7 @@ function buildSkeletonCard() {
         <div class="planet-card__times">&nbsp;</div>
         <div class="planet-card__best-time planet-card__best-time--skeleton">&nbsp;</div>
         <div class="planet-card__visibility">&nbsp;</div>
+        <div class="planet-card__equipment">&nbsp;</div>
     `;
     return card;
 }

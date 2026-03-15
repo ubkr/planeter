@@ -74,3 +74,31 @@ export function scoreToLevel(score) {
     if (score <= 79) return 'good';
     return 'excellent';
 }
+
+/**
+ * Returns an equipment recommendation for observing a planet.
+ *
+ * Possible return values:
+ *   null          – planet is not observable (below horizon, zero score, or missing altitude)
+ *   "naked_eye"   – planet is comfortably visible without aid
+ *   "binoculars"  – binoculars recommended (low altitude or faint Mercury)
+ *   "telescope"   – telescope recommended (valid value, not currently triggered by any rule)
+ *
+ * @param {{ is_above_horizon: boolean, visibility_score: number, altitude_deg: number, name: string, magnitude: number }} planet
+ * @returns {null|"naked_eye"|"binoculars"|"telescope"}
+ */
+export function getEquipmentRecommendation(planet) {
+  if (!planet.is_above_horizon || planet.visibility_score == null || planet.visibility_score === 0 || planet.altitude_deg == null) {
+    return null;
+  }
+
+  if (planet.altitude_deg >= 5 && planet.altitude_deg <= 10) {
+    return 'binoculars';
+  }
+
+  if (planet.name === 'Mercury' && planet.magnitude > 1.5) {
+    return 'binoculars';
+  }
+
+  return 'naked_eye';
+}

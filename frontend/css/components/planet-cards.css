@@ -260,6 +260,22 @@
     cursor: help;
 }
 
+/* --- Equipment Badge --- */
+
+.planet-card__equipment {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2xs);
+    padding: var(--space-2xs) var(--space-sm);
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    width: fit-content;
+    background: color-mix(in srgb, var(--color-text-secondary) 15%, transparent);
+    color: var(--color-text-primary);
+}
+
 /* --- Skeleton Loading State --- */
 
 .planet-card--skeleton {
@@ -272,7 +288,8 @@
 .planet-card--skeleton .planet-card__detail-label,
 .planet-card--skeleton .planet-card__detail-value,
 .planet-card--skeleton .planet-card__times,
-.planet-card--skeleton .planet-card__visibility {
+.planet-card--skeleton .planet-card__visibility,
+.planet-card--skeleton .planet-card__equipment {
     color: transparent;
     background: linear-gradient(
         90deg,
