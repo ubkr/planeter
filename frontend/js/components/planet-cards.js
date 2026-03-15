@@ -7,6 +7,7 @@
  */
 
 import { scoreToLevel, formatVisibilityReasons } from '../utils.js';
+import PLANET_DESCRIPTIONS from '../data/planet-descriptions.js';
 
 // Number of skeleton cards to show while loading.
 const PLANET_COUNT = 5;
@@ -158,6 +159,56 @@ function buildCard(planet) {
         visibilityEl.title = tooltipText;
     }
     card.appendChild(visibilityEl);
+
+    // Build the collapsible "Vad ska man leta efter?" description section.
+    // Skip entirely if no description data exists for this planet name.
+    const desc = PLANET_DESCRIPTIONS[planet.name];
+    if (desc) {
+        const toggleEl = document.createElement('button');
+        toggleEl.className = 'planet-card__description-toggle';
+        toggleEl.setAttribute('aria-expanded', 'false');
+
+        const toggleTextNode = document.createTextNode('Vad ska man leta efter?\u00a0');
+        const chevronEl = document.createElement('span');
+        chevronEl.className = 'planet-card__description-chevron';
+        chevronEl.textContent = '\u25b8';
+
+        toggleEl.appendChild(toggleTextNode);
+        toggleEl.appendChild(chevronEl);
+
+        const contentEl = document.createElement('div');
+        contentEl.className = 'planet-card__description';
+        contentEl.setAttribute('aria-hidden', 'true');
+
+        const colorEl = document.createElement('span');
+        colorEl.className = 'planet-card__description-color';
+        colorEl.textContent = desc.color_sv;
+
+        const appearanceEl = document.createElement('p');
+        appearanceEl.className = 'planet-card__description-text';
+        appearanceEl.textContent = desc.appearance_sv;
+
+        const tipEl = document.createElement('p');
+        tipEl.className = 'planet-card__description-text';
+        tipEl.textContent = desc.identification_tip_sv;
+
+        contentEl.appendChild(colorEl);
+        contentEl.appendChild(appearanceEl);
+        contentEl.appendChild(tipEl);
+
+        toggleEl.addEventListener('click', () => {
+            if (!toggleEl.isConnected) return;
+            const expanded = toggleEl.getAttribute('aria-expanded') === 'true';
+            const nowExpanded = !expanded;
+            toggleEl.setAttribute('aria-expanded', String(nowExpanded));
+            contentEl.setAttribute('aria-hidden', String(!nowExpanded));
+            contentEl.classList.toggle('planet-card__description--expanded', nowExpanded);
+            chevronEl.textContent = nowExpanded ? '\u25be' : '\u25b8';
+        });
+
+        card.appendChild(toggleEl);
+        card.appendChild(contentEl);
+    }
 
     return card;
 }

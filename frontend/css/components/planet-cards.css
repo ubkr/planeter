@@ -341,6 +341,90 @@
 
 /* Include best-time in the card-level skeleton reset */
 
+/* --- Description Toggle (collapsible "Vad ska man leta efter?") --- */
+
+.planet-card__description-toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    width: 100%;
+    padding: var(--space-2xs) 0;
+    margin: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: var(--font-family-base);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    user-select: none;
+    -webkit-user-select: none;
+    transition: color var(--transition-fast);
+}
+
+.planet-card__description-toggle:hover {
+    color: var(--color-text-primary);
+}
+
+.planet-card__description-toggle:focus-visible {
+    outline: 2px solid var(--color-accent-primary);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+}
+
+/* --- Description Chevron --- */
+
+.planet-card__description-chevron {
+    display: inline-block;
+    font-size: var(--font-size-xs);
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+/* --- Description Content (collapsible wrapper) --- */
+
+.planet-card__description {
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition:
+        max-height var(--transition-normal),
+        opacity var(--transition-normal);
+}
+
+.planet-card__description--expanded {
+    max-height: 20rem;
+    opacity: 1;
+}
+
+/* --- Description Color Label --- */
+
+.planet-card__description-color {
+    display: block;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+    line-height: 1.4;
+    margin-bottom: var(--space-2xs);
+}
+
+/* --- Description Text (appearance / identification tips) --- */
+
+.planet-card__description-text {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+    margin: 0 0 var(--space-xs) 0;
+}
+
+.planet-card__description-text:last-child {
+    margin-bottom: 0;
+}
+
+/* --- Skeleton: hide description toggle during loading --- */
+
+.planet-card--skeleton .planet-card__description-toggle {
+    display: none;
+}
+
 .planet-card--skeleton .planet-card__best-time {
     color: transparent;
     background: linear-gradient(
