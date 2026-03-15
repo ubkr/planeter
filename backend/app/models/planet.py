@@ -125,6 +125,46 @@ class LocationInfo(BaseModel):
     name: Optional[str] = Field(None, description="Human-readable place name, or null if not provided")
 
 
+class AstronomicalEvent(BaseModel):
+    """A detected astronomical event (conjunction, opposition, elongation, etc.)."""
+
+    event_type: str = Field(
+        ...,
+        description=(
+            "Event category: 'conjunction' | 'opposition' | 'mercury_elongation' | "
+            "'alignment' | 'venus_brilliancy' | 'moon_occultation'"
+        ),
+    )
+    bodies: List[str] = Field(
+        ...,
+        description="English names of the bodies involved, e.g. ['Venus', 'Jupiter'] or ['Mercury']",
+    )
+    date: str = Field(..., description="ISO 8601 UTC string of the event peak or midpoint")
+    description_sv: str = Field(..., description="Full Swedish description for display")
+    separation_deg: Optional[float] = Field(
+        None, description="Angular separation in degrees (conjunctions and moon occultations)"
+    )
+    elongation_deg: Optional[float] = Field(
+        None, description="Elongation from the Sun in degrees (oppositions and Mercury elongation)"
+    )
+    magnitude: Optional[float] = Field(
+        None, description="Apparent visual magnitude (Venus brilliancy)"
+    )
+    alignment_count: Optional[int] = Field(
+        None, description="Number of planets in the alignment arc"
+    )
+    days_away: Optional[int] = Field(
+        None, description="Days from the query start_dt (0 = today)"
+    )
+    event_icon: str = Field(
+        "",
+        description=(
+            "Icon key hint: 'conjunction' | 'opposition' | 'elongation' | "
+            "'alignment' | 'brilliancy' | 'occultation'"
+        ),
+    )
+
+
 class PlanetsResponse(BaseModel):
     """Top-level API response for planet visibility endpoints."""
 
@@ -135,6 +175,10 @@ class PlanetsResponse(BaseModel):
     weather: WeatherInfo
     planets: List[PlanetPosition]
     tonight_score: Optional[int] = Field(None, ge=0, le=100, description="Aggregate tonight score 0-100")
+    events: List[AstronomicalEvent] = Field(
+        default_factory=list,
+        description="Upcoming and current astronomical events detected for the observation window",
+    )
 
     class Config:
         json_schema_extra = {
@@ -145,5 +189,14 @@ class PlanetsResponse(BaseModel):
                 "moon": {"illumination": 0.45, "elevation_deg": 32.1, "azimuth_deg": 180.0},
                 "weather": {"cloud_cover": 15.0, "source": "met_no"},
                 "planets": [],
+                "events": [],
             }
         }
+
+
+class EventsResponse(BaseModel):
+    """Dedicated API response for the events endpoint."""
+
+    timestamp: str = Field(..., description="Query time as ISO 8601 UTC string")
+    location: LocationInfo
+    events: List[AstronomicalEvent]

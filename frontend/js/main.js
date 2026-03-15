@@ -1,8 +1,10 @@
 /**
  * main.js - Application entry point.
  *
- * Wires together LocationManager, SettingsModal, PlanetCards, and SkySummary.
+ * Wires together LocationManager, SettingsModal, PlanetCards, SkySummary,
+ * SkyMap, EventAlerts, and EventsTimeline.
  * Fetches planet visibility data on load, on location change, and every 5 minutes.
+ * Fetches events lazily when the "Kommande" tab is first opened for a location.
  */
 
 import { LocationManager } from './location-manager.js';
@@ -11,7 +13,9 @@ import { PlanetCards } from './components/planet-cards.js';
 import { SkySummary } from './components/sky-summary.js';
 import { TabNav } from './components/tab-nav.js';
 import { SkyMap } from './components/sky-map.js';
-import { fetchVisiblePlanets } from './api.js';
+import { EventAlerts } from './components/event-alerts.js';
+import { EventsTimeline } from './components/events-timeline.js';
+import { fetchVisiblePlanets, fetchEvents } from './api.js';
 import { formatLocation } from './utils.js';
 
 /** Auto-refresh interval in milliseconds. */
@@ -55,13 +59,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const skySummary = new SkySummary(skySummaryEl);
     const tabNav = new TabNav();
     const skyMap = new SkyMap(document.getElementById('skyMapContainer'));
-
-    // --- SkyMap tab-switch listener ---
-    window.addEventListener('tabChanged', (event) => {
-        if (event.detail.tabId === 'skymap') {
-            skyMap.render();
-        }
-    });
+    const eventAlerts = new EventAlerts(document.getElementById('eventAlerts'));
+    const eventsTimeline = new EventsTimeline(document.getElementById('eventsTimelineContainer'));
 
     // --- Interval tracking ---
     /** @type {number|null} */
@@ -69,6 +68,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /** Most recently used location, kept in sync for the auto-refresh closure. */
     let currentLocation = null;
+
+    /**
+     * Whether events have been loaded for the current location.
+     * Resets to false whenever the location changes so that switching back to
+     * the "Kommande" tab after a location change triggers a fresh fetch.
+     *
+     * @type {boolean}
+     */
+    let eventsLoaded = false;
 
     // --- Helper: hide error banner ---
     function hideError() {
@@ -112,7 +120,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             skySummary.render(data);
             planetCards.render(data.planets);
-            skyMap.plotBodies(data.planets, data.sun, data.moon);
+            eventAlerts.render(data.events || []);
+            skyMap.plotBodies(data.planets, data.sun, data.moon, data.events || []);
 
             if (constellationData !== null) {
                 skyMap.plotConstellations(constellationData, location.lat, location.lon, new Date(data.timestamp));
@@ -129,9 +138,44 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             planetCards.clear();
             skySummary.clear();
+            eventAlerts.clear();
             showError(error.message);
         }
     }
+
+    /**
+     * Fetch events for a location and render the timeline.
+     *
+     * Only called when the "Kommande" tab is activated and events have not
+     * yet been loaded for the current location.
+     *
+     * @param {Object} location - Location object with lat and lon.
+     */
+    async function loadEvents(location) {
+        eventsTimeline.showLoading();
+        try {
+            const data = await fetchEvents(location.lat, location.lon);
+            eventsTimeline.render(data.events || []);
+            eventsLoaded = true;
+        } catch (err) {
+            console.warn('Events: failed to load events', err);
+            eventsTimeline.showEmpty();
+        }
+    }
+
+    // --- Tab change listener ---
+    // Handles both skymap rendering and events lazy loading.
+    window.addEventListener('tabChanged', (event) => {
+        const { tabId } = event.detail;
+
+        if (tabId === 'skymap') {
+            skyMap.render();
+        }
+
+        if (tabId === 'events' && !eventsLoaded) {
+            loadEvents(currentLocation);
+        }
+    });
 
     // --- Settings trigger ---
     settingsTriggerEl.addEventListener('click', () => {
@@ -146,6 +190,8 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('locationChanged', (event) => {
         currentLocation = event.detail;
         locationDisplayEl.textContent = formatLocation(currentLocation);
+        // Reset events loaded flag so the timeline refreshes for the new location.
+        eventsLoaded = false;
         loadData(currentLocation);
     });
 

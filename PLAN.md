@@ -593,45 +593,84 @@ Each visible planet card displays a small equipment badge indicating whether the
 
 ---
 
-#### Phase B4: Conjunction and Opposition Alerts
+#### Phase B4: Astronomical Event Alerts — ✅
 
 **Depends on:** Phase 5 (API Layer) and Phase 6 (Frontend) for backend event detection and the frontend alert banner; Phase A3 (Sky Map plotting) additionally required for sky-map conjunction line and opposition glow rendering only — backend and banner work can proceed without A3
 **Parallelisable with:** Phase B2, Phase B3
 
 **Intended Outcome**
 
-The app detects and displays notable astronomical events: conjunctions (two planets or a planet and the Moon within 5° of each other) and oppositions (a superior planet's elongation exceeding 170°). A new `events` array in the API response lists current and upcoming events for the next 7 days. The frontend renders an event alert banner above the planet cards (and below the sky summary) when any events are active or imminent. Each alert includes a Swedish description, the date, and the involved bodies. On the sky map, bodies involved in an active conjunction are connected with a highlighted dashed line, and opposition planets are shown with a subtle glow.
+The app detects and displays six types of notable astronomical events within a 48-hour window and renders them as real-time alert banners on the planet cards tab. A new `events` array in the API response carries all active or imminent events. Each banner includes a Swedish description and the involved bodies. On the sky map, conjunction and occultation bodies are connected with a dashed line; opposition planets receive a subtle glow.
+
+The six event types detected:
+
+| event_type | Condition | Swedish description example |
+|---|---|---|
+| `conjunction` | Any two planets/Moon within 5° | "Venus och Jupiter i konjunktion (2,3° separation)" |
+| `opposition` | Mars/Jupiter/Saturn elongation > 170° | "Mars i opposition – bästa tillfället att observera planeten" |
+| `mercury_elongation` | Mercury elongation > 15° AND within 1° of local maximum | "Bästa tillfället att se Merkurius – titta lågt i väster strax efter solnedgång" |
+| `alignment` | 3+ naked-eye planets within 30° ecliptic arc | "4 planeter syns på rad i kvällshimlen!" |
+| `venus_brilliancy` | Venus magnitude < −4.5 | "Venus är nu på sin ljusaste – den syns till och med i dagsljus!" |
+| `moon_occultation` | Moon within 0.5° of a planet (6-hour sampling) | "Månen täcker Mars – ett sällsynt skådespel" |
+
+Events spanning multiple sample days are deduplicated into one, keeping the most extreme value.
 
 **Definition of Done**
-- [ ] `backend/app/models/planet.py` includes a new `AstronomicalEvent` Pydantic model with fields: `event_type` ("conjunction" or "opposition"), `bodies` (list of body names), `date` (ISO 8601 string), `separation_deg` (float, for conjunctions), `elongation_deg` (float, for oppositions), `description_sv` (Swedish description string)
-- [ ] `PlanetsResponse` includes `events: List[AstronomicalEvent]` (default empty list)
-- [ ] A new `backend/app/services/planets/events.py` module exports `detect_events(lat, lon, start_dt, end_dt) -> List[AstronomicalEvent]`
-- [ ] `detect_events` uses `ephem.separation()` to check all pairwise planet separations and each planet's separation from the Moon
-- [ ] `detect_events` uses the `.elong` attribute on superior planet bodies (Mars, Jupiter, Saturn) to detect oppositions
-- [ ] Conjunction threshold is 5° (configurable constant); opposition threshold is elongation > 170°
-- [ ] The function scans at daily intervals from `start_dt` to `end_dt` (7 days forward by default)
-- [ ] Each event includes a Swedish description, e.g. "Venus och Jupiter i konjunktion (2,3° separation)" or "Mars i opposition (elongation 178°)"
-- [ ] The `/visible` and `/tonight` endpoints call `detect_events()` and include the results in the response
-- [ ] `frontend/js/components/event-alerts.js` renders a banner for each event in the `events` array
-- [ ] Active events (happening today) use `--color-status-excellent` styling; upcoming events use `--color-status-fair`
-- [ ] The banner is not rendered when the `events` array is empty
-- [ ] On the sky map, bodies involved in an active conjunction are connected with a dashed line in `--color-accent-primary`
-- [ ] Opposition events are indicated on the sky map by a subtle glow effect on the planet dot
-- [ ] The event detection adds less than 100 ms to API response time (7 daily samples × 15 separation checks ≈ 105 `ephem` calls at ~1 ms each)
-- [ ] Mercury and Venus never generate opposition events (they are inferior planets)
-- [ ] The `/{name}` single-planet endpoint is intentionally excluded — it returns `PlanetPosition`, not `PlanetsResponse`, and therefore does not carry the `events` field; no changes are needed for that route
-- [ ] No regressions in existing endpoint response schemas — `events` is an additive field with a default empty list
+- [x] `backend/app/models/planet.py` includes a new `AstronomicalEvent` Pydantic model with fields: `event_type`, `bodies`, `date` (ISO 8601), `separation_deg`, `elongation_deg`, `description_sv`
+- [x] `PlanetsResponse` includes `events: List[AstronomicalEvent]` (default empty list)
+- [x] `backend/app/services/planets/events.py` exports `detect_events(lat, lon, start_dt, end_dt)` with six detector sub-functions
+- [x] `detect_events` scans a 48-hour window using `ephem.separation()`, `.elong`, and ecliptic coordinates
+- [x] The `/visible` and `/tonight` endpoints call `detect_events()` inside a try/except fallback and include results in the response
+- [x] `frontend/js/components/event-alerts.js` (`EventAlerts` class) renders a banner for each event; banner is hidden when the array is empty
+- [x] Active events use `--color-status-excellent` styling; upcoming events use `--color-status-fair`
+- [x] `frontend/js/components/sky-map.js` `plotBodies()` accepts an `events` param; draws dashed lines for conjunctions/occultations and adds `.sky-map-body--opposition` glow class for oppositions
+- [x] No regressions in existing endpoint response schemas — `events` is an additive field with a default empty list
 
 **Key files**
-- Create `backend/app/services/planets/events.py` — `detect_events()` function using `ephem.separation()` and `.elong`
-- Modify `backend/app/models/planet.py` — add `AstronomicalEvent` model; add `events` field to `PlanetsResponse`
-- Modify `backend/app/api/routes/planets.py` — call `detect_events()` in `/visible` and `/tonight` handlers; include events in response
-- Create `frontend/js/components/event-alerts.js` — event alert banner component
-- Create `frontend/css/components/event-alerts.css` — styling for event alert banners
+- Create `backend/app/services/planets/events.py` — `detect_events()` with six detector sub-functions
+- Modify `backend/app/models/planet.py` — add `AstronomicalEvent` and `EventsResponse` models; add `events` field to `PlanetsResponse`
+- Modify `backend/app/api/routes/planets.py` — call `detect_events()` in `/visible` and `/tonight` handlers with try/except fallback
+- Create `frontend/js/components/event-alerts.js` — `EventAlerts` class rendering alert banners
+- Create `frontend/css/components/event-alerts.css` — banner styles
 - Modify `frontend/css/main.css` — import `components/event-alerts.css`
-- Modify `frontend/index.html` — add `#eventAlerts` container between sky summary and planet cards
-- Modify `frontend/js/main.js` — instantiate `EventAlerts`; pass `data.events` to it after each API fetch
-- Modify `frontend/js/components/sky-map.js` — add conjunction line rendering and opposition glow effect in `plotBodies()`
+- Modify `frontend/index.html` — add `<div id="eventAlerts">` between sky summary and planet cards
+- Modify `frontend/js/main.js` — instantiate `EventAlerts`; call `eventAlerts.render(data.events)` after each data fetch
+- Modify `frontend/js/components/sky-map.js` — conjunction/occultation dashed lines and opposition glow in `plotBodies()`
+- Modify `frontend/css/components/sky-map.css` — add `.sky-map-conjunction-line` and `.sky-map-body--opposition` styles
+
+---
+
+#### Phase B5: Kommande Events Timeline — ✅
+
+**Depends on:** Phase B4 (event detection in `events.py`), Phase A1 (tab navigation shell)
+**Parallelisable with:** Phase C
+
+**Intended Outcome**
+
+A third "Kommande" tab shows all six event types across the next 60 days as a scrollable timeline. Events are grouped by Swedish month name. Each row displays the weekday and date, an event icon, a Swedish description, and a days-away badge ("idag" / "imorgon" / "om X dagar"). The tab lazy-loads its data on first switch and re-fetches whenever the location changes. An empty state message is shown when no notable events are found in the window.
+
+**Definition of Done**
+- [x] `backend/app/api/routes/events.py` provides a `GET /api/v1/events?lat=&lon=` endpoint with a 1-hour cache that calls `detect_events()` over a 60-day window and returns `EventsResponse`
+- [x] `backend/app/main.py` registers `events.router`
+- [x] `frontend/js/components/events-timeline.js` (`EventsTimeline` class) renders month-grouped rows with days-away badges, skeleton loading state, and an empty state message
+- [x] `frontend/css/components/events-timeline.css` styles the timeline, month headings, and days-away badges
+- [x] `frontend/js/api.js` exports `fetchEvents(lat, lon)` calling `/api/v1/events`
+- [x] `frontend/index.html` includes a "Kommande" tab button (`#tabEvents`) and a `#panelEvents` tab panel containing `#eventsTimelineContainer`
+- [x] `frontend/js/components/tab-nav.js` is refactored from hardcoded 2-tab logic to a generic 3-tab loop; dispatches a `tabChanged` custom event for all tabs
+- [x] `frontend/js/main.js` instantiates `EventsTimeline`, adds `loadEvents()`, and listens for `tabChanged`; events are lazy-loaded on first switch and the `eventsLoaded` flag resets on location change
+- [x] Empty state renders "Inga speciella händelser de närmaste 60 dagarna 🌙" when the response is empty
+- [x] No regressions in existing planet cards or sky map tabs
+
+**Key files**
+- Create `backend/app/api/routes/events.py` — `GET /api/v1/events` endpoint with 60-day window and 1-hour cache
+- Modify `backend/app/main.py` — register `events.router`
+- Create `frontend/js/components/events-timeline.js` — `EventsTimeline` class with month grouping, skeleton, and empty state
+- Create `frontend/css/components/events-timeline.css` — timeline and days-away badge styles
+- Modify `frontend/js/api.js` — add `fetchEvents(lat, lon)`
+- Modify `frontend/index.html` — add `#tabEvents` button and `#panelEvents` / `#eventsTimelineContainer`
+- Modify `frontend/css/main.css` — import `components/events-timeline.css`
+- Modify `frontend/js/components/tab-nav.js` — refactor to generic 3-tab loop with `tabChanged` event dispatch
+- Modify `frontend/js/main.js` — instantiate `EventsTimeline`; add `loadEvents()`; wire `tabChanged` listener with lazy-load and location-reset logic
 
 ### Phase C: Extended Bodies
 - Add Uranus and Neptune (telescope targets)

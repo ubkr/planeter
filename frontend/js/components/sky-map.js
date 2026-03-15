@@ -316,7 +316,7 @@ export class SkyMap {
 
         // If plotBodies() was called before render() completed, replay it now.
         if (this._pendingPlanets !== null) {
-            this.plotBodies(this._pendingPlanets, this._pendingSun, this._pendingMoon);
+            this.plotBodies(this._pendingPlanets, this._pendingSun, this._pendingMoon, this._pendingEvents || []);
         }
     }
 
@@ -452,7 +452,9 @@ export class SkyMap {
     }
 
     /**
-     * Plot celestial bodies (planets, Sun, Moon) onto the sky map.
+     * Plot celestial bodies (planets, Sun, Moon) onto the sky map, and
+     * optionally overlay event indicators for conjunctions, moon occultations,
+     * and oppositions.
      *
      * Safe to call before render() — the data is stored and replayed once the
      * SVG grid is ready. Safe to call multiple times — the body layer is fully
@@ -464,13 +466,16 @@ export class SkyMap {
      * @param {Object} sun - Sun object with elevation_deg and azimuth_deg.
      * @param {Object} moon - Moon object with elevation_deg, azimuth_deg,
      *   and illumination (0–1 float).
+     * @param {Object[]} [events=[]] - Array of AstronomicalEvent objects from the API.
+     *   Used to draw conjunction lines and opposition glows on the chart.
      */
-    plotBodies(planets, sun, moon) {
+    plotBodies(planets, sun, moon, events = []) {
         // Defer if the SVG grid has not been rendered yet.
         if (!this._rendered || !this.container.querySelector('svg')) {
             this._pendingPlanets = planets;
             this._pendingSun = sun;
             this._pendingMoon = moon;
+            this._pendingEvents = events;
             return;
         }
 
@@ -480,6 +485,7 @@ export class SkyMap {
         this._pendingPlanets = null;
         this._pendingSun = undefined;
         this._pendingMoon = undefined;
+        this._pendingEvents = undefined;
 
         const svg = this.container.querySelector('svg');
 
@@ -631,6 +637,84 @@ export class SkyMap {
             });
             label.textContent = 'Månen';
             bodiesGroup.appendChild(label);
+        }
+
+        // --- Event indicators ---
+        // Build a lookup table from lowercase body name to its plotted {x, y} position
+        // and the circle element (for opposition glow). Only bodies plotted above the
+        // horizon are included so indicators only appear for visible bodies.
+        if (Array.isArray(events) && events.length > 0) {
+            // Map: body name (lowercase) → { x, y, el }
+            const bodyPositions = new Map();
+
+            for (const planet of planets) {
+                if (planet.altitude_deg >= 0) {
+                    const pos = altAzToXY(planet.altitude_deg, planet.azimuth_deg, CENTER_X, CENTER_Y, HORIZON_RADIUS);
+                    // The circle element is the last child added for this planet.
+                    // We need to find it by class to attach the opposition modifier.
+                    const circleEl = bodiesGroup.querySelector(`.sky-map-body--${planet.name.toLowerCase()}`);
+                    bodyPositions.set(planet.name.toLowerCase(), { ...pos, el: circleEl });
+                }
+            }
+
+            // Also include Sun and Moon so conjunction lines can connect them.
+            if (sun && sun.elevation_deg >= 0) {
+                const pos = altAzToXY(sun.elevation_deg, sun.azimuth_deg, CENTER_X, CENTER_Y, HORIZON_RADIUS);
+                const circleEl = bodiesGroup.querySelector('.sky-map-body--sun');
+                bodyPositions.set('sun', { ...pos, el: circleEl });
+            }
+            if (moon && moon.elevation_deg >= 0) {
+                const pos = altAzToXY(moon.elevation_deg, moon.azimuth_deg, CENTER_X, CENTER_Y, HORIZON_RADIUS);
+                const circleEl = bodiesGroup.querySelector('.sky-map-body--moon');
+                bodyPositions.set('moon', { ...pos, el: circleEl });
+            }
+
+            for (const event of events) {
+                const type = event.event_type;
+
+                if (type === 'conjunction' || type === 'moon_occultation') {
+                    // Conjunction / occultation: draw a dashed line between the two
+                    // bodies involved. The API encodes bodies in the description but
+                    // also provides a `bodies` array when available. Fall back to
+                    // checking known planet names present in bodyPositions.
+                    const involved = Array.isArray(event.bodies)
+                        ? event.bodies.map((b) => b.toLowerCase())
+                        : [];
+
+                    if (involved.length >= 2) {
+                        const posA = bodyPositions.get(involved[0]);
+                        const posB = bodyPositions.get(involved[1]);
+
+                        if (posA && posB) {
+                            const line = svgEl('line');
+                            setAttrs(line, {
+                                x1: posA.x,
+                                y1: posA.y,
+                                x2: posB.x,
+                                y2: posB.y,
+                                class: 'sky-map-conjunction-line',
+                                'pointer-events': 'none',
+                            });
+                            // Insert the line before the bodies group so it renders behind dots.
+                            svg.insertBefore(line, bodiesGroup);
+                        }
+                    }
+                }
+
+                if (type === 'opposition') {
+                    // Opposition: add a glow modifier class to the planet's circle.
+                    const bodyName = Array.isArray(event.bodies) && event.bodies.length > 0
+                        ? event.bodies[0].toLowerCase()
+                        : null;
+
+                    if (bodyName) {
+                        const info = bodyPositions.get(bodyName);
+                        if (info && info.el) {
+                            info.el.classList.add('sky-map-body--opposition');
+                        }
+                    }
+                }
+            }
         }
     }
 }

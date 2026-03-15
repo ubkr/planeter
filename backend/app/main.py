@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from .config import settings
-from .api.routes import health, geocode, planets
+from .api.routes import health, geocode, planets, events
 
 FRONTEND_DIR = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "..", "frontend")
@@ -20,6 +20,7 @@ app = FastAPI(
 app.include_router(health.router)
 app.include_router(geocode.router)
 app.include_router(planets.router)
+app.include_router(events.router)
 
 
 @app.get("/")

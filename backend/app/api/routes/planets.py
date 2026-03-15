@@ -17,6 +17,7 @@ from ...models.planet import (
 )
 from ...services.aggregator import get_weather
 from ...services.planets.calculator import calculate_planet_positions
+from ...services.planets.events import detect_events
 from ...services.scoring import apply_scores, score_tonight
 from ...utils.logger import setup_logger
 from ...utils.moon import calculate_moon_penalty
@@ -344,6 +345,12 @@ async def get_visible_planets(
     if dark_start is not None:
         _compute_best_viewing_times(planets, lat, lon, dark_start, dark_end)
 
+    try:
+        events = detect_events(lat, lon, now_utc - timedelta(days=1), now_utc + timedelta(days=2))
+    except Exception as exc:
+        logger.warning(f"detect_events failed for ({lat}, {lon}): {exc}")
+        events = []
+
     sun_info = _build_sun_info(sun_data)
     moon_info = _build_moon_info(moon_data)
 
@@ -362,6 +369,7 @@ async def get_visible_planets(
             source=weather_data.source,
         ),
         planets=planets,
+        events=events,
     )
 
 
@@ -431,6 +439,13 @@ async def get_tonight_planets(
             f"samples={len(sample_times)}"
         )
 
+    now_utc = datetime.now(timezone.utc)
+    try:
+        events = detect_events(lat, lon, now_utc - timedelta(days=1), now_utc + timedelta(days=2))
+    except Exception as exc:
+        logger.warning(f"detect_events failed for ({lat}, {lon}): {exc}")
+        events = []
+
     # Use the pre-computed sun/moon data so metadata reflects the same moment
     # used for scoring, not the wall-clock time of the HTTP request.
     sun_info = _build_sun_info(sun_data)
@@ -447,6 +462,7 @@ async def get_tonight_planets(
         ),
         planets=planets,
         tonight_score=tonight,
+        events=events,
     )
 
 

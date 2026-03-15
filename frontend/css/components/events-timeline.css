@@ -1,0 +1,171 @@
+/* ==========================================================================
+   Events Timeline Component
+   Displays upcoming astronomical events grouped by calendar month.
+   ========================================================================== */
+
+/* --- Outer Container --- */
+
+.events-timeline {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
+/* --- Month Header --- */
+
+.events-timeline__month-header {
+    position: sticky;
+    top: 0;
+    z-index: var(--z-sticky);
+    padding: var(--space-xs) var(--space-md);
+    background: var(--color-bg-deep);
+    border-bottom: 1px solid var(--border-color);
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+/* --- Event Row --- */
+
+.events-timeline__event {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    border-bottom: 1px solid var(--border-color);
+    transition: background-color var(--transition-fast);
+}
+
+.events-timeline__event:last-child {
+    border-bottom: none;
+}
+
+.events-timeline__event:hover {
+    background-color: var(--color-bg-surface-hover);
+}
+
+/* --- Date Column --- */
+
+.events-timeline__date {
+    flex-shrink: 0;
+    width: 4rem;
+    font-family: var(--font-family-mono);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    /* Keep day number and weekday abbreviation on one line */
+    white-space: nowrap;
+}
+
+/* --- Event Icon --- */
+
+.events-timeline__icon {
+    flex-shrink: 0;
+    font-size: var(--font-size-lg);
+    line-height: 1;
+}
+
+/* --- Description --- */
+
+.events-timeline__description {
+    flex: 1;
+    min-width: 0;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-primary);
+    line-height: 1.4;
+}
+
+/* --- Days-Away Badge --- */
+
+.events-timeline__days-badge {
+    flex-shrink: 0;
+    display: inline-block;
+    padding: 2px var(--space-xs);
+    border-radius: var(--radius-full);
+    border: 1px solid var(--border-color);
+    background: var(--color-bg-surface);
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+    white-space: nowrap;
+}
+
+/* Modifier: today */
+
+.events-timeline__days-badge--today {
+    background: var(--color-status-excellent);
+    border-color: var(--color-status-excellent);
+    color: var(--color-text-inverse);
+    font-weight: 700;
+}
+
+/* Modifier: within the next 7 days */
+
+.events-timeline__days-badge--soon {
+    background: color-mix(in srgb, var(--color-status-fair) 20%, transparent);
+    border-color: color-mix(in srgb, var(--color-status-fair) 40%, transparent);
+    color: var(--color-status-fair);
+    font-weight: 600;
+}
+
+/* --- Empty State --- */
+
+.events-timeline__empty {
+    padding: var(--space-xl) var(--space-md);
+    text-align: center;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    font-style: italic;
+}
+
+/* --- Skeleton Loading State --- */
+
+.events-timeline__event--skeleton {
+    pointer-events: none;
+}
+
+/* Shared shimmer gradient applied to all skeleton blocks */
+
+.events-timeline__skeleton-block {
+    color: transparent;
+    background: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0.04) 0%,
+        rgba(255, 255, 255, 0.08) 50%,
+        rgba(255, 255, 255, 0.04) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.8s ease-in-out infinite;
+    border-radius: var(--radius-sm);
+    border-color: transparent;
+}
+
+/* Individual skeleton block widths so the loading state looks natural */
+
+.events-timeline__event--skeleton .events-timeline__date {
+    height: 1em;
+}
+
+.events-timeline__event--skeleton .events-timeline__icon {
+    width: 1.5em;
+    height: 1em;
+}
+
+.events-timeline__event--skeleton .events-timeline__description {
+    height: 1em;
+    /* Vary widths across rows via nth-child so they look like real text */
+    width: 70%;
+}
+
+.events-timeline__event--skeleton:nth-child(2n) .events-timeline__description {
+    width: 55%;
+}
+
+.events-timeline__event--skeleton:nth-child(3n) .events-timeline__description {
+    width: 80%;
+}
+
+.events-timeline__event--skeleton .events-timeline__days-badge {
+    width: 4rem;
+    height: 1em;
+}

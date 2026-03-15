@@ -114,3 +114,20 @@
     pointer-events: none;
     user-select: none;
 }
+
+/* --- Event indicators --- */
+
+/* Dashed line connecting two bodies involved in a conjunction or occultation. */
+.sky-map-conjunction-line {
+    fill: none;
+    stroke: var(--color-accent-primary, #f5c842);
+    stroke-width: 1;
+    stroke-dasharray: 4, 4;
+    opacity: 0.5;
+    stroke-linecap: round;
+}
+
+/* Glow applied to a planet circle when it is at opposition. */
+.sky-map-body--opposition {
+    filter: drop-shadow(0 0 6px var(--color-accent-primary, #f5c842));
+}

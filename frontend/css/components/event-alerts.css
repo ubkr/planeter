@@ -1,0 +1,111 @@
+/* ==========================================================================
+   Event Alerts Component
+   Displays real-time astronomical event alert banners above the planet cards.
+   ========================================================================== */
+
+/* --- Alerts Container --- */
+
+.event-alerts {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    width: 100%;
+}
+
+/* --- Alert Card Base --- */
+
+.event-alert {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--color-bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    border-left: 4px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
+    transition:
+        background-color var(--transition-normal),
+        border-color var(--transition-normal);
+}
+
+/* --- Card State Modifiers --- */
+
+/* Active: event happening today or has no days_away value */
+.event-alert--active {
+    border-left-color: var(--color-status-excellent);
+}
+
+/* Upcoming: event is days away */
+.event-alert--upcoming {
+    border-left-color: var(--color-status-fair);
+}
+
+/* --- Icon --- */
+
+.event-alert__icon {
+    font-size: var(--font-size-lg);
+    line-height: 1;
+    flex-shrink: 0;
+    margin-right: var(--space-2xs);
+}
+
+/* --- Description --- */
+
+.event-alert__description {
+    flex-grow: 1;
+    color: var(--color-text-primary);
+    font-size: var(--font-size-sm);
+    line-height: 1.4;
+    min-width: 0;
+}
+
+/* --- Date Badge --- */
+
+.event-alert__date {
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-xs);
+    white-space: nowrap;
+    flex-shrink: 0;
+    padding: var(--space-2xs) var(--space-sm);
+    background: color-mix(in srgb, var(--color-text-secondary) 12%, transparent);
+    border-radius: var(--radius-full);
+    font-weight: 500;
+}
+
+/* Active events get a tinted date badge matching the accent */
+.event-alert--active .event-alert__date {
+    background: color-mix(in srgb, var(--color-status-excellent) 15%, transparent);
+    color: var(--color-status-excellent);
+}
+
+/* --- Skeleton Loading State --- */
+
+.event-alert--skeleton {
+    pointer-events: none;
+}
+
+.event-alert--skeleton .event-alert__icon,
+.event-alert--skeleton .event-alert__description,
+.event-alert--skeleton .event-alert__date {
+    color: transparent;
+    background: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0.04) 0%,
+        rgba(255, 255, 255, 0.08) 50%,
+        rgba(255, 255, 255, 0.04) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.8s ease-in-out infinite;
+    border-radius: var(--radius-sm);
+}
+
+.event-alert--skeleton .event-alert__description {
+    height: 1em;
+}
+
+.event-alert--skeleton .event-alert__date {
+    min-width: 4rem;
+    height: 1em;
+}
