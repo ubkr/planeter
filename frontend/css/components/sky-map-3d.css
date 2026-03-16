@@ -116,3 +116,20 @@
     color: var(--color-text-muted);
     line-height: 1.5;
 }
+
+/* --- Celestial body labels (CSS2DRenderer overlays) --- */
+
+.sky-map-3d-label {
+    font-family: var(--font-family-base);
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+    white-space: nowrap;
+    pointer-events: none;
+    user-select: none;
+    padding: var(--space-2xs) var(--space-xs);
+    text-shadow:
+        0 1px 3px rgba(0, 0, 0, 0.9),
+        0 0 6px rgba(0, 0, 0, 0.6);
+    transition: color var(--transition-fast), opacity 0.2s ease;
+}
+

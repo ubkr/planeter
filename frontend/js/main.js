@@ -168,6 +168,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 // calls _handleResize() to size the WebGL canvas.
                 applyViewMode('3d');
                 skyMap3d.activate();
+                if (lastApiData !== null) {
+                    skyMap3d.plotBodies(lastApiData.planets, lastApiData.sun, lastApiData.moon, lastApiData.events || []);
+                }
                 localStorage.setItem(VIEW_MODE_KEY, '3d');
             } catch (err) {
                 console.error('Sky map 3D: failed to load or initialise', err);
@@ -249,6 +252,10 @@ document.addEventListener('DOMContentLoaded', () => {
             planetCards.render(data.planets);
             eventAlerts.render(data.events || []);
             skyMap.plotBodies(data.planets, data.sun, data.moon, data.events || []);
+
+            if (skyMap3d !== null) {
+                skyMap3d.plotBodies(data.planets, data.sun, data.moon, data.events || []);
+            }
 
             if (constellationData !== null) {
                 skyMap.plotConstellations(constellationData, location.lat, location.lon, new Date(data.timestamp));

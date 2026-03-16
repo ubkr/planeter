@@ -755,7 +755,7 @@ The app gains a new immersive 3D viewing mode inside the "Stjärnkarta" tab. A t
 
 ---
 
-#### Phase E3: Plotting Celestial Bodies in 3D
+#### Phase E3: Plotting Celestial Bodies in 3D — ✅
 
 **Depends on:** Phase E2, Phase A3
 **Parallelisable with:** None
@@ -764,15 +764,15 @@ The app gains a new immersive 3D viewing mode inside the "Stjärnkarta" tab. A t
 The planetary bodies (and the Sun and Moon) currently plotted in 2D are brought into the 3D sphere. The spherical coordinates (altitude, azimuth) are projected into 3D Cartesian coordinates (`x, y, z`), mapping them to a fixed radius on the inner surface of the sphere. All celestial bodies are rendered as **sprites (billboarded quads)**, coloured and sized relative to their properties (e.g. magnitude), consistent with the colour coding used in the 2D view. Body text labels are rendered as **CSS2D HTML overlays** via Three.js `CSS2DRenderer`, matching the labelling style of the 2D sky map. An interactive raycaster lets the user tap or hover on bodies to summon the standard Swedish tooltips.
 
 **Definition of Done**
-- [ ] Spherical coordinate math correctly converts altitude/azimuth into Cartesian coordinates for sphere plotting.
-- [ ] Planets, the Sun, and the Moon render as billboarded sprite quads in the celestial sky based on the current location's live API data.
-- [ ] Bodies with altitude < 0 (below the horizon) are hidden entirely — the ground plane from E2 acts as the occlusion boundary.
-- [ ] Hovering (desktop) or tapping (mobile) on a 3D celestial object works smoothly using a raycaster.
-- [ ] Triggering an object displays the existing Swedish tooltip interface (with name, altitude, azimuth direction, and magnitude).
-- [ ] Each celestial body has a text label rendered as a CSS2D HTML overlay, matching the labelling style of the 2D sky map.
-- [ ] `SkyMap3D` exposes a `plotBodies(planets, sun, moon, events)` method with the same parameter signature as the 2D `SkyMap.plotBodies()`.
-- [ ] The Sun is rendered as a larger warm-coloured sprite; the Moon sprite shows its illumination percentage in its tooltip; planets use the same colour coding as the 2D view's CSS classes.
-- [ ] Updating the geographic location dynamically refreshes object placement in the 3D scene.
+- [x] Spherical coordinate math correctly converts altitude/azimuth into Cartesian coordinates for sphere plotting.
+- [x] Planets, the Sun, and the Moon render as billboarded sprite quads in the celestial sky based on the current location's live API data.
+- [x] Bodies with altitude < 0 (below the horizon) are hidden entirely — the ground plane from E2 acts as the occlusion boundary.
+- [x] Hovering (desktop) or tapping (mobile) on a 3D celestial object works smoothly using a raycaster.
+- [x] Triggering an object displays the existing Swedish tooltip interface (with name, altitude, azimuth direction, and magnitude).
+- [x] Each celestial body has a text label rendered as a CSS2D HTML overlay, matching the labelling style of the 2D sky map.
+- [x] `SkyMap3D` exposes a `plotBodies(planets, sun, moon, events)` method with the same parameter signature as the 2D `SkyMap.plotBodies()`.
+- [x] The Sun is rendered as a larger warm-coloured sprite; the Moon sprite shows its illumination percentage in its tooltip; planets use the same colour coding as the 2D view's CSS classes.
+- [x] Updating the geographic location dynamically refreshes object placement in the 3D scene.
 
 **Key files**
 - Modify `frontend/js/components/sky-map-3d.js` — implement spherical-to-cartesian projection, sprite rendering, CSS2DRenderer label overlays, and raycasting for interaction.

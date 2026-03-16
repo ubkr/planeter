@@ -7,8 +7,7 @@
  *   - An alt-azimuth grid (altitude rings at 0°/30°/60°, azimuth lines every 45°)
  *   - Cardinal direction labels (N, O, S, V) rendered as canvas-texture sprites
  *   - OrbitControls for drag-to-look navigation (zoom and pan disabled)
- *
- * Planet plotting is NOT included here — that is Phase E3/E4.
+ *   - Celestial body sprites (planets, Sun, Moon) with CSS2D tooltip labels
  *
  * Import paths assume the file lives at:
  *   frontend/js/components/sky-map-3d.js
@@ -16,6 +15,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { altAzToCartesian } from '../astro-projection.js';
 
 // ---------------------------------------------------------------------------
@@ -47,6 +47,20 @@ const CARDINALS = [
     { text: 'S', azimuth: 180 },
     { text: 'V', azimuth: 270 },
 ];
+
+/**
+ * Colour for each celestial body used when rendering glow sprites.
+ * Keys are lowercase body names.
+ */
+const BODY_COLORS = {
+    mercury: '#9ca3af',
+    venus:   '#fbbf24',
+    mars:    '#ef4444',
+    jupiter: '#f59e0b',
+    saturn:  '#d4a017',
+    sun:     '#fde68a',
+    moon:    '#e2e8f0',
+};
 
 // ---------------------------------------------------------------------------
 // Private helpers
@@ -161,6 +175,47 @@ function buildCardinalLabels() {
     return group;
 }
 
+/**
+ * Create a CanvasTexture rendering a filled circle with a soft radial gradient
+ * glow for use as a body sprite.
+ *
+ * @param {string} color - CSS colour string (e.g. '#fbbf24').
+ * @returns {THREE.CanvasTexture}
+ */
+function buildBodyTexture(color) {
+    const canvas = document.createElement('canvas');
+    canvas.width  = 64;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+
+    // Radial gradient: body colour at centre, transparent at edge.
+    const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gradient.addColorStop(0,   color);
+    gradient.addColorStop(1,   'rgba(0,0,0,0)');
+
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 64, 64);
+
+    // Solid filled circle in the centre.
+    ctx.beginPath();
+    ctx.arc(32, 32, 20, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+
+    return new THREE.CanvasTexture(canvas);
+}
+
+/**
+ * Compute the sprite scale for a celestial body based on its magnitude.
+ * Brighter bodies (lower magnitude) produce a larger sprite.
+ *
+ * @param {number} magnitude
+ * @returns {number} World-space scale value.
+ */
+function bodyScale(magnitude) {
+    return SPHERE_RADIUS * Math.max(0.025, Math.min(0.08, 0.055 - magnitude * 0.008));
+}
+
 // ---------------------------------------------------------------------------
 // SkyMap3D class
 // ---------------------------------------------------------------------------
@@ -174,7 +229,10 @@ function buildCardinalLabels() {
  *   map3d.deactivate();   // pause rendering
  *   map3d.dispose();      // full teardown
  *
- * Planet/body plotting is left for Phase E3.
+ * Body plotting:
+ *   map3d.plotBodies(planets, sun, moon, events);
+ *   Safe to call before activate() — arguments are stored and replayed once
+ *   the scene is ready.
  */
 export default class SkyMap3D {
     /**
@@ -185,10 +243,23 @@ export default class SkyMap3D {
         this.container = container;
 
         // All Three.js state is null until activate() initialises it.
-        this._renderer = null;
-        this._scene    = null;
-        this._camera   = null;
-        this._controls = null;
+        this._renderer    = null;
+        this._cssRenderer = null;
+        this._scene       = null;
+        this._camera      = null;
+        this._controls    = null;
+
+        // Body and label groups — created once in _initScene().
+        this._bodiesGroup = null;
+        this._labelsGroup = null;
+
+        // Raycaster for cursor feedback on body sprites.
+        this._raycaster = null;
+        this._pointer   = null;
+
+        // Tracks the label element currently under the pointer, so mouseout can
+        // be dispatched when the pointer moves away.
+        this._hoveredLabel = null;
 
         // Tracks whether the render loop is currently active, used to prevent
         // double-registration of the window resize listener.
@@ -196,6 +267,9 @@ export default class SkyMap3D {
 
         // Bound resize handler so it can be removed cleanly.
         this._onResize = this._handleResize.bind(this);
+
+        // Deferred plotBodies arguments stored when activate() has not yet run.
+        this._pendingBodies = null;
     }
 
     // -----------------------------------------------------------------------
@@ -227,6 +301,13 @@ export default class SkyMap3D {
             window.addEventListener('resize', this._onResize);
             this._active = true;
         }
+
+        // Replay any plotBodies() call that arrived before the scene was ready.
+        if (this._pendingBodies !== null) {
+            const { planets, sun, moon, events } = this._pendingBodies;
+            this._pendingBodies = null;
+            this.plotBodies(planets, sun, moon, events);
+        }
     }
 
     /**
@@ -257,9 +338,115 @@ export default class SkyMap3D {
             this._renderer = null;
         }
 
-        this._controls = null;
-        this._camera   = null;
-        this._scene    = null;
+        if (this._cssRenderer !== null) {
+            if (this._cssRenderer.domElement.parentNode) {
+                this._cssRenderer.domElement.parentNode.removeChild(this._cssRenderer.domElement);
+            }
+            this._cssRenderer = null;
+        }
+
+        if (this._controls !== null) {
+            this._controls.dispose();
+        }
+        this._controls    = null;
+        this._camera      = null;
+        this._scene       = null;
+        this._bodiesGroup = null;
+        this._labelsGroup = null;
+        this._raycaster   = null;
+        this._pointer     = null;
+    }
+
+    /**
+     * Plot celestial bodies (planets, Sun, Moon) as glow sprites with CSS2D
+     * tooltip labels into the 3D scene.
+     *
+     * Safe to call before activate() — arguments are stored and replayed once
+     * the scene is ready. Safe to call multiple times — all previous sprites
+     * and labels are disposed and removed before rebuilding.
+     *
+     * Bodies whose altitude is strictly below 0° are not rendered.
+     *
+     * @param {Object[]} planets - Array of planet objects from the API.
+     *   Each must have: name, name_sv, altitude_deg, azimuth_deg, direction, magnitude.
+     * @param {Object} sun - Sun object with elevation_deg and azimuth_deg.
+     * @param {Object} moon - Moon object with elevation_deg, azimuth_deg, illumination.
+     * @param {Object[]} [events=[]] - Astronomical event objects (reserved for E4).
+     */
+    plotBodies(planets, sun, moon, events = []) {
+        // Defer if the scene has not been initialised yet.
+        if (this._scene === null) {
+            this._pendingBodies = { planets, sun, moon, events };
+            return;
+        }
+
+        if (!Array.isArray(planets)) return;
+
+        // Clear previous sprites (dispose GPU resources) and labels.
+        this._clearBodies();
+
+        // --- Planets ---
+        for (const planet of planets) {
+            if (planet.altitude_deg < 0) continue;
+
+            const color = BODY_COLORS[planet.name.toLowerCase()] ?? '#ffffff';
+            const tooltipText =
+                `${planet.name_sv}\n` +
+                `Höjd: ${planet.altitude_deg.toFixed(1)}°\n` +
+                `Riktning: ${planet.direction}\n` +
+                `Magnitud: ${planet.magnitude.toFixed(1)}`;
+
+            this._addBodySprite(
+                planet.altitude_deg,
+                planet.azimuth_deg,
+                color,
+                planet.magnitude,
+                planet.name_sv,
+                tooltipText,
+                { name_sv: planet.name_sv, altitude_deg: planet.altitude_deg, azimuth_deg: planet.azimuth_deg, direction: planet.direction, magnitude: planet.magnitude, type: 'planet' },
+            );
+        }
+
+        // --- Sun ---
+        if (sun && sun.elevation_deg >= 0) {
+            const tooltipText =
+                `Solen\n` +
+                `Höjd: ${sun.elevation_deg.toFixed(1)}°\n` +
+                `Riktning: ${sun.direction || sun.azimuth_deg.toFixed(0) + '°'}`;
+
+            // Use a fixed large scale for the Sun (1.5× the brightest-star formula).
+            const sunMagnitude = -26; // effectively forces max scale, overridden below
+            this._addBodySprite(
+                sun.elevation_deg,
+                sun.azimuth_deg,
+                BODY_COLORS.sun,
+                sunMagnitude,
+                'Solen',
+                tooltipText,
+                { name_sv: 'Solen', altitude_deg: sun.elevation_deg, azimuth_deg: sun.azimuth_deg, type: 'sun' },
+                /* scaleFactor */ 1.5,
+            );
+        }
+
+        // --- Moon ---
+        if (moon && moon.elevation_deg >= 0) {
+            const tooltipText =
+                `Månen\nHöjd: ${moon.elevation_deg.toFixed(1)}°\nRiktning: ${moon.direction || moon.azimuth_deg.toFixed(0) + '°'}\nBelysning: ${Math.round(moon.illumination * 100)}%`;
+
+            this._addBodySprite(
+                moon.elevation_deg,
+                moon.azimuth_deg,
+                BODY_COLORS.moon,
+                // Use a fixed moderate magnitude so the Moon is distinctly large.
+                -12,
+                'Månen',
+                tooltipText,
+                { name_sv: 'Månen', altitude_deg: moon.elevation_deg, azimuth_deg: moon.azimuth_deg, type: 'moon' },
+                /* scaleFactor */ 1.3,
+            );
+        }
+
+        // TODO E4: render event indicators
     }
 
     // -----------------------------------------------------------------------
@@ -283,6 +470,15 @@ export default class SkyMap3D {
         }
 
         renderer.setClearColor(0x0a0a1a, 1);
+
+        // --- CSS2DRenderer (overlays HTML labels on the WebGL canvas) ---
+        const cssRenderer = new CSS2DRenderer();
+        cssRenderer.domElement.style.position     = 'absolute';
+        cssRenderer.domElement.style.top          = '0';
+        cssRenderer.domElement.style.left         = '0';
+        cssRenderer.domElement.style.pointerEvents = 'none';
+        cssRenderer.domElement.style.width        = '100%';
+        cssRenderer.domElement.style.height       = '100%';
 
         // --- Scene ---
         const scene = new THREE.Scene();
@@ -340,23 +536,71 @@ export default class SkyMap3D {
         // --- Cardinal direction labels ---
         scene.add(buildCardinalLabels());
 
+        // --- Body groups (sprites and CSS2D labels) ---
+        const bodiesGroup = new THREE.Group();
+        const labelsGroup = new THREE.Group();
+        scene.add(bodiesGroup);
+        scene.add(labelsGroup);
+
+        // --- Raycaster for cursor feedback ---
+        const raycaster = new THREE.Raycaster();
+        const pointer   = new THREE.Vector2();
+
         // Commit scene/camera/controls to the instance before touching the DOM.
         // If any of these assignments were to throw, no canvas will have been
         // orphaned in the DOM and this._renderer remains null (the sentinel).
-        this._scene    = scene;
-        this._camera   = camera;
-        this._controls = controls;
+        this._scene       = scene;
+        this._camera      = camera;
+        this._controls    = controls;
+        this._bodiesGroup = bodiesGroup;
+        this._labelsGroup = labelsGroup;
+        this._raycaster   = raycaster;
+        this._pointer     = pointer;
 
-        // Attach the canvas to the DOM only after all instance fields above are
-        // set, so a teardown racing a failed init can still clean up safely.
+        // Attach the WebGL canvas to the DOM.
         renderer.domElement.setAttribute('aria-hidden', 'true');
         this.container.appendChild(renderer.domElement);
 
-        // this._renderer is assigned last so that the null check in activate()
-        // is a reliable sentinel for complete initialisation — any earlier throw
-        // leaves it null.
+        // The container must be positioned so the CSS2DRenderer overlay is
+        // correctly layered over the WebGL canvas.
+        if (getComputedStyle(this.container).position === 'static') {
+            this.container.style.position = 'relative';
+        }
+
+        // Attach the CSS2DRenderer overlay after the canvas.
+        this.container.appendChild(cssRenderer.domElement);
+
+        // Register pointermove for cursor feedback on body sprites.
+        renderer.domElement.addEventListener('pointermove', (event) => {
+            this._handlePointerMove(event);
+        });
+
+        // Register pointerdown to trigger tooltips on tap (mobile) and click.
+        renderer.domElement.addEventListener('pointerdown', (event) => {
+            if (this._renderer === null || this._bodiesGroup === null) return;
+
+            const rect = this._renderer.domElement.getBoundingClientRect();
+            const ndcX =  ((event.clientX - rect.left) / rect.width)  * 2 - 1;
+            const ndcY = -((event.clientY - rect.top)  / rect.height) * 2 + 1;
+
+            const pointer = new THREE.Vector2(ndcX, ndcY);
+            this._raycaster.setFromCamera(pointer, this._camera);
+
+            const hits = this._raycaster.intersectObjects(this._bodiesGroup.children);
+            if (hits.length > 0) {
+                const labelEl = hits[0].object.userData.labelEl;
+                if (labelEl) {
+                    labelEl.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, cancelable: true }));
+                }
+            }
+        });
+
+        // this._renderer and this._cssRenderer are assigned last so that the
+        // null check in activate() is a reliable sentinel for complete
+        // initialisation — any earlier throw leaves them null.
         this._setPixelRatio(renderer);
-        this._renderer = renderer;
+        this._renderer    = renderer;
+        this._cssRenderer = cssRenderer;
     }
 
     // -----------------------------------------------------------------------
@@ -371,6 +615,7 @@ export default class SkyMap3D {
                 this._controls.update();
             }
             this._renderer.render(this._scene, this._camera);
+            this._cssRenderer.render(this._scene, this._camera);
         });
     }
 
@@ -400,6 +645,7 @@ export default class SkyMap3D {
         this._camera.aspect = width / height;
         this._camera.updateProjectionMatrix();
         this._renderer.setSize(width, height);
+        this._cssRenderer.setSize(width, height);
     }
 
     // -----------------------------------------------------------------------
@@ -417,5 +663,125 @@ export default class SkyMap3D {
     _setPixelRatio(renderer = this._renderer) {
         if (renderer === null) return;
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    }
+
+    // -----------------------------------------------------------------------
+    // Private — body sprite management
+    // -----------------------------------------------------------------------
+
+    /**
+     * Remove and dispose all body sprites and CSS2D label objects from the
+     * _bodiesGroup and _labelsGroup.
+     *
+     * SpriteMaterial and CanvasTexture are explicitly disposed to prevent
+     * GPU memory leaks on each plotBodies() call.
+     */
+    _clearBodies() {
+        // Dismiss any active tooltip to prevent stale activeIcon references
+        if (this._hoveredLabel !== null) {
+            this._hoveredLabel.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, cancelable: true }));
+            this._hoveredLabel = null;
+        }
+
+        // Dispose sprite materials and textures.
+        for (const child of this._bodiesGroup.children) {
+            if (child.material) {
+                if (child.material.map) {
+                    child.material.map.dispose();
+                }
+                child.material.dispose();
+            }
+        }
+        this._bodiesGroup.clear();
+
+        // CSS2DObjects do not hold GPU resources, but their DOM elements are
+        // removed from the overlay when the object leaves the scene graph.
+        this._labelsGroup.clear();
+    }
+
+    /**
+     * Create one body sprite and its CSS2D label, then add both to their
+     * respective groups.
+     *
+     * @param {number} altitudeDeg - Body altitude in degrees.
+     * @param {number} azimuthDeg  - Body azimuth in degrees.
+     * @param {string} color       - CSS colour string for the glow texture.
+     * @param {number} magnitude   - Apparent magnitude (drives sprite scale).
+     * @param {string} nameSv      - Swedish name shown as label text.
+     * @param {string} tooltipText - Plain-text tooltip content.
+     * @param {Object} userData    - Metadata stored in sprite.userData.
+     * @param {number} [scaleFactor=1] - Multiplier applied on top of the
+     *   magnitude-based scale formula (used for Sun/Moon).
+     */
+    _addBodySprite(altitudeDeg, azimuthDeg, color, magnitude, nameSv, tooltipText, userData, scaleFactor = 1) {
+        const { x, y, z } = altAzToCartesian(altitudeDeg, azimuthDeg, GRID_RADIUS);
+        const position = new THREE.Vector3(x, y, z);
+
+        // --- Sprite ---
+        const texture  = buildBodyTexture(color);
+        const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false });
+        const sprite   = new THREE.Sprite(material);
+
+        const scale = bodyScale(magnitude) * scaleFactor;
+        sprite.scale.set(scale, scale, 1);
+        sprite.position.copy(position);
+        sprite.userData = { ...userData };
+
+        this._bodiesGroup.add(sprite);
+
+        // --- CSS2D label ---
+        const element = document.createElement('div');
+        element.className = 'sky-map-3d-label info-icon';
+        element.dataset.tooltipTitle = tooltipText;
+        element.textContent = nameSv;
+        element.style.pointerEvents = 'none';
+        element.setAttribute('tabindex', '0');
+        element.setAttribute('role', 'button');
+        element.setAttribute('aria-label', nameSv);
+
+        // Store label element reference on the sprite so the pointerdown
+        // handler can trigger the tooltip without relying on pointer-events.
+        sprite.userData.labelEl = element;
+
+        const labelObject = new CSS2DObject(element);
+        // Offset upward slightly so the label clears the sprite.
+        labelObject.position.set(x, y + SPHERE_RADIUS * 0.04, z);
+
+        this._labelsGroup.add(labelObject);
+    }
+
+    // -----------------------------------------------------------------------
+    // Private — pointer move (cursor feedback)
+    // -----------------------------------------------------------------------
+
+    /**
+     * Update the canvas cursor style based on whether the pointer is over
+     * any body sprite.
+     *
+     * @param {PointerEvent} event
+     */
+    _handlePointerMove(event) {
+        if (this._renderer === null || this._bodiesGroup === null) return;
+
+        const rect = this._renderer.domElement.getBoundingClientRect();
+        this._pointer.x =  ((event.clientX - rect.left)  / rect.width)  * 2 - 1;
+        this._pointer.y = -((event.clientY - rect.top)   / rect.height) * 2 + 1;
+
+        this._raycaster.setFromCamera(this._pointer, this._camera);
+
+        const hits = this._raycaster.intersectObjects(this._bodiesGroup.children);
+
+        if (hits.length > 0) {
+            const labelEl = hits[0].object.userData.labelEl;
+            if (labelEl && labelEl !== this._hoveredLabel) {
+                labelEl.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, cancelable: true }));
+            }
+            this._hoveredLabel = labelEl;
+            this._renderer.domElement.style.cursor = 'pointer';
+        } else if (this._hoveredLabel !== null) {
+            this._hoveredLabel.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, cancelable: true }));
+            this._hoveredLabel = null;
+            this._renderer.domElement.style.cursor = '';
+        }
     }
 }
