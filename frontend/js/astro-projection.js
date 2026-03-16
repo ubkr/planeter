@@ -173,3 +173,21 @@ export function raDecToAltAz(ra_deg, dec_deg, lat, lon, utc_timestamp) {
 
     return { altitude_deg, azimuth_deg };
 }
+
+/**
+ * Converts sky coordinates (altitude/azimuth) to Three.js Cartesian coordinates.
+ * Convention: y-up, north along -z, east along +x.
+ * @param {number} altitudeDeg - Altitude above horizon in degrees (0=horizon, 90=zenith)
+ * @param {number} azimuthDeg  - Azimuth in degrees (0=N, 90=E, 180=S, 270=W)
+ * @param {number} radius      - Sphere radius
+ * @returns {{x: number, y: number, z: number}}
+ */
+export function altAzToCartesian(altitudeDeg, azimuthDeg, radius = 1) {
+  const alt = altitudeDeg * Math.PI / 180;
+  const az  = azimuthDeg  * Math.PI / 180;
+  return {
+    x:  radius * Math.cos(alt) * Math.sin(az),
+    y:  radius * Math.sin(alt),
+    z: -radius * Math.cos(alt) * Math.cos(az),
+  };
+}

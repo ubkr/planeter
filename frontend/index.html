@@ -85,8 +85,20 @@
 
       <!-- Stjärnkarta tab panel (hidden by default) -->
       <div id="panelSkyMap" role="tabpanel" aria-labelledby="tabSkyMap" class="tab-panel--hidden" hidden>
-        <div id="skyMapContainer" class="sky-map-container">
-          <p class="sky-map-placeholder">Stj&auml;rnkartan kommer snart...</p>
+        <div class="sky-map-panel">
+          <!-- 2D / 3D view toggle -->
+          <div class="skymap-view-toggle" role="group" aria-label="Kartvy">
+            <button class="skymap-view-toggle__btn active" data-view="2d" aria-pressed="true">2D</button>
+            <button class="skymap-view-toggle__btn" data-view="3d" aria-pressed="false">3D Vy</button>
+          </div>
+          <!-- 2D SVG sky map -->
+          <div id="skyMapContainer" class="sky-map-container">
+            <p class="sky-map-placeholder">Stj&auml;rnkartan kommer snart...</p>
+          </div>
+          <!-- 3D WebGL sky dome (hidden until the 3D toggle is activated) -->
+          <div id="skyMap3dContainer" aria-hidden="true" aria-label="3D-himmel">
+            <div class="skymap-3d-error" hidden></div>
+          </div>
         </div>
       </div>
 
@@ -104,6 +116,22 @@
     <div id="settingsModalContainer"></div>
   </div>
 
+  <!-- Import map feature detection: set window._noImportMap=true for browsers
+       that do not support import maps so the 3D toggle can disable itself. -->
+  <script>
+    if (!HTMLScriptElement.supports || !HTMLScriptElement.supports('importmap')) {
+      window._noImportMap = true;
+    }
+  </script>
+  <!-- Import map: lets ES modules use bare specifiers for Three.js. -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./lib/three.module.min.js",
+      "three/addons/": "./lib/three/addons/"
+    }
+  }
+  </script>
   <!-- Tooltip (non-module, self-initializing) - load if it exists -->
   <script src="js/components/tooltip.js" onerror="this.remove()"></script>
   <!-- Main app module -->

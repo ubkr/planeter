@@ -21,6 +21,9 @@ import { formatLocation } from './utils.js';
 /** Auto-refresh interval in milliseconds. */
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
+/** localStorage key for the user's preferred sky-map view mode. */
+const VIEW_MODE_KEY = 'planet_view_mode';
+
 /**
  * Constellation line data loaded once at startup from data/constellations.json.
  * Null if the fetch failed or has not completed yet.
@@ -61,6 +64,117 @@ document.addEventListener('DOMContentLoaded', () => {
     const skyMap = new SkyMap(document.getElementById('skyMapContainer'));
     const eventAlerts = new EventAlerts(document.getElementById('eventAlerts'));
     const eventsTimeline = new EventsTimeline(document.getElementById('eventsTimelineContainer'));
+
+    // --- 3D sky map state ---
+
+    /**
+     * Cached SkyMap3D instance — created once on first activation.
+     * @type {import('./components/sky-map-3d.js').default|null}
+     */
+    let skyMap3d = null;
+
+    /** DOM elements for the 2D/3D toggle. */
+    const skyMap3dContainerEl = document.getElementById('skyMap3dContainer');
+    const toggleBtns = Array.from(document.querySelectorAll('.skymap-view-toggle__btn'));
+    const errorEl = skyMap3dContainerEl
+        ? skyMap3dContainerEl.querySelector('.skymap-3d-error')
+        : null;
+
+    /**
+     * Show the in-container 3D error message and switch back to 2D.
+     *
+     * @param {string} message - Swedish-language error text.
+     */
+    function show3dError(message) {
+        if (errorEl) {
+            errorEl.textContent = message;
+            errorEl.removeAttribute('hidden');
+        }
+        activateView('2d');
+    }
+
+    /**
+     * Apply all DOM mutations needed to switch between 2D and 3D views.
+     * Does NOT start/stop the render loop — callers do that around this.
+     *
+     * @param {'2d'|'3d'} mode
+     */
+    function applyViewMode(mode) {
+        const skyMapContainerEl = document.getElementById('skyMapContainer');
+        const is3d = mode === '3d';
+
+        // Container visibility
+        if (skyMapContainerEl) {
+            skyMapContainerEl.style.display = is3d ? 'none' : '';
+        }
+        if (skyMap3dContainerEl) {
+            skyMap3dContainerEl.classList.toggle('active', is3d);
+            skyMap3dContainerEl.setAttribute('aria-hidden', is3d ? 'false' : 'true');
+        }
+
+        // Toggle button states
+        for (const btn of toggleBtns) {
+            const isThisActive = btn.dataset.view === mode;
+            btn.classList.toggle('active', isThisActive);
+            btn.setAttribute('aria-pressed', isThisActive ? 'true' : 'false');
+        }
+    }
+
+    /**
+     * Switch the sky map view mode and persist the preference.
+     *
+     * Handles all async loading, error cases, and render-loop management.
+     *
+     * @param {'2d'|'3d'} mode
+     */
+    async function activateView(mode) {
+        if (mode === '3d') {
+            // Guard: import maps not supported
+            if (window._noImportMap) {
+                alert('3D-vyn är inte tillgänglig i den här webbläsaren (saknar stöd för import maps).');
+                return;
+            }
+
+            // Guard: WebGL not supported
+            if (!window.WebGLRenderingContext) {
+                show3dError('Din webbläsare stöder inte 3D-vy (WebGL saknas).');
+                const btn3d = toggleBtns.find((b) => b.dataset.view === '3d');
+                if (btn3d) btn3d.disabled = true;
+                return;
+            }
+
+            try {
+                // Lazy-load and instantiate SkyMap3D only once.
+                if (skyMap3d === null) {
+                    const mod = await import('./components/sky-map-3d.js');
+                    skyMap3d = new mod.default(skyMap3dContainerEl);
+                }
+
+                // applyViewMode must run first so the container has layout
+                // dimensions (clientWidth/clientHeight > 0) before activate()
+                // calls _handleResize() to size the WebGL canvas.
+                applyViewMode('3d');
+                skyMap3d.activate();
+                localStorage.setItem(VIEW_MODE_KEY, '3d');
+            } catch (err) {
+                console.error('Sky map 3D: failed to load or initialise', err);
+                show3dError('3D-vyn kunde inte laddas. Försök igen senare.');
+                localStorage.setItem(VIEW_MODE_KEY, '2d');
+            }
+        } else {
+            // Switch to 2D
+            if (skyMap3d) {
+                skyMap3d.deactivate();
+            }
+            applyViewMode('2d');
+            localStorage.setItem(VIEW_MODE_KEY, '2d');
+        }
+    }
+
+    // Wire the toggle buttons.
+    for (const btn of toggleBtns) {
+        btn.addEventListener('click', () => activateView(btn.dataset.view));
+    }
 
     // --- Interval tracking ---
     /** @type {number|null} */
@@ -164,12 +278,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Tab change listener ---
-    // Handles both skymap rendering and events lazy loading.
+    // Handles skymap rendering, 3D pause/resume, and events lazy loading.
     window.addEventListener('tabChanged', (event) => {
         const { tabId } = event.detail;
 
         if (tabId === 'skymap') {
             skyMap.render();
+
+            // If the user had 3D active when they last visited this tab, resume it.
+            const storedMode = localStorage.getItem(VIEW_MODE_KEY) || '2d';
+            if (storedMode === '3d' && skyMap3d !== null) {
+                skyMap3d.activate();
+            }
+        } else {
+            // Leaving the sky map tab — pause the 3D render loop to save GPU.
+            if (skyMap3d !== null) {
+                skyMap3d.deactivate();
+            }
         }
 
         if (tabId === 'events' && !eventsLoaded) {
@@ -215,4 +340,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
     loadData(currentLocation);
+
+    // --- Restore stored 3D preference ---
+    // If the user last left the app in 3D mode, trigger the 3D view once the
+    // page has initialised. We do this asynchronously so it does not block the
+    // initial planet-data fetch.
+    if ((localStorage.getItem(VIEW_MODE_KEY) || '2d') === '3d') {
+        // Use setTimeout so the DOM is fully settled before starting WebGL.
+        setTimeout(() => activateView('3d'), 0);
+    }
 });

@@ -722,7 +722,7 @@ Planets that are currently not visible (either below the horizon or blocked by d
 
 ---
 
-#### Phase E2: 3D Sky Setting & Navigation
+#### Phase E2: 3D Sky Setting & Navigation — ✅
 
 **Depends on:** Phase A1, Phase A2
 **Parallelisable with:** Phase E1
@@ -730,17 +730,17 @@ Planets that are currently not visible (either below the horizon or blocked by d
 **Note:** Three.js (~600KB minified, ~150KB gzipped) is loaded lazily — dynamically injected only when the user first activates 3D mode — to avoid impacting initial page load performance. ARCHITECTURE.md and TECH_CHOICES.md must be updated in Phase E5 to document the Three.js dependency.
 
 **Intended Outcome**
-The app gains a new immersive 3D viewing mode inside the "Stjärnkarta" tab. A toggle allows the user to switch between the existing "2D Projektion" and a new "3D Vy". **Three.js** is introduced as the 3D library, vendored as local IIFE/UMD files under `frontend/lib/` (both `three.min.js` and `OrbitControls.js`) — no CDN dependency, no build step required. A 3D scene is set up where the camera is placed precisely at the origin (0, 0, 0), acting as the user's viewpoint (creating an inside-out sphere view). Orbit controls allow the user to drag the screen to rotate and tilt the camera around the central pivot, simulating looking around the real sky. A visible horizon plane and an alt-azimuth grid are drawn to give the viewer perspective.
+The app gains a new immersive 3D viewing mode inside the "Stjärnkarta" tab. A toggle allows the user to switch between the existing "2D Projektion" and a new "3D Vy". **Three.js** is introduced as the 3D library, vendored as local ES module files under `frontend/lib/` (both `three.module.min.js` and `OrbitControls.js`) and resolved via a `<script type="importmap">` block in `index.html` — no CDN dependency, no build step required. A 3D scene is set up where the camera is placed precisely at the origin (0, 0, 0), acting as the user's viewpoint (creating an inside-out sphere view). Orbit controls allow the user to drag the screen to rotate and tilt the camera around the central pivot, simulating looking around the real sky. A visible horizon plane and an alt-azimuth grid are drawn to give the viewer perspective.
 
 **Definition of Done**
-- [ ] Three.js and OrbitControls are vendored as local IIFE/UMD files under `frontend/lib/` — no CDN dependency, no build step required.
+- [ ] Three.js r0.174.0 and OrbitControls are vendored as local ES module files under `frontend/lib/`, resolved via a `<script type="importmap">` block in `index.html` — no CDN dependency, no build step required.
 - [ ] A view toggle (e.g. standard buttons or a switch) is added to the "Stjärnkarta" tab allowing switching between 2D and 3D views.
 - [ ] Selecting "3D Vy" instantiates a full-width immersive 3D canvas instead of the SVG map.
 - [ ] A camera placed at the center (0,0,0) with drag-to-look controls allows full 360-degree panning and tilting.
 - [ ] A horizon line/plane is drawn to define where the sky meets the earth.
 - [ ] A celestial grid (lines marking azimuth every 30° to 45°, and lines for altitude at 30° and 60°) is drawn natively in 3D space.
 - [ ] Changing screen size / rotating a mobile device resizes the 3D canvas while maintaining a correct aspect ratio.
-- [ ] The Three.js render loop (`requestAnimationFrame`) is started when the 3D view becomes active and cleanly stopped (via `cancelAnimationFrame` or renderer disposal) when the user switches to 2D view or navigates away from the Stjärnkarta tab.
+- [ ] The Three.js render loop is started when the 3D view becomes active and cleanly stopped via `renderer.setAnimationLoop(null)` when the user switches to 2D view or navigates away from the Stjärnkarta tab.
 - [ ] The user's 2D/3D view preference is stored in `localStorage` and restored on page load.
 - [ ] Mobile touch controls use single-finger drag for rotation only; pinch-zoom is disabled (fixed-radius sphere view).
 - [ ] The 2D SVG sky map remains the default view and the accessible fallback; the 3D canvas element has `aria-hidden="true"` with a visible or screen-reader-accessible hint pointing users to the 2D view.
@@ -751,7 +751,7 @@ The app gains a new immersive 3D viewing mode inside the "Stjärnkarta" tab. A t
 - Modify `frontend/css/components/sky-map.css` — styling for the 3D canvas container ensuring proper layout.
 - Create `frontend/css/components/sky-map-3d.css` — 3D-specific styles (canvas sizing, toggle button positioning, fallback hint).
 - Modify `frontend/js/main.js` — wiring 2D/3D toggle state, lazy-loading Three.js, persisting preference to `localStorage`.
-- Add `frontend/lib/three.min.js` and `frontend/lib/OrbitControls.js` — vendored Three.js IIFE/UMD dependencies.
+- Add `frontend/lib/three.module.min.js` and `frontend/lib/OrbitControls.js` — vendored Three.js ES module dependencies resolved via import map.
 
 ---
 

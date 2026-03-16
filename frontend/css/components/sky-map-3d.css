@@ -1,0 +1,110 @@
+/* ==========================================================================
+   Sky Map 3D
+   WebGL-powered 3D sky dome rendered with Three.js.
+   Hidden by default; activated via the 2D/3D view toggle.
+   ========================================================================== */
+
+/* --- 3D Canvas Container --- */
+
+#skyMap3dContainer {
+    display: none;
+    position: relative;
+    width: 100%;
+    max-width: 600px;
+    aspect-ratio: 1 / 1;
+    margin-inline: auto;
+    overflow: hidden;
+    border-radius: var(--radius-lg);
+    background: var(--color-bg-surface);
+}
+
+#skyMap3dContainer.active {
+    display: block;
+}
+
+#skyMap3dContainer canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    /* touch-action on the canvas itself, where Three.js attaches pointer
+       event listeners, so the browser does not intercept touch gestures. */
+    touch-action: none;
+    cursor: grab;
+}
+
+#skyMap3dContainer canvas:active {
+    cursor: grabbing;
+}
+
+/* --- View Toggle (2D / 3D Switcher) --- */
+
+.skymap-view-toggle {
+    position: absolute;
+    top: var(--space-sm);
+    right: var(--space-sm);
+    z-index: var(--z-default);
+    display: flex;
+    gap: 0;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    border: var(--border-width) solid var(--border-color);
+    box-shadow: var(--shadow-sm);
+}
+
+.skymap-view-toggle__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-2xs) var(--space-sm);
+    min-width: 3rem;
+    border: none;
+    background: var(--color-bg-deep);
+    color: var(--color-text-muted);
+    font-family: var(--font-family-base);
+    font-size: var(--font-size-xs);
+    font-weight: 500;
+    line-height: 1;
+    cursor: pointer;
+    transition:
+        background var(--transition-fast),
+        color var(--transition-fast);
+    white-space: nowrap;
+}
+
+.skymap-view-toggle__btn:not(:last-child) {
+    border-right: var(--border-width) solid var(--border-color);
+}
+
+.skymap-view-toggle__btn:hover {
+    background: var(--color-bg-surface-hover);
+    color: var(--color-text-secondary);
+}
+
+.skymap-view-toggle__btn.active {
+    background: var(--color-bg-surface-hover);
+    color: var(--color-text-primary);
+}
+
+/* Accessible focus styles */
+.skymap-view-toggle__btn:focus-visible {
+    outline: 2px solid var(--color-accent-secondary);
+    outline-offset: -2px;
+    border-radius: var(--radius-sm);
+    z-index: 1;
+}
+
+/* --- Error / Fallback Message --- */
+
+.skymap-3d-error {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-lg);
+    text-align: center;
+    font-family: var(--font-family-base);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    line-height: 1.5;
+}

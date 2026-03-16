@@ -4,6 +4,15 @@
    Container enforces a 1:1 aspect ratio and caps width at 600px.
    ========================================================================== */
 
+/* --- Panel wrapper (holds toggle + 2D/3D containers) --- */
+
+.sky-map-panel {
+    position: relative;
+    width: 100%;
+    max-width: 600px;
+    margin-inline: auto;
+}
+
 /* --- Container --- */
 
 .sky-map-container {
