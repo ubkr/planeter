@@ -34,8 +34,11 @@ const AZ_LINES = [0, 45, 90, 135, 180, 225, 270, 315];
 /** Number of points used to approximate each ring as a polyline. */
 const RING_SEGMENTS = 128;
 
-/** Dim blue-grey colour shared by all grid lines. */
-const GRID_COLOR = 0x334455;
+/** Grid line colour — bright enough to be clearly visible against the dark sky background. */
+const GRID_COLOR = 0x4488bb;
+
+/** Grid lines are drawn at this fraction of SPHERE_RADIUS to avoid z-fighting with the sphere surface. */
+const GRID_RADIUS = SPHERE_RADIUS * 0.98;
 
 /** Cardinal label definitions: text (Swedish), azimuth, and canvas text colour. */
 const CARDINALS = [
@@ -60,7 +63,7 @@ function buildAltitudeRing(altitudeDeg, material) {
     const points = [];
     for (let i = 0; i <= RING_SEGMENTS; i++) {
         const az = (i / RING_SEGMENTS) * 360;
-        const { x, y, z } = altAzToCartesian(altitudeDeg, az, SPHERE_RADIUS);
+        const { x, y, z } = altAzToCartesian(altitudeDeg, az, GRID_RADIUS);
         points.push(new THREE.Vector3(x, y, z));
     }
     const geo = new THREE.BufferGeometry().setFromPoints(points);
@@ -79,7 +82,7 @@ function buildAzimuthLine(azimuthDeg, material) {
     const points = [];
     for (let i = 0; i <= RING_SEGMENTS; i++) {
         const alt = (i / RING_SEGMENTS) * 90;
-        const { x, y, z } = altAzToCartesian(alt, azimuthDeg, SPHERE_RADIUS);
+        const { x, y, z } = altAzToCartesian(alt, azimuthDeg, GRID_RADIUS);
         points.push(new THREE.Vector3(x, y, z));
     }
     const geo = new THREE.BufferGeometry().setFromPoints(points);
@@ -299,10 +302,14 @@ export default class SkyMap3D {
         controls.target.set(0, 0, 0);
         // Negative rotateSpeed gives the sky-dome feel: dragging right rotates
         // the camera left, as if the observer is turning their head.
+        // Negative rotateSpeed inverts drag direction for the sky-dome feel:
+        // dragging UP increases phi internally → phi=π means camera looks toward zenith.
         controls.rotateSpeed = -0.5;
-        // Allow a slight dip (~9°) below the horizon so rising/setting planets
-        // remain visible, while preventing the view from going fully underground.
-        controls.maxPolarAngle = Math.PI * 0.55;
+        // With inverted controls phi increases upward, so:
+        //   maxPolarAngle near π  → allows full zenith viewing
+        //   minPolarAngle ~81°    → prevents looking more than ~9° below the horizon
+        controls.maxPolarAngle = Math.PI * 0.99;
+        controls.minPolarAngle = Math.PI * 0.45;
         controls.update();
 
         // --- Celestial sphere (inside-out, camera inside) ---
