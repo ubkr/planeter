@@ -1,4 +1,4 @@
-# Planetvis (Planeter) — Architecture
+# Planeter — Architecture
 
 ## High-Level System Design
 
@@ -12,12 +12,13 @@ index.html                        /api/v1/planets/visible
   +-- settings-modal.js             +-- MoonCalculator (ephem)
   +-- planet-cards.js               +-- WeatherAggregator
   +-- sky-summary.js                |     +-- MetNoClient
-  +-- api.js                        |     +-- OpenMeteoClient
-                                    +-- VisibilityScorer
-                                    +-- CacheService
+  +-- sky-map.js                    |     +-- OpenMeteoClient
+  +-- sky-map-3d.js                 +-- VisibilityScorer
+  +-- events-timeline.js            +-- CacheService
+  +-- api.js
 ```
 
-The architecture mirrors norrsken: a stateless FastAPI backend that computes planet positions and visibility on demand, and a vanilla JavaScript frontend that stores location in `localStorage` and passes coordinates to every API call.
+A stateless FastAPI backend computes planet positions and visibility on demand. The vanilla JavaScript frontend stores the user's location in `localStorage` and passes coordinates to every API call.
 
 ## Component Hierarchy
 
@@ -29,51 +30,73 @@ backend/
     main.py                       -- FastAPI app, router registration, static file serving
     config.py                     -- Pydantic Settings (defaults, cache TTL, log level)
     models/
-      planet.py                   -- PlanetPosition, PlanetVisibility, PlanetsResponse
-      weather.py                  -- WeatherData, WeatherResponse (copied from norrsken)
+      planet.py                   -- PlanetPosition, PlanetVisibility, PlanetsResponse, EventsResponse
+      weather.py                  -- WeatherData, WeatherResponse
     services/
       planets/
         calculator.py             -- Core ephem-based planet position calculations
+        events.py                 -- Astronomical event detection (conjunctions, oppositions, etc.)
       weather/
-        base.py                   -- WeatherSourceBase ABC (copied from norrsken)
-        metno_client.py           -- Met.no API client (copied from norrsken)
-        openmeteo_client.py       -- Open-Meteo API client (copied from norrsken)
+        base.py                   -- WeatherSourceBase ABC
+        metno_client.py           -- Met.no API client
+        openmeteo_client.py       -- Open-Meteo API client
       scoring.py                  -- Planet visibility scoring algorithm
       aggregator.py               -- Weather aggregation with fallbacks
-      cache_service.py            -- In-memory TTL cache (copied from norrsken)
+      cache_service.py            -- In-memory TTL cache
     api/
       routes/
         planets.py                -- Planet visibility endpoints
-        health.py                 -- Health check endpoint (copied from norrsken)
+        events.py                 -- Upcoming astronomical events endpoint
+        geocode.py                -- Nominatim reverse-geocoding proxy
+        health.py                 -- Health check endpoint
     utils/
-      logger.py                   -- Logging setup (copied from norrsken)
-      sun.py                      -- Sun position/twilight (copied from norrsken)
-      moon.py                     -- Moon position/illumination (adapted from norrsken)
+      logger.py                   -- Logging setup
+      sun.py                      -- Sun position/twilight
+      moon.py                     -- Moon position/illumination
 ```
 
 ### Frontend
 
 ```
 frontend/
-  index.html                      -- Main page
+  index.html                      -- Main page; import map for Three.js bare specifiers
   css/
-    tokens.css                    -- Design tokens (adapted from norrsken, planetary theme)
-    base.css                      -- Reset and base styles (from norrsken)
-    layout.css                    -- Grid layout (from norrsken)
+    tokens.css                    -- CSS custom properties: colours, spacing, typography
+    base.css                      -- Reset and base styles
+    layout.css                    -- App grid layout
     main.css                      -- Imports all CSS
     components/
-      planet-cards.css            -- Planet info card styling (new)
-      modal.css                   -- Settings modal (from norrsken)
+      planet-cards.css            -- Planet info card styling
+      modal.css                   -- Settings modal
+      sky-map.css                 -- 2D SVG sky map
+      sky-map-3d.css              -- 3D sky-dome viewer
+      tab-nav.css                 -- Tab navigation bar
+      events-timeline.css         -- Upcoming events timeline
+      event-alerts.css            -- Event alert banners
   js/
-    main.js                       -- App entry point, initialization
-    api.js                        -- API client for planet endpoints
-    location-manager.js           -- Location persistence (adapted from norrsken)
+    main.js                       -- App entry point, tab orchestration
+    api.js                        -- API client (planets, events, geocode)
+    location-manager.js           -- Location persistence (localStorage)
+    astro-projection.js           -- Alt/az → Cartesian projection utilities
+    utils.js                      -- Shared formatting/helper utilities
+    data/
+      planet-descriptions.js      -- Static Swedish-language planet descriptions
     components/
-      planet-cards.js             -- Individual planet visibility cards (new)
-      sky-summary.js              -- "Visible tonight" overview (new)
-      settings-modal.js           -- Location picker modal (from norrsken)
-      map-selector.js             -- Leaflet map (from norrsken)
-      tooltip.js                  -- Tooltip utility (from norrsken)
+      planet-cards.js             -- Individual planet visibility cards
+      sky-summary.js              -- "Visible tonight" summary banner
+      sky-map.js                  -- 2D SVG polar sky chart
+      sky-map-3d.js               -- 3D WebGL sky-dome (Three.js)
+      events-timeline.js          -- Upcoming astronomical events timeline
+      event-alerts.js             -- Event alert banners (Planeter tab)
+      tab-nav.js                  -- Tab navigation component
+      settings-modal.js           -- Location picker modal (Leaflet)
+      map-selector.js             -- Leaflet map widget
+      tooltip.js                  -- Tooltip utility
+  lib/
+    three.module.min.js           -- Three.js r168 (vendored, ES module)
+    three/addons/
+      controls/OrbitControls.js   -- Mouse/touch camera orbit
+      renderers/CSS2DRenderer.js  -- HTML overlay labels in 3D view
 ```
 
 ## Data Flow
@@ -86,8 +109,9 @@ frontend/
 4. Backend `PlanetCalculator` uses `ephem` to compute positions of all naked-eye planets
 5. Backend `WeatherAggregator` fetches cloud cover from Met.no (with Open-Meteo fallback)
 6. Backend `VisibilityScorer` combines positions, sun/moon state, and weather into per-planet scores
-7. Response sent to browser
-8. `PlanetCards` component renders one card per planet
+7. Response sent to browser; `PlanetCards` and `SkySummary` components render the Planets tab
+8. When the user opens the **Stjärnkarta** tab, `SkyMap` (2D) or `SkyMap3D` (Three.js) renders planet positions
+9. When the user opens the **Kommande** tab, `APIClient` fetches `GET /api/v1/events` and `EventsTimeline` renders the next 60 days of conjunctions, oppositions, etc.
 
 ### Calculation Pipeline (Backend)
 
@@ -129,7 +153,7 @@ Response JSON
 
 ### Using `ephem` for Planet Positions
 
-The `ephem` library (already used in norrsken for Sun and Moon) provides dedicated classes for all planets:
+The `ephem` library provides dedicated classes for all naked-eye planets:
 
 ```python
 observer = ephem.Observer()
@@ -157,7 +181,7 @@ transit_time  = observer.next_transit(mars)
 | Altitude | 40 | 0 pts at horizon; linear ramp to 40 pts at 45°; clamped at 40 pts for higher altitudes |
 | Magnitude | 25 | Venus at −4.5 → 25 pts; Saturn at +1 → ~10 pts; scaled inversely |
 | Cloud cover | 35 | <25% → 35 pts; 25–50% → 23 pts; 50–75% → 12 pts; ≥75% → 0 pts |
-| Sun penalty | −50 to 0 | Same twilight bands as norrsken's `sun.py` |
+| Sun penalty | −50 to 0 | Twilight bands defined in `utils/sun.py`: civil > nautical > astronomical > darkness |
 | Atmospheric extinction | −10 to 0 | Progressive penalty below 10° altitude |
 | Moon proximity | −10 to 0 | Bright, nearby Moon reduces planet contrast |
 
@@ -175,14 +199,14 @@ A planet is declared **"visible"** when: altitude > 0°, total score > 15, and s
 ## State Management
 
 ### Backend
-- **Stateless**: no per-user session state (same as norrsken)
-- **In-memory cache**: weather data cached with TTL (default 30 min); planet calculations are fast pure-CPU so no caching needed
+- **Stateless**: no per-user session state
+- **In-memory cache**: weather data cached with TTL (default 30 min); events cached for 1 hour keyed by date + rounded coordinates; planet calculations are fast pure-CPU so not cached
 - **Config via `.env`**: default location, cache TTL, log level, Met.no user-agent
 
 ### Frontend
 - **`localStorage`**: user's selected location persisted under `planet_location` key
 - **In-memory**: current planet data, UI state
-- **`locationChanged` custom event**: triggers full data reload (same pattern as norrsken)
+- **`locationChanged` custom event**: triggers full data reload across all tabs
 
 ## API Response Schema
 
@@ -216,3 +240,26 @@ A planet is declared **"visible"** when: altitude > 0°, total score > 15, and s
 ### `GET /api/v1/planets/tonight`
 
 Same structure as above but includes visibility windows: when each planet rises, when it enters darkness, when it sets or dawn breaks.
+
+### `GET /api/v1/events`
+
+```json
+{
+  "location": { "lat": 55.7, "lon": 13.4, "name": "Södra Sandby" },
+  "generated_at": "2026-03-16T10:00:00Z",
+  "events": [
+    {
+      "type": "opposition",
+      "planet": "Mars",
+      "date": "2026-03-20",
+      "description": "Mars i opposition — bästa synlighet"
+    }
+  ]
+}
+```
+
+Covers a 60-day look-ahead window. Events are cached for 1 hour, keyed on rounded coordinates and today's date.
+
+### `GET /api/v1/geocode/reverse`
+
+Proxy to Nominatim. Accepts `lat` and `lon` query parameters; returns a display name string. Proxying through the backend avoids browser CORS restrictions and rate-limit attribution issues.
