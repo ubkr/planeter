@@ -73,6 +73,16 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     let skyMap3d = null;
 
+    /**
+     * True when the stored preference is '3d' but the skymap tab has not yet
+     * become visible.  Activation is deferred so that the WebGL renderer
+     * receives non-zero container dimensions.  Consumed (set to false) by the
+     * tabChanged handler the first time the skymap tab is shown.
+     *
+     * @type {boolean}
+     */
+    let pendingView3d = (localStorage.getItem(VIEW_MODE_KEY) || '2d') === '3d';
+
     /** DOM elements for the 2D/3D toggle. */
     const skyMap3dContainerEl = document.getElementById('skyMap3dContainer');
     const toggleBtns = Array.from(document.querySelectorAll('.skymap-view-toggle__btn'));
@@ -129,6 +139,9 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     async function activateView(mode) {
         if (mode === '3d') {
+            // Reset any stale error overlay from a prior failed attempt.
+            if (errorEl) errorEl.setAttribute('hidden', '');
+
             // Guard: import maps not supported
             if (window._noImportMap) {
                 alert('3D-vyn är inte tillgänglig i den här webbläsaren (saknar stöd för import maps).');
@@ -285,10 +298,18 @@ document.addEventListener('DOMContentLoaded', () => {
         if (tabId === 'skymap') {
             skyMap.render();
 
-            // If the user had 3D active when they last visited this tab, resume it.
-            const storedMode = localStorage.getItem(VIEW_MODE_KEY) || '2d';
-            if (storedMode === '3d' && skyMap3d !== null) {
-                skyMap3d.activate();
+            // First-load case: the user's stored preference was '3d' but we
+            // deferred activation until the tab is visible so the container
+            // has non-zero dimensions.  Consume the flag and activate now.
+            if (pendingView3d) {
+                pendingView3d = false;
+                activateView('3d');
+            } else if (skyMap3d !== null) {
+                // Subsequent tab switches: resume the already-created 3D instance.
+                const storedMode = localStorage.getItem(VIEW_MODE_KEY) || '2d';
+                if (storedMode === '3d') {
+                    skyMap3d.activate();
+                }
             }
         } else {
             // Leaving the sky map tab — pause the 3D render loop to save GPU.
@@ -341,12 +362,4 @@ document.addEventListener('DOMContentLoaded', () => {
 
     loadData(currentLocation);
 
-    // --- Restore stored 3D preference ---
-    // If the user last left the app in 3D mode, trigger the 3D view once the
-    // page has initialised. We do this asynchronously so it does not block the
-    // initial planet-data fetch.
-    if ((localStorage.getItem(VIEW_MODE_KEY) || '2d') === '3d') {
-        // Use setTimeout so the DOM is fully settled before starting WebGL.
-        setTimeout(() => activateView('3d'), 0);
-    }
 });

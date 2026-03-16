@@ -96,8 +96,16 @@
 /* --- Error / Fallback Message --- */
 
 .skymap-3d-error {
+    /* Default to hidden so the [hidden] attribute is never overridden by a
+       stronger display value. Without this, display:flex would win over the
+       UA stylesheet's [hidden]{display:none}, leaving an invisible full-size
+       overlay that intercepts all pointer events and breaks OrbitControls. */
+    display: none;
     position: absolute;
     inset: 0;
+}
+
+.skymap-3d-error:not([hidden]) {
     display: flex;
     align-items: center;
     justify-content: center;

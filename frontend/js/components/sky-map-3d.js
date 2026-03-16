@@ -269,31 +269,41 @@ export default class SkyMap3D {
      */
     _initScene() {
         // --- Renderer ---
-        this._renderer = new THREE.WebGLRenderer({ antialias: true });
-        this._setPixelRatio();
-        this._renderer.domElement.setAttribute('aria-hidden', 'true');
-        this.container.appendChild(this._renderer.domElement);
+        // Use a local variable so this._renderer remains null until the entire
+        // initialisation succeeds. The null check in activate() thereby
+        // correctly reflects whether a full init has completed.
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+
+        // Validate the WebGL context before calling any other renderer methods.
+        if (renderer.getContext() === null) {
+            throw new Error('WebGL-kontext kunde inte skapas');
+        }
+
+        renderer.setClearColor(0x0a0a1a, 1);
 
         // --- Scene ---
-        this._scene = new THREE.Scene();
+        const scene = new THREE.Scene();
 
         // --- Camera ---
         // Aspect ratio is corrected in _handleResize(); use 1 as a placeholder.
-        this._camera = new THREE.PerspectiveCamera(60, 1, 0.1, SPHERE_RADIUS * 2.5);
-        // Place camera at the very centre of the sky sphere, slightly offset from
-        // the exact origin to avoid a degenerate lookAt() vector.
-        this._camera.position.set(0, 0.001, 0);
-        this._camera.lookAt(0, 0, -1);
+        const camera = new THREE.PerspectiveCamera(60, 1, 0.1, SPHERE_RADIUS * 2.5);
+        // The +Z offset causes OrbitControls to orient the camera toward -Z,
+        // which is North in this coordinate system — a correct horizon-facing
+        // initial view. (Exact origin would produce a degenerate up vector.)
+        camera.position.set(0, 0, 0.001);
 
         // --- OrbitControls ---
-        this._controls = new OrbitControls(this._camera, this._renderer.domElement);
-        this._controls.enableZoom = false;
-        this._controls.enablePan  = false;
-        this._controls.target.set(0, 0, 0);
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableZoom = false;
+        controls.enablePan  = false;
+        controls.target.set(0, 0, 0);
         // Negative rotateSpeed gives the sky-dome feel: dragging right rotates
         // the camera left, as if the observer is turning their head.
-        this._controls.rotateSpeed = -0.5;
-        this._controls.update();
+        controls.rotateSpeed = -0.5;
+        // Allow a slight dip (~9°) below the horizon so rising/setting planets
+        // remain visible, while preventing the view from going fully underground.
+        controls.maxPolarAngle = Math.PI * 0.55;
+        controls.update();
 
         // --- Celestial sphere (inside-out, camera inside) ---
         const sphereGeo = new THREE.SphereGeometry(SPHERE_RADIUS, 32, 32);
@@ -301,7 +311,7 @@ export default class SkyMap3D {
             color: 0x0a0a1a,
             side: THREE.BackSide,
         });
-        this._scene.add(new THREE.Mesh(sphereGeo, sphereMat));
+        scene.add(new THREE.Mesh(sphereGeo, sphereMat));
 
         // --- Horizon ground plane ---
         // A flat disc at y=0 that visually separates sky from "ground".
@@ -315,13 +325,31 @@ export default class SkyMap3D {
         const ground = new THREE.Mesh(groundGeo, groundMat);
         // CircleGeometry lies in the XY plane; rotate so it lies in the XZ plane (y=0).
         ground.rotation.x = -Math.PI / 2;
-        this._scene.add(ground);
+        scene.add(ground);
 
         // --- Alt-azimuth grid ---
-        this._scene.add(buildGrid());
+        scene.add(buildGrid());
 
         // --- Cardinal direction labels ---
-        this._scene.add(buildCardinalLabels());
+        scene.add(buildCardinalLabels());
+
+        // Commit scene/camera/controls to the instance before touching the DOM.
+        // If any of these assignments were to throw, no canvas will have been
+        // orphaned in the DOM and this._renderer remains null (the sentinel).
+        this._scene    = scene;
+        this._camera   = camera;
+        this._controls = controls;
+
+        // Attach the canvas to the DOM only after all instance fields above are
+        // set, so a teardown racing a failed init can still clean up safely.
+        renderer.domElement.setAttribute('aria-hidden', 'true');
+        this.container.appendChild(renderer.domElement);
+
+        // this._renderer is assigned last so that the null check in activate()
+        // is a reliable sentinel for complete initialisation — any earlier throw
+        // leaves it null.
+        this._setPixelRatio(renderer);
+        this._renderer = renderer;
     }
 
     // -----------------------------------------------------------------------
@@ -332,7 +360,9 @@ export default class SkyMap3D {
     _startLoop() {
         if (this._renderer === null) return;
         this._renderer.setAnimationLoop(() => {
-            this._controls.update();
+            if (this._controls !== null) {
+                this._controls.update();
+            }
             this._renderer.render(this._scene, this._camera);
         });
     }
@@ -372,9 +402,13 @@ export default class SkyMap3D {
     /**
      * Apply the device pixel ratio (capped at 2 to avoid excessive GPU load
      * on very high-DPI displays).
+     *
+     * @param {THREE.WebGLRenderer} [renderer] - Renderer to configure.
+     *   Defaults to this._renderer. Pass the local renderer instance when
+     *   calling from _initScene() before this._renderer has been assigned.
      */
-    _setPixelRatio() {
-        if (this._renderer === null) return;
-        this._renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    _setPixelRatio(renderer = this._renderer) {
+        if (renderer === null) return;
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     }
 }
