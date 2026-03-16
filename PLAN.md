@@ -643,7 +643,7 @@ Events spanning multiple sample days are deduplicated into one, keeping the most
 #### Phase B5: Kommande Events Timeline — ✅
 
 **Depends on:** Phase B4 (event detection in `events.py`), Phase A1 (tab navigation shell)
-**Parallelisable with:** Phase C
+**Parallelisable with:** Phase E1
 
 **Intended Outcome**
 
@@ -673,11 +673,157 @@ A third "Kommande" tab shows all six event types across the next 60 days as a sc
 - Modify `frontend/js/main.js` — instantiate `EventsTimeline`; add `loadEvents()`; wire `tabChanged` listener with lazy-load and location-reset logic
 
 ### Phase C: Extended Bodies
+
+**Status: Deferred** — These phases are planned for a future iteration and are not yet scheduled for implementation. See Phase E for the current development track.
+
 - Add Uranus and Neptune (telescope targets)
 - Add bright asteroids (Vesta, Ceres)
 - Add comets (when notable ones are active)
 - International Space Station pass predictions
 
 ### Phase D: Notifications
+
+**Status: Deferred** — These phases are planned for a future iteration and are not yet scheduled for implementation. See Phase E for the current development track.
+
 - Push notifications for rare events (conjunctions, oppositions, Mercury visibility windows)
 - "Tonight's highlights" daily summary
+
+### Phase E: UI Refinements
+
+Phase E consists of five sub-phases with distinct dependency profiles. E1 is an independent UI refinement that targets the planet cards layout and can be implemented standalone without touching the sky map or any 3D machinery. E2–E4 form a sequential 3D feature track that introduces Three.js and builds up the immersive sky view in layers: scene scaffold (E2), celestial body plotting (E3), and constellation geometry with environment polish (E4). E5 is a documentation update that closes out Phase E by ensuring ARCHITECTURE.md, TECH_CHOICES.md, and CLAUDE.md accurately reflect everything introduced during E2–E4.
+
+#### Phase E1: Collapse Non-Visible Planets
+
+**Depends on:** Phase B1, Phase B2, Phase B3
+**Parallelisable with:** All other future phases
+
+**Intended Outcome**
+
+Planets that are currently not visible (either below the horizon or blocked by daylight/cloud cover) take up significantly less vertical space to make scanning for actual visible planets much easier. Instead of displaying the full grid of astronomical details (altitude, magnitude, rise/set times, etc.), non-visible planets are rendered as compact "mini-cards". These compact cards show only the planet name, a visibility status pill, and the "Bästa tid" section (if the planet becomes visible later tonight). This progressive disclosure prevents overwhelming the user with irrelevant data. Compact mode is applied only after API data has loaded — skeleton loading cards retain their full height to prevent layout shift.
+
+**Definition of Done**
+- [ ] In `frontend/js/components/planet-cards.js`, `buildCard()` branches its rendering logic: planets with `is_visible == false` or `is_above_horizon == false` use a simplified compact layout.
+- [ ] The compact card hides the score bar, the detailed grid (altitude, direction, magnitude, constellation), and the generic rise/transit/set times.
+- [ ] The compact card displays the planet name, the visibility condition pill, and the "Bästa tid" section.
+- [ ] `frontend/css/components/planet-cards.css` is updated with styles for the compact layout (e.g., `.planet-card--compact`), reducing padding and adjusting the flex layout to save vertical space.
+- [ ] Non-visible planets still maintain their greyed-out visual appearance.
+- [ ] The "Vad ska man leta efter?" description toggle is hidden on compact cards (compact mode prioritises minimal height).
+- [ ] The equipment badge (added in B3) is hidden on compact cards.
+- [ ] Event alert badges (added in B4) are hidden on compact cards.
+- [ ] The visibility pill on compact cards distinguishes between "Under horisonten" (`is_above_horizon: false`) and "Ej synlig" (above horizon but not visible due to daylight or clouds).
+- [ ] Skeleton loading cards retain full height; compact mode only applies after API data has loaded.
+- [ ] No changes to the backend API are required.
+- [ ] Page renders neatly on both mobile and desktop viewports, seamlessly mixing full-height and compact cards in the grid.
+
+**Key files**
+- Modify `frontend/js/components/planet-cards.js` — add compact rendering flow to `buildCard()`
+- Modify `frontend/css/components/planet-cards.css` — add layout rules for `.planet-card--compact`
+
+---
+
+#### Phase E2: 3D Sky Setting & Navigation
+
+**Depends on:** Phase A1, Phase A2
+**Parallelisable with:** Phase E1
+
+**Note:** Three.js (~600KB minified, ~150KB gzipped) is loaded lazily — dynamically injected only when the user first activates 3D mode — to avoid impacting initial page load performance. ARCHITECTURE.md and TECH_CHOICES.md must be updated in Phase E5 to document the Three.js dependency.
+
+**Intended Outcome**
+The app gains a new immersive 3D viewing mode inside the "Stjärnkarta" tab. A toggle allows the user to switch between the existing "2D Projektion" and a new "3D Vy". **Three.js** is introduced as the 3D library, vendored as local IIFE/UMD files under `frontend/lib/` (both `three.min.js` and `OrbitControls.js`) — no CDN dependency, no build step required. A 3D scene is set up where the camera is placed precisely at the origin (0, 0, 0), acting as the user's viewpoint (creating an inside-out sphere view). Orbit controls allow the user to drag the screen to rotate and tilt the camera around the central pivot, simulating looking around the real sky. A visible horizon plane and an alt-azimuth grid are drawn to give the viewer perspective.
+
+**Definition of Done**
+- [ ] Three.js and OrbitControls are vendored as local IIFE/UMD files under `frontend/lib/` — no CDN dependency, no build step required.
+- [ ] A view toggle (e.g. standard buttons or a switch) is added to the "Stjärnkarta" tab allowing switching between 2D and 3D views.
+- [ ] Selecting "3D Vy" instantiates a full-width immersive 3D canvas instead of the SVG map.
+- [ ] A camera placed at the center (0,0,0) with drag-to-look controls allows full 360-degree panning and tilting.
+- [ ] A horizon line/plane is drawn to define where the sky meets the earth.
+- [ ] A celestial grid (lines marking azimuth every 30° to 45°, and lines for altitude at 30° and 60°) is drawn natively in 3D space.
+- [ ] Changing screen size / rotating a mobile device resizes the 3D canvas while maintaining a correct aspect ratio.
+- [ ] The Three.js render loop (`requestAnimationFrame`) is started when the 3D view becomes active and cleanly stopped (via `cancelAnimationFrame` or renderer disposal) when the user switches to 2D view or navigates away from the Stjärnkarta tab.
+- [ ] The user's 2D/3D view preference is stored in `localStorage` and restored on page load.
+- [ ] Mobile touch controls use single-finger drag for rotation only; pinch-zoom is disabled (fixed-radius sphere view).
+- [ ] The 2D SVG sky map remains the default view and the accessible fallback; the 3D canvas element has `aria-hidden="true"` with a visible or screen-reader-accessible hint pointing users to the 2D view.
+
+**Key files**
+- Modify `frontend/index.html` — add the view-toggle UI to the sky map container; Three.js is not loaded here but injected dynamically on first 3D activation.
+- Create `frontend/js/components/sky-map-3d.js` — core class for managing the 3D canvas, scene loop, and camera controls.
+- Modify `frontend/css/components/sky-map.css` — styling for the 3D canvas container ensuring proper layout.
+- Create `frontend/css/components/sky-map-3d.css` — 3D-specific styles (canvas sizing, toggle button positioning, fallback hint).
+- Modify `frontend/js/main.js` — wiring 2D/3D toggle state, lazy-loading Three.js, persisting preference to `localStorage`.
+- Add `frontend/lib/three.min.js` and `frontend/lib/OrbitControls.js` — vendored Three.js IIFE/UMD dependencies.
+
+---
+
+#### Phase E3: Plotting Celestial Bodies in 3D
+
+**Depends on:** Phase E2, Phase A3
+**Parallelisable with:** None
+
+**Intended Outcome**
+The planetary bodies (and the Sun and Moon) currently plotted in 2D are brought into the 3D sphere. The spherical coordinates (altitude, azimuth) are projected into 3D Cartesian coordinates (`x, y, z`), mapping them to a fixed radius on the inner surface of the sphere. All celestial bodies are rendered as **sprites (billboarded quads)**, coloured and sized relative to their properties (e.g. magnitude), consistent with the colour coding used in the 2D view. Body text labels are rendered as **CSS2D HTML overlays** via Three.js `CSS2DRenderer`, matching the labelling style of the 2D sky map. An interactive raycaster lets the user tap or hover on bodies to summon the standard Swedish tooltips.
+
+**Definition of Done**
+- [ ] Spherical coordinate math correctly converts altitude/azimuth into Cartesian coordinates for sphere plotting.
+- [ ] Planets, the Sun, and the Moon render as billboarded sprite quads in the celestial sky based on the current location's live API data.
+- [ ] Bodies with altitude < 0 (below the horizon) are hidden entirely — the ground plane from E2 acts as the occlusion boundary.
+- [ ] Hovering (desktop) or tapping (mobile) on a 3D celestial object works smoothly using a raycaster.
+- [ ] Triggering an object displays the existing Swedish tooltip interface (with name, altitude, azimuth direction, and magnitude).
+- [ ] Each celestial body has a text label rendered as a CSS2D HTML overlay, matching the labelling style of the 2D sky map.
+- [ ] `SkyMap3D` exposes a `plotBodies(planets, sun, moon, events)` method with the same parameter signature as the 2D `SkyMap.plotBodies()`.
+- [ ] The Sun is rendered as a larger warm-coloured sprite; the Moon sprite shows its illumination percentage in its tooltip; planets use the same colour coding as the 2D view's CSS classes.
+- [ ] Updating the geographic location dynamically refreshes object placement in the 3D scene.
+
+**Key files**
+- Modify `frontend/js/components/sky-map-3d.js` — implement spherical-to-cartesian projection, sprite rendering, CSS2DRenderer label overlays, and raycasting for interaction.
+- Modify `frontend/js/main.js` — ensure API payload data is piped directly into the 3D view when it is active.
+- Modify `frontend/js/components/tooltip.js` — may need a small adaptation to work with CSS2D-projected coordinates when called from the 3D view.
+
+---
+
+#### Phase E4: 3D Constellations & Environment Polish
+
+**Depends on:** Phase E3, Phase A4
+**Parallelisable with:** None
+
+**Intended Outcome**
+The 3D sky environment is completed by wrapping the viewer in constellation lines, completing the digital planetarium experience. The RA/Dec Stellarium data reused from Phase A4 is projected to the same 3D Cartesian space on the sphere, connecting the stars with `LineBasicMaterial` line segments. Cardinal direction labels (N, O, S, V) and constellation IAU labels are rendered as **CSS2D HTML overlays** via `CSS2DRenderer`, consistent with the body label approach introduced in E3. Constellation geometry is built once per data update and never rebuilt per render frame. ARCHITECTURE.md is updated in Phase E5 (not here) to document the completed 3D component.
+
+**Definition of Done**
+- [ ] Constellation JSON data points are projected using `altAzToCartesian()` and connected with `LineBasicMaterial` line segments (Three.js `LineSegments`) to draw star lines behind the planets.
+- [ ] Constellation lines perfectly align with the planets, the Sun, and the Moon.
+- [ ] CSS2DRenderer renders 'N', 'O', 'S', 'V' cardinal labels smoothly around the 3D horizon ring, consistent with the E3 label approach.
+- [ ] Constellation labels appear mapped to their celestial geometric centres as CSS2D overlays.
+- [ ] Constellations below the horizon are not rendered, consistent with the 2D view's behaviour.
+- [ ] Constellation line geometry (Three.js `LineSegments`) is built once per data update (on location change or time refresh), not rebuilt every render frame — the render loop only handles camera rotation.
+- [ ] Constellation line geometry is profiled on a mid-range mobile browser; geometry rebuild occurs only on data updates, not per frame.
+- [ ] ARCHITECTURE.md is updated with a `SkyMap3D` component description, its interface (`plotBodies`, `plotConstellations`), and the Three.js/CSS2DRenderer dependency — this is done in Phase E5.
+
+**Key files**
+- Modify `frontend/js/components/sky-map-3d.js` — loop through constellation sets generating `LineSegments` geometry and CSS2D cardinal labels.
+- Modify `frontend/js/astro-projection.js` — add an `altAzToCartesian(altitude_deg, azimuth_deg, radius)` export that converts spherical sky coordinates to Three.js `{x, y, z}` scene coordinates.
+- Add `frontend/data/constellations.json` — reused from Phase A4; referenced here for completeness.
+- Modify `frontend/js/main.js` — pass constellation data and location into `SkyMap3D` on each render.
+
+---
+
+#### Phase E5: Documentation Update
+
+**Depends on:** Phase E4
+**Parallelisable with:** None
+
+**Intended Outcome**
+All project documentation is updated to accurately reflect the Three.js dependency and the new 3D component architecture introduced in E2–E4. This is a documentation-only phase: no source code changes, no new features.
+
+**Definition of Done**
+- [ ] `ARCHITECTURE.md` describes the `SkyMap3D` class, its public interface (`plotBodies`, `plotConstellations`), and how it relates to the 2D `SkyMap` — including the CSS2DRenderer overlay approach and the `altAzToCartesian` utility.
+- [ ] `ARCHITECTURE.md` includes the 2D/3D component hierarchy in the component diagram.
+- [ ] `TECH_CHOICES.md` documents the Three.js choice with rationale: WebGL 3D library, actively maintained, well-documented, IIFE/UMD build available for no-bundler projects.
+- [ ] `TECH_CHOICES.md` documents the vendored-over-CDN decision: no runtime CDN dependency, consistent with the project's offline-capable constraint.
+- [ ] `TECH_CHOICES.md` documents the lazy-loading strategy: Three.js is loaded dynamically only when the user first activates 3D mode, to avoid impacting initial page load (~150KB gzipped).
+- [ ] `CLAUDE.md` stack section is updated if Three.js is confirmed as a permanent part of the stack.
+
+**Key files**
+- `ARCHITECTURE.md` — add `SkyMap3D` component description, CSS2DRenderer usage, `altAzToCartesian` utility, and the 2D/3D component hierarchy
+- `TECH_CHOICES.md` — document the Three.js decision: why Three.js over alternatives, why vendored over CDN, lazy-loading strategy
+- `CLAUDE.md` — add Three.js to the stack description if appropriate
+
