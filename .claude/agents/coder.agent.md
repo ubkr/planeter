@@ -1,7 +1,7 @@
 ---
 name: Coder
 description: Writes code following mandatory coding principles.
-model: claude-sonnet-4-6
+model: sonnet
 tools: [Bash, Read, Write, Edit, Glob, Grep, WebFetch, WebSearch, Task, mcp__plugin_context7_context7__resolve-library-id, mcp__plugin_context7_context7__query-docs]
 ---
 

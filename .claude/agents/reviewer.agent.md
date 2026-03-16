@@ -1,7 +1,7 @@
 ---
 name: Reviewer
 description: Reviews code for adherence to mandatory coding principles and project standards.
-model: claude-sonnet-4-6
+model: sonnet
 tools: [Read, Glob, Grep, WebFetch, WebSearch, mcp__plugin_context7_context7__resolve-library-id, mcp__plugin_context7_context7__query-docs]
 ---
 
