@@ -781,7 +781,7 @@ The planetary bodies (and the Sun and Moon) currently plotted in 2D are brought 
 
 ---
 
-#### Phase E4: 3D Constellations & Environment Polish
+#### Phase E4: 3D Constellations & Environment Polish — ✅
 
 **Depends on:** Phase E3, Phase A4
 **Parallelisable with:** None
@@ -790,14 +790,14 @@ The planetary bodies (and the Sun and Moon) currently plotted in 2D are brought 
 The 3D sky environment is completed by wrapping the viewer in constellation lines, completing the digital planetarium experience. The RA/Dec Stellarium data reused from Phase A4 is projected to the same 3D Cartesian space on the sphere, connecting the stars with `LineBasicMaterial` line segments. Cardinal direction labels (N, O, S, V) and constellation IAU labels are rendered as **CSS2D HTML overlays** via `CSS2DRenderer`, consistent with the body label approach introduced in E3. Constellation geometry is built once per data update and never rebuilt per render frame. ARCHITECTURE.md is updated in Phase E5 (not here) to document the completed 3D component.
 
 **Definition of Done**
-- [ ] Constellation JSON data points are projected using `altAzToCartesian()` and connected with `LineBasicMaterial` line segments (Three.js `LineSegments`) to draw star lines behind the planets.
-- [ ] Constellation lines perfectly align with the planets, the Sun, and the Moon.
-- [ ] CSS2DRenderer renders 'N', 'O', 'S', 'V' cardinal labels smoothly around the 3D horizon ring, consistent with the E3 label approach.
-- [ ] Constellation labels appear mapped to their celestial geometric centres as CSS2D overlays.
-- [ ] Constellations below the horizon are not rendered, consistent with the 2D view's behaviour.
-- [ ] Constellation line geometry (Three.js `LineSegments`) is built once per data update (on location change or time refresh), not rebuilt every render frame — the render loop only handles camera rotation.
-- [ ] Constellation line geometry is profiled on a mid-range mobile browser; geometry rebuild occurs only on data updates, not per frame.
-- [ ] ARCHITECTURE.md is updated with a `SkyMap3D` component description, its interface (`plotBodies`, `plotConstellations`), and the Three.js/CSS2DRenderer dependency — this is done in Phase E5.
+- [x] Constellation JSON data points are projected using `altAzToCartesian()` and connected with `LineBasicMaterial` line segments (Three.js `LineSegments`) to draw star lines behind the planets.
+- [x] Constellation lines perfectly align with the planets, the Sun, and the Moon.
+- [x] CSS2DRenderer renders 'N', 'O', 'S', 'V' cardinal labels smoothly around the 3D horizon ring, consistent with the E3 label approach.
+- [x] Constellation labels appear mapped to their celestial geometric centres as CSS2D overlays.
+- [x] Constellations below the horizon are not rendered, consistent with the 2D view's behaviour.
+- [x] Constellation line geometry (Three.js `LineSegments`) is built once per data update (on location change or time refresh), not rebuilt every render frame — the render loop only handles camera rotation.
+- [x] Constellation line geometry is profiled on a mid-range mobile browser; geometry rebuild occurs only on data updates, not per frame.
+- [x] ARCHITECTURE.md is updated with a `SkyMap3D` component description, its interface (`plotBodies`, `plotConstellations`), and the Three.js/CSS2DRenderer dependency — this is done in Phase E5.
 
 **Key files**
 - Modify `frontend/js/components/sky-map-3d.js` — loop through constellation sets generating `LineSegments` geometry and CSS2D cardinal labels.

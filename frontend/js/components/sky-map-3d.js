@@ -16,7 +16,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
-import { altAzToCartesian } from '../astro-projection.js';
+import { altAzToCartesian, raDecToAltAz } from '../astro-projection.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -39,6 +39,9 @@ const GRID_COLOR = 0x4488bb;
 
 /** Grid lines are drawn at this fraction of SPHERE_RADIUS to avoid z-fighting with the sphere surface. */
 const GRID_RADIUS = SPHERE_RADIUS * 0.98;
+
+/** Constellation lines sit slightly inside the grid to render behind it. */
+const CONSTELLATION_RADIUS = SPHERE_RADIUS * 0.96;
 
 /** Cardinal label definitions: text (Swedish), azimuth, and canvas text colour. */
 const CARDINALS = [
@@ -249,9 +252,10 @@ export default class SkyMap3D {
         this._camera      = null;
         this._controls    = null;
 
-        // Body and label groups — created once in _initScene().
-        this._bodiesGroup = null;
-        this._labelsGroup = null;
+        // Body, label, and constellation groups — created once in _initScene().
+        this._bodiesGroup        = null;
+        this._labelsGroup        = null;
+        this._constellationsGroup = null;
 
         // Raycaster for cursor feedback on body sprites.
         this._raycaster = null;
@@ -348,13 +352,14 @@ export default class SkyMap3D {
         if (this._controls !== null) {
             this._controls.dispose();
         }
-        this._controls    = null;
-        this._camera      = null;
-        this._scene       = null;
-        this._bodiesGroup = null;
-        this._labelsGroup = null;
-        this._raycaster   = null;
-        this._pointer     = null;
+        this._controls            = null;
+        this._camera              = null;
+        this._scene               = null;
+        this._bodiesGroup         = null;
+        this._labelsGroup         = null;
+        this._constellationsGroup = null;
+        this._raycaster           = null;
+        this._pointer             = null;
     }
 
     /**
@@ -447,6 +452,120 @@ export default class SkyMap3D {
         }
 
         // TODO E4: render event indicators
+    }
+
+    /**
+     * Plot constellation lines and IAU abbreviation labels into the 3D scene.
+     *
+     * Converts each star endpoint from equatorial (RA/Dec) to horizontal
+     * (Alt/Az) coordinates for the given observer and time, then maps to
+     * Three.js world space at CONSTELLATION_RADIUS.
+     *
+     * Line segments where BOTH endpoints are below the horizon (alt ≤ 0) are
+     * skipped.  Partially-visible segments are included in full — the ground
+     * plane naturally occludes the below-horizon portion.
+     *
+     * All valid segments across every constellation are batched into a single
+     * THREE.LineSegments draw call.  A CSS2D label bearing the IAU abbreviation
+     * is placed at the average world position of that constellation's
+     * above-horizon star endpoints.
+     *
+     * @param {Object[]} constellationData - Array from constellations.json.
+     *   Each element has: iau {string}, lines {number[][]} where each inner
+     *   array is [ra1_deg, dec1_deg, ra2_deg, dec2_deg].
+     * @param {number}      lat           - Observer latitude in degrees.
+     * @param {number}      lon           - Observer longitude in degrees.
+     * @param {Date|number} utcTimestamp  - UTC instant as a Date or Unix ms.
+     */
+    plotConstellations(constellationData, lat, lon, utcTimestamp) {
+        if (this._scene === null) {
+            console.warn('SkyMap3D: plotConstellations called before scene was initialised — data dropped');
+            return;
+        }
+        if (!Array.isArray(constellationData)) return;
+
+        this._clearConstellations();
+
+        // Collect all valid segment positions into one flat array for a
+        // single LineSegments draw call.
+        const segmentPositions = [];
+
+        const lineMat = new THREE.LineBasicMaterial({
+            color:       0x334455,
+            transparent: true,
+            opacity:     0.5,
+        });
+
+        for (const constellation of constellationData) {
+            if (!Array.isArray(constellation.lines)) continue;
+
+            // Accumulate above-horizon endpoint positions for this constellation's
+            // label anchor, averaged over all visible star endpoints.
+            const labelPoints = [];
+
+            for (const seg of constellation.lines) {
+                const [ra1, dec1, ra2, dec2] = seg;
+
+                const { altitude_deg: alt1, azimuth_deg: az1 } =
+                    raDecToAltAz(ra1, dec1, lat, lon, utcTimestamp);
+                const { altitude_deg: alt2, azimuth_deg: az2 } =
+                    raDecToAltAz(ra2, dec2, lat, lon, utcTimestamp);
+
+                // Skip segments where both endpoints are below the horizon.
+                if (alt1 <= 0 && alt2 <= 0) continue;
+
+                const p1 = altAzToCartesian(alt1, az1, CONSTELLATION_RADIUS);
+                const p2 = altAzToCartesian(alt2, az2, CONSTELLATION_RADIUS);
+
+                segmentPositions.push(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z);
+
+                // Track above-horizon endpoints for the label anchor.
+                if (alt1 > 0) labelPoints.push(p1);
+                if (alt2 > 0) labelPoints.push(p2);
+            }
+
+            // Place a label if at least one endpoint of this constellation is
+            // above the horizon.
+            if (labelPoints.length === 0) continue;
+
+            let sumX = 0, sumY = 0, sumZ = 0;
+            for (const p of labelPoints) {
+                sumX += p.x;
+                sumY += p.y;
+                sumZ += p.z;
+            }
+            const n = labelPoints.length;
+            let cx = sumX / n;
+            let cy = sumY / n;
+            let cz = sumZ / n;
+            const len = Math.sqrt(cx * cx + cy * cy + cz * cz);
+            if (len > 0) {
+                cx = (cx / len) * CONSTELLATION_RADIUS;
+                cy = (cy / len) * CONSTELLATION_RADIUS;
+                cz = (cz / len) * CONSTELLATION_RADIUS;
+            }
+
+            const labelEl = document.createElement('div');
+            labelEl.className = 'constellation-label';
+            labelEl.textContent = constellation.iau;
+
+            const labelObj = new CSS2DObject(labelEl);
+            labelObj.position.set(cx, cy, cz);
+            this._constellationsGroup.add(labelObj);
+        }
+
+        // Build the single LineSegments object only if there is at least one
+        // valid segment to render.
+        if (segmentPositions.length > 0) {
+            const positions = new Float32Array(segmentPositions);
+            const geo = new THREE.BufferGeometry();
+            geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            const lines = new THREE.LineSegments(geo, lineMat);
+            this._constellationsGroup.add(lines);
+        } else {
+            // No visible segments — dispose the material to avoid a GPU leak.
+            lineMat.dispose();
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -542,6 +661,10 @@ export default class SkyMap3D {
         scene.add(bodiesGroup);
         scene.add(labelsGroup);
 
+        // --- Constellation group (line segments and IAU abbreviation labels) ---
+        const constellationsGroup = new THREE.Group();
+        scene.add(constellationsGroup);
+
         // --- Raycaster for cursor feedback ---
         const raycaster = new THREE.Raycaster();
         const pointer   = new THREE.Vector2();
@@ -549,13 +672,14 @@ export default class SkyMap3D {
         // Commit scene/camera/controls to the instance before touching the DOM.
         // If any of these assignments were to throw, no canvas will have been
         // orphaned in the DOM and this._renderer remains null (the sentinel).
-        this._scene       = scene;
-        this._camera      = camera;
-        this._controls    = controls;
-        this._bodiesGroup = bodiesGroup;
-        this._labelsGroup = labelsGroup;
-        this._raycaster   = raycaster;
-        this._pointer     = pointer;
+        this._scene               = scene;
+        this._camera              = camera;
+        this._controls            = controls;
+        this._bodiesGroup         = bodiesGroup;
+        this._labelsGroup         = labelsGroup;
+        this._constellationsGroup = constellationsGroup;
+        this._raycaster           = raycaster;
+        this._pointer             = pointer;
 
         // Attach the WebGL canvas to the DOM.
         renderer.domElement.setAttribute('aria-hidden', 'true');
@@ -697,6 +821,25 @@ export default class SkyMap3D {
         // CSS2DObjects do not hold GPU resources, but their DOM elements are
         // removed from the overlay when the object leaves the scene graph.
         this._labelsGroup.clear();
+    }
+
+    /**
+     * Remove and dispose all constellation geometry, materials, and CSS2D
+     * label objects from _constellationsGroup.
+     *
+     * The LineSegments geometry and material are explicitly disposed to prevent
+     * GPU memory leaks on each plotConstellations() call.
+     */
+    _clearConstellations() {
+        for (const child of this._constellationsGroup.children) {
+            if (child.geometry) {
+                child.geometry.dispose();
+            }
+            if (child.material) {
+                child.material.dispose();
+            }
+        }
+        this._constellationsGroup.clear();
     }
 
     /**

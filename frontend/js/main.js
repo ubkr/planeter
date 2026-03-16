@@ -171,6 +171,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (lastApiData !== null) {
                     skyMap3d.plotBodies(lastApiData.planets, lastApiData.sun, lastApiData.moon, lastApiData.events || []);
                 }
+                if (constellationData !== null && lastApiData !== null) {
+                    skyMap3d.plotConstellations(constellationData, currentLocation.lat, currentLocation.lon, new Date(lastApiData.timestamp));
+                }
                 localStorage.setItem(VIEW_MODE_KEY, '3d');
             } catch (err) {
                 console.error('Sky map 3D: failed to load or initialise', err);
@@ -259,6 +262,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (constellationData !== null) {
                 skyMap.plotConstellations(constellationData, location.lat, location.lon, new Date(data.timestamp));
+                if (skyMap3d !== null) {
+                    skyMap3d.plotConstellations(constellationData, location.lat, location.lon, new Date(data.timestamp));
+                }
             }
 
             const timeString = new Intl.DateTimeFormat('sv-SE', {
@@ -361,6 +367,9 @@ document.addEventListener('DOMContentLoaded', () => {
             constellationData = parsed;
             if (lastApiData !== null) {
                 skyMap.plotConstellations(constellationData, currentLocation.lat, currentLocation.lon, new Date(lastApiData.timestamp));
+                if (skyMap3d !== null) {
+                    skyMap3d.plotConstellations(constellationData, currentLocation.lat, currentLocation.lon, new Date(lastApiData.timestamp));
+                }
             }
         })
         .catch((err) => {
