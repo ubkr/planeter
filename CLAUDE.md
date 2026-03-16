@@ -15,3 +15,20 @@ A Swedish-language web app showing which naked-eye planets (Mercury, Venus, Mars
 - **`PLAN.md`** — Phased implementation plan and future roadmap.
 - **`ARCHITECTURE.md`** — Component hierarchy, data flow, calculation pipeline, visibility scoring algorithm, and API response schema.
 - **`TECH_CHOICES.md`** — Rationale for every technology choice: ephem vs alternatives, weather sources, frontend libraries, Python dependencies, and design theme.
+
+## Workflow
+
+- Always validate the plan/phase intent against existing code BEFORE implementing. Read relevant files first, don't assume.
+- When working with a sibling/reference project, copy needed files and information into the current project immediately. Do not keep referencing the other project.
+
+## Quality Checks
+
+- After implementation, run a self-review pass checking for bugs, NaN issues, missing imports, and CSS/interaction conflicts before presenting as done.
+
+## Agent Patterns
+
+- When asked to use an orchestrator/delegation pattern, ALWAYS delegate to sub-agents via the Task tool. Never do the work directly. If delegation fails, report the failure rather than bypassing the pattern.
+
+## Environment
+
+- Check the Python version in the environment before using modern syntax (3.10+ type unions, tomllib, etc). Target Python 3.9+ unless told otherwise.
