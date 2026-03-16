@@ -8,7 +8,7 @@ tools: [Bash, Read, Write, Edit, Glob, Grep, WebFetch, WebSearch, Task, mcp__plu
 ALWAYS use #context7 MCP Server to read relevant documentation. Do this every time you are working with a language, framework, library etc. Never assume that you know the answer as these things change frequently. Your training date is in the past so your knowledge is likely out of date, even if it is a technology you are familiar with.
 
 Always read `CLAUDE.md` before starting any task to understand project-specific constraints.
-This project uses a Python/FastAPI backend and a Next.js/TypeScript frontend.
+This project uses a **Python 3.9 / FastAPI + ephem** backend and a **Vanilla JS/HTML/CSS frontend** (no build step, no framework).
 Always read existing tests before writing new ones to understand testing patterns and existing coverage.
 
 ## Mandatory Coding Principles

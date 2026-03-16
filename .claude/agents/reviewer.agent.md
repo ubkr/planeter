@@ -71,13 +71,15 @@ Review all submitted code against the following principles. For each issue found
 ### 12. Documentation Accuracy
 - Does any updated documentation (README, API docs, IMPLEMENTATION_NOTES.md) reflect only the current implementation — no changelogs or historical notes?
 
-### 13. Project-Specific Conventions
-- Does scraping code use `scraper_simple.py` (HTTP/httpx)? This is the canonical scraper. `scraper.py` (Playwright) is unused/experimental and should not be referenced or called.
-- Is price stored as an integer (kr stripped of non-breaking spaces and the "kr" suffix)?
-- Are dates stored as ISO 8601 datetimes? Are "idag" (today) and "igår" (yesterday) parsed correctly?
-- Is the ad ID extracted from the URL pattern `/marknad/{id}-{slug}` — not from page text?
-- Does the scraper respect `SCRAPE_DELAY_SECONDS` between requests and `MAX_PAGES_PER_SCRAPE` limits?
-- Do API schemas (Pydantic) stay in sync with SQLAlchemy models (`models.py` is the source of truth)?
+### 13. Project-Specific Conventions (Planeter)
+- **Stack**: Python 3.9 + FastAPI backend; Vanilla JS/HTML/CSS frontend (no build step, no framework). Do not suggest React, TypeScript, or Next.js patterns.
+- **Astronomy**: Planet calculations use the `ephem` library. All time values in the API are UTC ISO 8601 strings. Frontend converts to `Europe/Stockholm` using `Intl.DateTimeFormat`.
+- **Scoring**: Visibility scores are integers 0–100. Component weights: altitude 0–40, magnitude 0–25, cloud cover 0–35. A planet below the horizon always scores 0. `is_visible` requires sun altitude < −12° (nautical twilight).
+- **Weather**: Cloud cover is a 0–100 integer. Primary source is Met.no; Open-Meteo is the fallback. Weather calls must be mocked in tests — no real HTTP calls in the test suite.
+- **Swedish UI**: All user-facing labels, planet names, and status text must be in Swedish (Merkurius, Venus, Mars, Jupiter, Saturnus; "Synlig", "Ej synlig", "Under horisonten", etc.).
+- **CSS tokens**: Design tokens live in `frontend/css/tokens.css`. Never hardcode colours, spacing, or font sizes — always reference a `--var` token.
+- **Source of truth**: `ARCHITECTURE.md` is the canonical reference for the scoring algorithm and API response schema. `PLAN.md` is the canonical reference for implementation decisions and phase status. If documentation is updated, it must match the current implementation — no changelogs or historical notes in doc files.
+- **No dead code**: The codebase must not contain references to files, selectors, or routes that do not exist in planeter (watch for norrsken copy-paste artifacts).
 
 
 
