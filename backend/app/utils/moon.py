@@ -46,7 +46,9 @@ def calculate_moon_penalty(lat: float, lon: float, dt: datetime = None) -> dict:
     return {
         "illumination": round(illumination, 3),
         "elevation_deg": round(elevation_deg, 1),
-        "azimuth_deg": round(azimuth_deg, 1),
+        # % 360.0 must come after round() — floating-point rounding can produce
+        # exactly 360.0, which would violate the MoonInfo lt=360 Pydantic constraint.
+        "azimuth_deg": round(azimuth_deg, 1) % 360.0,
     }
 
 

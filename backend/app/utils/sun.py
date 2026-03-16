@@ -56,11 +56,14 @@ def calculate_sun_penalty(lat: float, lon: float, dt: datetime = None) -> dict:
         twilight_phase = "darkness"
         penalty_pts = 0.0
 
-    azimuth_deg = math.degrees(float(sun.az)) % 360.0
+    # sun.az is the azimuth in radians; normalise to [0, 360)
+    azimuth_deg = math.degrees(float(sun.az))
 
     return {
         "elevation_deg": round(elevation_deg, 1),
-        "azimuth_deg": round(azimuth_deg, 1),
+        # % 360.0 must come after round() — floating-point rounding can produce
+        # exactly 360.0, which would violate the SunInfo lt=360 Pydantic constraint.
+        "azimuth_deg": round(azimuth_deg, 1) % 360.0,
         "twilight_phase": twilight_phase,
         "penalty_pts": penalty_pts,
     }

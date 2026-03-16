@@ -117,6 +117,8 @@ def calculate_planet_positions(lat: float, lon: float, dt: datetime = None) -> L
         planet_body.compute(observer)
 
         altitude_deg = round(math.degrees(float(planet_body.alt)), 1)
+        # % 360 must come after round() — floating-point rounding can produce
+        # exactly 360.0, which would violate the PlanetPosition lt=360 Pydantic constraint.
         azimuth_deg = round(math.degrees(float(planet_body.az)), 1) % 360
         magnitude = round(float(planet_body.mag), 2)
 
