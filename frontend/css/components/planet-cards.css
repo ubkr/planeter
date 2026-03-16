@@ -65,6 +65,20 @@
     opacity: 0.8;
 }
 
+/* Compact mode for non-visible planets */
+
+.planet-card--compact {
+    padding: var(--space-sm) var(--space-md);
+    gap: var(--space-xs);
+}
+
+.planet-card--compact .planet-card__score-bar { display: none; }
+.planet-card--compact .planet-card__details { display: none; }
+.planet-card--compact .planet-card__times { display: none; }
+.planet-card--compact .planet-card__equipment { display: none; }
+.planet-card--compact .planet-card__description-toggle,
+.planet-card--compact .planet-card__description { display: none; }
+
 /* --- Header --- */
 
 .planet-card__header {

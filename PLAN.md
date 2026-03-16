@@ -692,7 +692,7 @@ A third "Kommande" tab shows all six event types across the next 60 days as a sc
 
 Phase E consists of five sub-phases with distinct dependency profiles. E1 is an independent UI refinement that targets the planet cards layout and can be implemented standalone without touching the sky map or any 3D machinery. E2–E4 form a sequential 3D feature track that introduces Three.js and builds up the immersive sky view in layers: scene scaffold (E2), celestial body plotting (E3), and constellation geometry with environment polish (E4). E5 is a documentation update that closes out Phase E by ensuring ARCHITECTURE.md, TECH_CHOICES.md, and CLAUDE.md accurately reflect everything introduced during E2–E4.
 
-#### Phase E1: Collapse Non-Visible Planets
+#### Phase E1: Collapse Non-Visible Planets — ✅
 
 **Depends on:** Phase B1, Phase B2, Phase B3
 **Parallelisable with:** All other future phases
@@ -702,18 +702,19 @@ Phase E consists of five sub-phases with distinct dependency profiles. E1 is an 
 Planets that are currently not visible (either below the horizon or blocked by daylight/cloud cover) take up significantly less vertical space to make scanning for actual visible planets much easier. Instead of displaying the full grid of astronomical details (altitude, magnitude, rise/set times, etc.), non-visible planets are rendered as compact "mini-cards". These compact cards show only the planet name, a visibility status pill, and the "Bästa tid" section (if the planet becomes visible later tonight). This progressive disclosure prevents overwhelming the user with irrelevant data. Compact mode is applied only after API data has loaded — skeleton loading cards retain their full height to prevent layout shift.
 
 **Definition of Done**
-- [ ] In `frontend/js/components/planet-cards.js`, `buildCard()` branches its rendering logic: planets with `is_visible == false` or `is_above_horizon == false` use a simplified compact layout.
-- [ ] The compact card hides the score bar, the detailed grid (altitude, direction, magnitude, constellation), and the generic rise/transit/set times.
-- [ ] The compact card displays the planet name, the visibility condition pill, and the "Bästa tid" section.
-- [ ] `frontend/css/components/planet-cards.css` is updated with styles for the compact layout (e.g., `.planet-card--compact`), reducing padding and adjusting the flex layout to save vertical space.
-- [ ] Non-visible planets still maintain their greyed-out visual appearance.
-- [ ] The "Vad ska man leta efter?" description toggle is hidden on compact cards (compact mode prioritises minimal height).
-- [ ] The equipment badge (added in B3) is hidden on compact cards.
-- [ ] Event alert badges (added in B4) are hidden on compact cards.
-- [ ] The visibility pill on compact cards distinguishes between "Under horisonten" (`is_above_horizon: false`) and "Ej synlig" (above horizon but not visible due to daylight or clouds).
-- [ ] Skeleton loading cards retain full height; compact mode only applies after API data has loaded.
-- [ ] No changes to the backend API are required.
-- [ ] Page renders neatly on both mobile and desktop viewports, seamlessly mixing full-height and compact cards in the grid.
+- [x] In `frontend/js/components/planet-cards.js`, `buildCard()` branches its rendering logic: planets with `is_visible == false` or `is_above_horizon == false` use a simplified compact layout.
+- [x] The compact card hides the score bar, the detailed grid (altitude, direction, magnitude, constellation), and the generic rise/transit/set times.
+- [x] The compact card displays the planet name, the visibility condition pill, and the "Bästa tid" section.
+- [x] `frontend/css/components/planet-cards.css` is updated with styles for the compact layout (e.g., `.planet-card--compact`), reducing padding and adjusting the flex layout to save vertical space.
+- [x] Non-visible planets still maintain their greyed-out visual appearance.
+- [x] The "Vad ska man leta efter?" description toggle is hidden on compact cards (compact mode prioritises minimal height).
+- [x] The equipment badge (added in B3) is hidden on compact cards.
+- [x] Event alert badges (added in B4) are hidden on compact cards.
+> **Note:** B4's event alerts are rendered in a separate `#eventAlerts` container above the planet grid, not inside individual cards. This DoD bullet is vacuously satisfied.
+- [x] The visibility pill on compact cards distinguishes between "Under horisonten" (`is_above_horizon: false`) and "Ej synlig" (above horizon but not visible due to daylight or clouds).
+- [x] Skeleton loading cards retain full height; compact mode only applies after API data has loaded.
+- [x] No changes to the backend API are required.
+- [x] Page renders neatly on both mobile and desktop viewports, seamlessly mixing full-height and compact cards in the grid.
 
 **Key files**
 - Modify `frontend/js/components/planet-cards.js` — add compact rendering flow to `buildCard()`

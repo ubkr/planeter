@@ -59,8 +59,10 @@ function formatMagnitude(mag) {
 function buildCard(planet) {
     const score = planet.visibility_score ?? 0;
     const level = scoreToLevel(score);
-    const isAbove = planet.is_above_horizon;
+    const isAbove = planet.is_above_horizon ?? false;
     const isVisible = planet.is_visible ?? false;
+
+    const isCompact = !isVisible;
 
     const card = document.createElement('div');
     card.className = 'planet-card';
@@ -72,11 +74,16 @@ function buildCard(planet) {
         card.classList.add('planet-card--not-visible');
     }
 
+    if (isCompact) {
+        card.classList.add('planet-card--compact');
+    }
+
     card.innerHTML = `
         <div class="planet-card__header">
             <div class="planet-card__name">${planet.name_sv ?? planet.name}</div>
             <div class="planet-card__score" data-score-level="${level}">${score}</div>
         </div>
+        ${!isCompact ? `
         <div class="planet-card__score-bar"
              data-score-level="${level}"
              style="--score-percent: ${score}%"></div>
@@ -104,6 +111,7 @@ function buildCard(planet) {
                 <span class="planet-card__time-value">${formatTime(planet.set_time)}</span>
             </span>
         </div>
+        ` : ''}
     `;
 
     // Build the best-observation-time row imperatively so that formatTime() is
@@ -153,7 +161,13 @@ function buildCard(planet) {
         ? 'planet-card__visibility info-icon'
         : 'planet-card__visibility';
     visibilityEl.dataset.visible = isVisible;
-    visibilityEl.textContent = isVisible ? 'Synlig' : 'Ej synlig';
+    if (isVisible) {
+        visibilityEl.textContent = 'Synlig';
+    } else if (!isAbove) {
+        visibilityEl.textContent = 'Under horisonten';
+    } else {
+        visibilityEl.textContent = 'Ej synlig';
+    }
     if (tooltipText) {
         visibilityEl.tabIndex = 0;
         visibilityEl.title = tooltipText;
@@ -161,22 +175,25 @@ function buildCard(planet) {
     card.appendChild(visibilityEl);
 
     // Build the equipment recommendation badge if an equipment level applies.
-    const EQUIPMENT_LABELS = {
-        naked_eye:  'Blotta ögat',
-        binoculars: 'Kikare rekommenderas',
-        telescope:  'Teleskop',
-    };
-    const equipment = getEquipmentRecommendation(planet);
-    if (equipment !== null) {
-        const equipmentEl = document.createElement('div');
-        equipmentEl.className = 'planet-card__equipment';
-        equipmentEl.textContent = EQUIPMENT_LABELS[equipment];
-        card.appendChild(equipmentEl);
+    // Hidden in compact mode (non-visible planets).
+    if (!isCompact) {
+        const EQUIPMENT_LABELS = {
+            naked_eye:  'Blotta ögat',
+            binoculars: 'Kikare rekommenderas',
+            telescope:  'Teleskop',
+        };
+        const equipment = getEquipmentRecommendation(planet);
+        if (equipment !== null) {
+            const equipmentEl = document.createElement('div');
+            equipmentEl.className = 'planet-card__equipment';
+            equipmentEl.textContent = EQUIPMENT_LABELS[equipment];
+            card.appendChild(equipmentEl);
+        }
     }
 
     // Build the collapsible "Vad ska man leta efter?" description section.
-    // Skip entirely if no description data exists for this planet name.
-    const desc = PLANET_DESCRIPTIONS[planet.name];
+    // Skip entirely if no description data exists for this planet name, or in compact mode.
+    const desc = !isCompact ? PLANET_DESCRIPTIONS[planet.name] : null;
     if (desc) {
         const toggleEl = document.createElement('button');
         toggleEl.className = 'planet-card__description-toggle';
