@@ -53,11 +53,40 @@
 | Library | Version | Source | Purpose |
 |---|---|---|---|
 | Leaflet | 1.9.4 | CDN (`unpkg.com`) with SRI hashes | Map for location selection |
-| Three.js | r168 | Local (`/lib/three.module.min.js`) | 3D sky-dome renderer |
-| Three.js OrbitControls | r168 | Local (`/lib/three/addons/`) | Mouse/touch camera control in 3D view |
-| Three.js CSS2DRenderer | r168 | Local (`/lib/three/addons/`) | HTML planet labels in 3D view |
+| Three.js | r170 | Local (`/lib/three.module.min.js`) | 3D sky-dome renderer |
+| Three.js OrbitControls | r170 | Local (`/lib/three/addons/`) | Mouse/touch camera control in 3D view |
+| Three.js CSS2DRenderer | r170 | Local (`/lib/three/addons/`) | HTML planet labels in 3D view |
 
 Three.js is loaded via an [import map](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/script/type/importmap) so ES modules use bare specifiers (`import * as THREE from 'three'`). Browsers that do not support import maps (IE, old Safari) detect the missing feature at startup and disable the 3D tab. Vendoring Three.js locally avoids CDN downtime risk and removes the need for a build step.
+
+### Why Three.js for the 3D sky view
+
+| Alternative | Verdict | Reason not chosen |
+|---|---|---|
+| **Babylon.js** | Full-featured | Much larger bundle; API complexity exceeds project needs |
+| **Raw WebGL** | Possible | Requires writing shaders, matrix math, and render-loop boilerplate from scratch — significant effort for no benefit |
+| **A-Frame** | HTML-centric | Adds a full ECS framework on top of Three.js; unnecessary abstraction layer |
+| **Three.js** | **Chosen** | Actively maintained, well-documented, ships a pure ES module build (`three.module.min.js`) that works with import maps and no bundler; wide ecosystem; OrbitControls and CSS2DRenderer are available as drop-in addons |
+
+### Vendored over CDN
+
+Three.js (and its addons) are vendored as local files under `frontend/lib/` rather than loaded from a CDN. Rationale:
+
+- **No runtime CDN dependency** — the app works without network access to third-party servers after the initial page load.
+- **Consistent with offline-capable constraint** — the rest of the app (all JS/CSS) is already served from the FastAPI static files mount; Three.js follows the same pattern.
+- **SRI hash not required** — the file is already in the repo and served from the same origin, so there is no supply-chain risk.
+- **No build step** — the ES module build is consumable directly from the import map without bundling or transpilation.
+
+### Lazy-loading strategy
+
+Three.js is approximately 600 KB minified (~150 KB gzipped). To avoid impacting initial page load, `sky-map-3d.js` is **not** imported statically. Instead, `main.js` loads it dynamically the first time the user activates 3D mode:
+
+```js
+const mod = await import('./components/sky-map-3d.js');
+skyMap3d = new mod.default(skyMap3dContainerEl);
+```
+
+This deferred `import()` means users who never open 3D mode never download Three.js. The `SkyMap3D` instance is cached after the first load so subsequent tab switches do not re-import the module.
 
 ## Python Dependencies
 

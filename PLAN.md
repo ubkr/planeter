@@ -771,12 +771,12 @@ The 3D sky environment is completed by wrapping the viewer in constellation line
 All project documentation is updated to accurately reflect the Three.js dependency and the new 3D component architecture introduced in E2–E4. This is a documentation-only phase: no source code changes, no new features.
 
 **Definition of Done**
-- [ ] `ARCHITECTURE.md` describes the `SkyMap3D` class, its public interface (`plotBodies`, `plotConstellations`), and how it relates to the 2D `SkyMap` — including the CSS2DRenderer overlay approach and the `altAzToCartesian` utility.
-- [ ] `ARCHITECTURE.md` includes the 2D/3D component hierarchy in the component diagram.
-- [ ] `TECH_CHOICES.md` documents the Three.js choice with rationale: WebGL 3D library, actively maintained, well-documented, IIFE/UMD build available for no-bundler projects.
-- [ ] `TECH_CHOICES.md` documents the vendored-over-CDN decision: no runtime CDN dependency, consistent with the project's offline-capable constraint.
-- [ ] `TECH_CHOICES.md` documents the lazy-loading strategy: Three.js is loaded dynamically only when the user first activates 3D mode, to avoid impacting initial page load (~150KB gzipped).
-- [ ] `CLAUDE.md` stack section is updated if Three.js is confirmed as a permanent part of the stack.
+- [x] `ARCHITECTURE.md` describes the `SkyMap3D` class, its public interface (`plotBodies`, `plotConstellations`), and how it relates to the 2D `SkyMap` — including the CSS2DRenderer overlay approach and the `altAzToCartesian` utility.
+- [x] `ARCHITECTURE.md` includes the 2D/3D component hierarchy in the component diagram.
+- [x] `TECH_CHOICES.md` documents the Three.js choice with rationale: WebGL 3D library, actively maintained, well-documented, IIFE/UMD build available for no-bundler projects.
+- [x] `TECH_CHOICES.md` documents the vendored-over-CDN decision: no runtime CDN dependency, consistent with the project's offline-capable constraint.
+- [x] `TECH_CHOICES.md` documents the lazy-loading strategy: Three.js is loaded dynamically only when the user first activates 3D mode, to avoid impacting initial page load (~150KB gzipped).
+- [x] `CLAUDE.md` stack section is updated if Three.js is confirmed as a permanent part of the stack.
 
 **Key files**
 - `ARCHITECTURE.md` — add `SkyMap3D` component description, CSS2DRenderer usage, `altAzToCartesian` utility, and the 2D/3D component hierarchy

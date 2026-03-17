@@ -93,11 +93,69 @@ frontend/
       map-selector.js             -- Leaflet map widget
       tooltip.js                  -- Tooltip utility
   lib/
-    three.module.min.js           -- Three.js r168 (vendored, ES module)
+    three.module.min.js           -- Three.js r170 (vendored, ES module)
     three/addons/
       controls/OrbitControls.js   -- Mouse/touch camera orbit
       renderers/CSS2DRenderer.js  -- HTML overlay labels in 3D view
 ```
+
+## Sky Map Components
+
+### SkyMap (2D)
+
+`frontend/js/components/sky-map.js` renders a polar SVG projection of the sky dome. The zenith is at the centre; the horizon is the outer ring; North (azimuth 0°) is at the top; East is to the right (compass-view convention). Public methods:
+
+- `render()` — builds the static SVG grid (altitude rings, cardinal labels). Idempotent.
+- `plotBodies(planets, sun, moon, events)` — adds/replaces planet, Sun, and Moon dots with tooltip labels. Also draws conjunction lines and opposition glows from the `events` array.
+- `plotConstellations(constellationData, lat, lon, utcTimestamp)` — draws constellation stick-figure lines and IAU labels behind the body layer.
+
+Both `plotBodies` and `plotConstellations` are safe to call before `render()` — arguments are stored and replayed once the SVG grid is ready.
+
+### SkyMap3D (3D)
+
+`frontend/js/components/sky-map-3d.js` renders an immersive WebGL sky dome using Three.js. The camera sits at the origin (inside-out sphere), OrbitControls let the user drag to look around, and the render loop is started/stopped on tab activation/deactivation.
+
+**Public interface:**
+
+- `activate()` — builds the scene on first call (renderer, camera, controls, hemisphere geometry, alt-azimuth grid); on subsequent calls resizes the canvas and restarts the render loop.
+- `deactivate()` — stops the render loop (keeps GPU resources alive for fast resume).
+- `dispose()` — full teardown: stops the loop, releases GPU resources, removes canvas from DOM.
+- `plotBodies(planets, sun, moon, events)` — plots planets, Sun, and Moon as canvas-texture glow sprites. Each body also gets a CSS2D HTML label. Bodies with altitude < 0° are not rendered. Safe to call before `activate()` — arguments are stored and replayed.
+- `plotConstellations(constellationData, lat, lon, utcTimestamp)` — converts RA/Dec star endpoints to alt/az (via `raDecToAltAz`), then to Three.js Cartesian space (via `altAzToCartesian`). All visible constellation segments are batched into a single `THREE.LineSegments` draw call. IAU abbreviation labels are rendered as CSS2D overlays. Must be called after `activate()` — data is dropped with a console warning if the scene is not yet initialised.
+
+**CSS2DRenderer overlay:**
+
+`CSS2DRenderer` produces an HTML `<div>` that is positioned `absolute`, anchored at `top: 0; left: 0`, sized to match the WebGL canvas, and has `pointerEvents: none`. It is appended after the WebGL `<canvas>` inside the same container element (which is set to `position: relative` if it is not already). The overlay renders CSS2D label `<div>` elements that follow 3D scene positions without interfering with pointer events on the canvas.
+
+**`altAzToCartesian` coordinate convention:**
+
+`frontend/js/astro-projection.js` exports `altAzToCartesian(altitudeDeg, azimuthDeg, radius)`. Coordinate system: **y-up**, **north along −z**, **east along +x**. The formula is:
+
+```
+x =  radius * cos(alt) * sin(az)
+y =  radius * sin(alt)
+z = -radius * cos(alt) * cos(az)
+```
+
+This maps altitude 0° / azimuth 0° (horizon-North) to the −z axis, and altitude 90° (zenith) to the +y axis, consistent with Three.js scene orientation.
+
+### 2D/3D Component Hierarchy (Stjärnkarta tab)
+
+```
+SkyMap tab (panelSkyMap)
+  +-- .skymap-view-toggle         -- 2D / 3D toggle buttons
+  +-- #skyMapContainer            -- SkyMap (2D SVG)
+  |     +-- <svg>                 -- polar projection grid
+  |           +-- .sky-map-constellations  -- constellation lines + IAU labels
+  |           +-- .sky-map-bodies          -- planet/sun/moon dots + text labels
+  +-- #skyMap3dContainer          -- SkyMap3D (Three.js WebGL)
+        +-- <canvas>              -- WebGL renderer output (aria-hidden)
+        +-- CSS2DRenderer <div>   -- HTML label overlay (pointerEvents: none)
+              +-- .sky-map-3d-label  -- per-body CSS2D labels
+              +-- .constellation-label  -- IAU abbreviation labels
+```
+
+`SkyMap3D` is not imported at page load. `main.js` lazy-loads it via `await import('./components/sky-map-3d.js')` the first time the user activates 3D mode, so Three.js (~150 KB gzipped) does not affect initial page load.
 
 ## Data Flow
 
