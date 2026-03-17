@@ -783,3 +783,28 @@ All project documentation is updated to accurately reflect the Three.js dependen
 - `TECH_CHOICES.md` — document the Three.js decision: why Three.js over alternatives, why vendored over CDN, lazy-loading strategy
 - `CLAUDE.md` — add Three.js to the stack description if appropriate
 
+---
+
+#### Phase E6: Expanderingsknapp för stjärnkartan
+
+**Depends on:** Phase E5
+**Parallelisable with:** None
+
+**Intended Outcome**
+Användaren kan expandera stjärnkartan (2D eller 3D) så att den fyller hela webbläsarfönstret, och sedan minimera den tillbaka till ursprunglig storlek. En knapp placeras i `.sky-map-panel` och togglar klassen `.sky-map-panel--expanded`, som via CSS-regler tar över hela skärmen (`position: fixed; inset: 0`). Three.js-renderaren ritar om canvasen automatiskt via det befintliga `_handleResize()`-anropet, och SVG:en för 2D-vyn skalas korrekt via sin `viewBox`.
+
+**Definition of Done**
+- [ ] En knapp med texten "Förstora" och "Minimera" (beroende på läge) syns i `.sky-map-panel` för både 2D- och 3D-läget
+- [ ] Klick på knappen togglar klassen `.sky-map-panel--expanded` på `.sky-map-panel` och panelen täcker hela webbläsarfönstret (`100vw × 100vh`) utan scrollbars
+- [ ] Klick igen tar bort klassen och återgår kartan till ursprunglig layout (`max-width: 600px; aspect-ratio: 1/1`)
+- [ ] 3D-canvasen ritar om utan svarta kanter eller felaktiga proportioner i expanderat läge (verifieras via `SkyMap3D._handleResize()`)
+- [ ] 2D-SVG:en fyller det expanderade utrymmet utan distorsion (aspect ratio bevaras via `viewBox="0 0 500 500"`)
+
+**Key files**
+- Modify `frontend/index.html` — lägg till expand/minimera-knapp inuti `.sky-map-panel`
+- Modify `frontend/css/components/sky-map.css` — lägg till `.sky-map-panel--expanded`-regler med `position: fixed; inset: 0; z-index` för helskärmsläge
+- Modify `frontend/css/components/sky-map-3d.css` — lägg till expanded-state-regler för `#skyMap3dContainer` i helskärmsläge
+- Modify `frontend/js/main.js` — koppla knapptryckning till klasstoggle och anrop till `skyMap3d._handleResize()`
+
+---
+
