@@ -195,6 +195,50 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.addEventListener('click', () => activateView(btn.dataset.view));
     }
 
+    // --- Sky map expand / minimise ---
+
+    const skyMapPanelEl = document.querySelector('.sky-map-panel');
+    const expandBtn = document.querySelector('.sky-map-expand-btn');
+    const expandBtnLabel = expandBtn ? expandBtn.querySelector('.sky-map-expand-btn__label') : null;
+
+    /**
+     * Toggle the sky map panel between its normal layout position and a
+     * fixed fullscreen overlay.  After toggling, the 3D renderer is notified
+     * so it can resize its canvas to the new container dimensions.
+     */
+    function toggleSkyMapExpanded() {
+        if (!skyMapPanelEl || !expandBtn) return;
+
+        const isExpanded = skyMapPanelEl.classList.toggle('sky-map-panel--expanded');
+
+        // Suppress page scroll while the map occupies the full viewport.
+        document.body.style.overflow = isExpanded ? 'hidden' : '';
+
+        if (expandBtnLabel) {
+            expandBtnLabel.textContent = isExpanded ? 'Minimera' : 'Förstora';
+        }
+        expandBtn.setAttribute('aria-label', isExpanded ? 'Minimera stjärnkartan' : 'Förstora stjärnkartan');
+        expandBtn.setAttribute('title', isExpanded ? 'Minimera' : 'Förstora');
+
+        // Defer the resize call by one animation frame so the browser has
+        // committed the new position:fixed layout before Three.js reads
+        // clientWidth / clientHeight, preventing black borders in expanded mode.
+        if (skyMap3d !== null) {
+            requestAnimationFrame(() => { skyMap3d._handleResize(); });
+        }
+    }
+
+    if (expandBtn) {
+        expandBtn.addEventListener('click', toggleSkyMapExpanded);
+    }
+
+    // Collapse the expanded map when the user presses Escape.
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && skyMapPanelEl && skyMapPanelEl.classList.contains('sky-map-panel--expanded')) {
+            toggleSkyMapExpanded();
+        }
+    });
+
     // --- Interval tracking ---
     /** @type {number|null} */
     let refreshIntervalId = null;

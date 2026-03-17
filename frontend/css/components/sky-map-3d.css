@@ -22,6 +22,18 @@
     display: block;
 }
 
+/* --- Expanded (fullscreen) overrides for 3D container --- */
+
+.sky-map-panel--expanded #skyMap3dContainer,
+.sky-map-panel--expanded #skyMap3dContainer.active {
+    max-width: 100%;
+    aspect-ratio: auto;
+    flex: 1;
+    border-radius: 0;
+    margin-inline: 0;
+    overflow: hidden;
+}
+
 #skyMap3dContainer canvas {
     display: block;
     width: 100%;

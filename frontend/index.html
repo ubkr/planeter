@@ -86,6 +86,11 @@
       <!-- Stjärnkarta tab panel (hidden by default) -->
       <div id="panelSkyMap" role="tabpanel" aria-labelledby="tabSkyMap" class="tab-panel--hidden" hidden>
         <div class="sky-map-panel">
+          <!-- Expand / minimise button -->
+          <button class="sky-map-expand-btn" aria-label="Förstora stjärnkartan" title="Förstora">
+            <span aria-hidden="true">&#x26F6;</span>
+            <span class="sky-map-expand-btn__label">Förstora</span>
+          </button>
           <!-- 2D / 3D view toggle -->
           <div class="skymap-view-toggle" role="group" aria-label="Kartvy">
             <button class="skymap-view-toggle__btn active" data-view="2d" aria-pressed="true">2D</button>

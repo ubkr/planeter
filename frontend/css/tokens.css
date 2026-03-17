@@ -86,6 +86,7 @@
     /* Z-Index */
     --z-background: -1;
     --z-default: 1;
+    --z-panel-controls: 10;
     --z-sticky: 100;
     --z-modal: 1000;
     --z-tooltip: 1100;
