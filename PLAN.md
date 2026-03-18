@@ -762,7 +762,7 @@ The 3D sky environment is completed by wrapping the viewer in constellation line
 
 ---
 
-#### Phase E5: Documentation Update
+#### Phase E5: Documentation Update — ✅
 
 **Depends on:** Phase E4
 **Parallelisable with:** None
@@ -785,7 +785,7 @@ All project documentation is updated to accurately reflect the Three.js dependen
 
 ---
 
-#### Phase E6: Expanderingsknapp för stjärnkartan
+#### Phase E6: Expanderingsknapp för stjärnkartan — ✅
 
 **Depends on:** Phase E5
 **Parallelisable with:** None
