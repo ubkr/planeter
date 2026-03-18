@@ -659,6 +659,36 @@ A third "Kommande" tab shows all six event types across the next 60 days as a sc
 - Modify `frontend/js/components/tab-nav.js` — refactor to generic 3-tab loop with `tabChanged` event dispatch
 - Modify `frontend/js/main.js` — instantiate `EventsTimeline`; add `loadEvents()`; wire `tabChanged` listener with lazy-load and location-reset logic
 
+---
+
+#### Phase B6: Event Detail — Observation Guidance
+
+**Depends on:** Phase B4, Phase B5
+**Parallelisable with:** Phase B1, Phase B2, Phase E7
+
+**Intended Outcome**
+
+Clicking or tapping an event row (in either the Kommande timeline or the alert cards) reveals detailed observation guidance for that event. The detail view shows the best viewing time window (start and end as `HH:MM`), the sky position at event peak (altitude in degrees, compass direction in Swedish such as "sydväst"), and a short Swedish prose tip explaining where and when to look. The exact interaction pattern — inline expand, modal, bottom sheet, or other — is left to the designer; the backend supplies all necessary data and the frontend components expose a stable hook point for whichever pattern is chosen. Events whose peak occurs during daytime or below the horizon receive a Swedish note explaining reduced visibility. All new UI strings are in Swedish.
+
+**Definition of Done**
+- [ ] `AstronomicalEvent` model includes optional observation guidance fields: `best_time_start`, `best_time_end`, `altitude_deg`, `azimuth_deg`, `compass_direction_sv`, and `observation_tip_sv`
+- [ ] The event detection pipeline computes sky position and optimal viewing window for each event type, populating the new fields on every returned event
+- [ ] Events whose peak is below the horizon or during daylight carry a Swedish explanatory note in `observation_tip_sv`
+- [ ] Clicking/tapping an event in the Kommande timeline reveals the detail content with no full-page navigation
+- [ ] Clicking/tapping an event alert card reveals the same detail content
+- [ ] Detail content is accessible via keyboard (Enter/Space to toggle) and includes appropriate ARIA attributes
+- [ ] No regressions in existing event rendering, planet cards, or sky map tabs
+
+**Key files**
+- Modify `backend/app/models/planet.py` — add optional fields to `AstronomicalEvent`: `best_time_start`, `best_time_end` (ISO time strings), `altitude_deg`, `azimuth_deg` (floats), `compass_direction_sv` (str), `observation_tip_sv` (str)
+- Modify `backend/app/services/planets/events.py` — for each detected event, compute the observer-local optimal viewing window and sky coordinates at peak; generate a Swedish observation tip; handle below-horizon and daytime edge cases
+- Modify `frontend/js/components/events-timeline.js` — add click/tap handler on event rows; render a detail section showing time window, compass direction, and observation tip (exact interaction pattern determined by designer)
+- Modify `frontend/js/components/event-alerts.js` — add click/tap handler on alert cards; render the same detail content
+- Modify `frontend/css/components/events-timeline.css` — style the detail/expanded state for timeline rows
+- Modify `frontend/css/components/event-alerts.css` — style the detail/expanded state for alert cards
+
+---
+
 ### Phase C: Extended Bodies
 
 **Status: Deferred** — These phases are planned for a future iteration and are not yet scheduled for implementation. See Phase E for the current development track.
@@ -837,6 +867,34 @@ Användaren kan expandera stjärnkartan (2D eller 3D) så att den fyller hela we
 - Modify `frontend/css/components/sky-map.css` — lägg till `.sky-map-panel--expanded`-regler med `position: fixed; inset: 0; z-index` för helskärmsläge
 - Modify `frontend/css/components/sky-map-3d.css` — lägg till expanded-state-regler för `#skyMap3dContainer` i helskärmsläge
 - Modify `frontend/js/main.js` — koppla knapptryckning till klasstoggle och anrop till `skyMap3d._handleResize()`
+
+---
+
+#### Phase E7: Zoom in the 2D and 3D Sky Map
+
+**Depends on:** Phase E6
+**Parallelisable with:** Phase B1, Phase B2
+
+**Intended Outcome**
+The user can zoom in and out in both the 2D and 3D sky map using pinch/scroll gestures and via +/− buttons in the map view. In the 2D view the SVG's `viewBox` is adjusted around the map centre to zoom without changing the projection maths. In the 3D view the camera's `fov` (field of view) is changed instead of moving the camera, because the camera sits at the origin inside the sphere. The zoom level is reset on view switch (2D/3D) and on new data fetch to avoid disorientation.
+
+**Definition of Done**
+- [ ] Two buttons labelled "+" and "−" are visible in `.sky-map-panel` in both 2D and 3D mode, positioned without overlapping the existing expand/collapse button
+- [ ] Clicking "+" zooms in (shows a smaller portion of the sky in greater detail); clicking "−" zooms out (shows a larger portion of the sky)
+- [ ] Pinch-zoom on mobile devices and scroll wheel on desktop zoom in/out in both views
+- [ ] In the 2D view the SVG's `viewBox` attribute is adjusted dynamically around the centre point `(250, 250)` within the range 200×200 (maximum zoom-in) to 500×500 (default, fully zoomed out)
+- [ ] In the 3D view `PerspectiveCamera.fov` is adjusted within the range 20° (maximum zoom-in) to 90° (maximum zoom-out), with a default value of 60°
+- [ ] The camera in the 3D view stays at the origin `(0, 0, 0.001)` regardless of zoom level — dolly-zoom via OrbitControls remains disabled (`enableZoom = false`); FOV zoom is handled manually
+- [ ] The zoom level is reset to the default on switching between 2D and 3D and on new data fetch (location change)
+- [ ] The zoom buttons work correctly in both normal mode and expanded fullscreen mode (`.sky-map-panel--expanded`)
+- [ ] No JavaScript console errors on rapid repeated zoom or on zooming an empty map (before API data has loaded)
+
+**Key files**
+- Modify `frontend/index.html` — add +/− zoom buttons inside `.sky-map-panel`
+- Modify `frontend/js/components/sky-map.js` — add `zoomIn()`, `zoomOut()`, and `resetZoom()` methods that adjust the SVG's `viewBox`; add wheel event listener on the SVG element
+- Modify `frontend/js/components/sky-map-3d.js` — add `zoomIn()`, `zoomOut()`, and `resetZoom()` methods that adjust `camera.fov` and call `camera.updateProjectionMatrix()`; add wheel event listener on the canvas
+- Modify `frontend/js/main.js` — wire +/− button presses to the active view's zoom methods; call `resetZoom()` on view switch and on location change
+- Modify `frontend/css/components/sky-map.css` — add `.sky-map-zoom-controls` rules for button placement and styling, consistent with the existing `.sky-map-expand-btn`
 
 ---
 
