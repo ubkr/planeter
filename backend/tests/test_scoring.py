@@ -495,16 +495,26 @@ def test_nautical_twilight_sun_altitude_minus_8_not_visible():
     is_visible=False is the -12° sun-altitude threshold, not an accidental
     below-horizon position returned by the live ephem calculator.
     """
-    # sun_altitude=-8 falls in nautical_twilight: penalty_pts=20.
-    sun_data = {"elevation_deg": -8.0, "twilight_phase": "nautical_twilight", "penalty_pts": 20.0}
+    # sun_altitude=-8 falls in nautical_twilight, limiting_mag=0.5.
+    # Piecewise-linear penalty at sun_alt=-8°: interpolated between -12°→16 and -6°→38
+    # frac = (-8 - (-12)) / (-6 - (-12)) = 4/6; penalty = 16 + (4/6)*22 = 30.67
+    # A faint planet (magnitude=2.0) fails the magnitude gate (2.0 < 0.5 is False)
+    # so is_visible remains False regardless of the score.
+    sun_data = {
+        "elevation_deg": -8.0,
+        "twilight_phase": "nautical_twilight",
+        "penalty_pts": 30.67,
+        "limiting_magnitude": 0.5,
+    }
     moon_data = {"illumination": 0.0, "elevation_deg": -30.0, "azimuth_deg": 0.0}
 
-    planet = _make_planet(altitude_deg=30.0)
+    planet = _make_planet(altitude_deg=30.0, magnitude=2.0)
     result = apply_scores([planet], sun_data, moon_data, 0.0)
     scored = result[0]
 
     assert scored.is_visible is False, (
-        f"Expected is_visible=False when sun_altitude=-8, "
+        f"Expected is_visible=False when sun_altitude=-8 and planet magnitude=2.0 "
+        f"(faint planet not visible during nautical twilight), "
         f"got is_visible={scored.is_visible} (score={scored.visibility_score})"
     )
 
@@ -518,9 +528,17 @@ def test_astronomical_twilight_sun_altitude_minus_14_bright_planet_visible():
     Uses a fixed known-above-horizon planet (Venus) by constructing it
     directly, bypassing the live ephem calculation.
     """
-    # sun_altitude=-14 falls in astronomical_twilight: penalty_pts=8.
-    # altitude=45, magnitude=-4.5, cloud=0 → score = 40+25+35-8 = 92 > 15.
-    sun_data = {"elevation_deg": -14.0, "twilight_phase": "astronomical_twilight", "penalty_pts": 8.0}
+    # sun_altitude=-14 falls in astronomical_twilight, limiting_mag=4.5.
+    # Piecewise-linear penalty at sun_alt=-14°: interpolated between -18°→4 and -12°→16
+    # frac = (-14 - (-18)) / (-12 - (-18)) = 4/6; penalty = 4 + (4/6)*12 = 12.0
+    # Venus (magnitude=-4.5) passes the magnitude gate (-4.5 < 4.5 = True).
+    # mag_headroom=9.0, scale=0.0, effective_penalty=0; score = 40+25+35 = 100 > 15.
+    sun_data = {
+        "elevation_deg": -14.0,
+        "twilight_phase": "astronomical_twilight",
+        "penalty_pts": 12.0,
+        "limiting_magnitude": 4.5,
+    }
     moon_data = {"illumination": 0.0, "elevation_deg": -30.0, "azimuth_deg": 0.0}
 
     planet = _make_planet(altitude_deg=45.0, magnitude=-4.5)

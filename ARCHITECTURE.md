@@ -179,7 +179,7 @@ Input: (lat, lon, datetime_utc)
   v
 ephem.Observer(lat, lon, date)
   |
-  +---> ephem.Sun()      --> sun_alt, twilight_phase, sun_penalty
+  +---> ephem.Sun()      --> sun_alt, twilight_phase, sun_penalty, limiting_magnitude
   +---> ephem.Moon()     --> moon_alt, moon_illumination, moon_az
   +---> ephem.Mercury()  --> alt, az, mag, rise, set, transit
   +---> ephem.Venus()    --> alt, az, mag, rise, set, transit
@@ -239,13 +239,13 @@ transit_time  = observer.next_transit(mars)
 | Altitude | 40 | 0 pts at horizon; linear ramp to 40 pts at 45°; clamped at 40 pts for higher altitudes |
 | Magnitude | 25 | Venus at −4.5 → 25 pts; Saturn at +1 → ~10 pts; scaled inversely |
 | Cloud cover | 35 | <25% → 35 pts; 25–50% → 23 pts; 50–75% → 12 pts; ≥75% → 0 pts |
-| Sun penalty | −50 to 0 | Twilight bands defined in `utils/sun.py`: civil > nautical > astronomical > darkness |
+| Sun penalty | −50 to 0 | Continuous magnitude-aware function of sun altitude. Base penalty decreases smoothly from 50 (daylight) to 0 (darkness, sun < −18°). Effective penalty scaled by planet brightness relative to sky limiting magnitude (Schaefer 1993): bright planets (Venus, Jupiter) are penalised less during twilight than faint ones. |
 | Atmospheric extinction | −10 to 0 | Progressive penalty below 10° altitude |
 | Moon proximity | −10 to 0 | Bright, nearby Moon reduces planet contrast |
 
 **Total** = clamp(0, 100, altitude + magnitude + clouds − sun_penalty − extinction − moon_proximity)
 
-A planet is declared **"visible"** when: altitude > 0°, total score > 15, and sun elevation < -12°.
+A planet is declared **"visible"** when: altitude > 0, total score > 15, and apparent magnitude < sky limiting magnitude for the current sun altitude. The limiting magnitude is a continuous function of sun depression angle, ranging from approximately −5.0 at sunset to +6.5 in full darkness (Schaefer 1993, "Astronomy and the Limits of Vision", *Vistas in Astronomy* Vol. 36, pp. 311–361).
 
 ### Key Astronomical Concepts
 
@@ -253,6 +253,7 @@ A planet is declared **"visible"** when: altitude > 0°, total score > 15, and s
 - **Superior planets** (Mars, Jupiter, Saturn): can appear anywhere along the ecliptic; best at opposition.
 - **Apparent magnitude**: lower = brighter. Venus can reach −4.6; Jupiter −2.9; Mars −2.9; Saturn +0.5; Mercury −1.9 to +5.7.
 - **Atmospheric extinction**: objects below ~10° are significantly dimmed; below ~5° very difficult.
+- **Twilight limiting magnitude**: the faintest stellar magnitude visible to the naked eye as a function of sun depression angle. Bright objects like Venus (mag −4) become visible well before civil twilight ends, while faint naked-eye stars require full astronomical darkness.
 
 ## State Management
 

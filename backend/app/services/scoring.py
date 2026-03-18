@@ -17,6 +17,7 @@ def score_planet(
     cloud_cover: float,
     moon_illumination: float,
     moon_separation: float,
+    limiting_mag: float = 6.5,
 ) -> Tuple[int, List[str]]:
     """
     Compute a 0–100 visibility score for a single planet, with reason keys.
@@ -32,11 +33,25 @@ def score_planet(
 
     Partial-penalty reason keys (collected when score > 0):
       - cloud cover in [25, 75) → "molnighet"
-      - any sun/twilight penalty (0 < sun_penalty_pts < 50) → "dagsljus"
+      - any effective sun/twilight penalty > 0 → "dagsljus"
       - atmospheric extinction active (altitude < 10°) → "atmosfärisk_dämpning"
       - moon proximity penalty active → "månljus"
 
     Good-conditions fallback: "goda_förhållanden" when no reason was collected.
+
+    The sun penalty is magnitude-aware: during twilight (0 < sun_penalty_pts < 50)
+    a planet whose apparent magnitude is already brighter than the sky background
+    (large mag_headroom) receives a reduced effective penalty.  The scale factor
+    is derived from how much headroom the planet has relative to the limiting
+    magnitude:
+
+        mag_headroom         = limiting_mag - planet.magnitude
+        scale                = clamp(1.0 - mag_headroom / 5.0, 0.0, 1.0)
+        effective_penalty    = sun_penalty_pts * scale
+
+    Examples:
+      Venus (mag −4.0), limiting_mag +1.0 → headroom=5.0, scale=0.0, penalty≈0
+      Saturn (mag +0.5), limiting_mag +1.0 → headroom=0.5, scale=0.9, penalty≈90%
 
     Args:
         planet:            Computed position data for the planet.
@@ -45,6 +60,10 @@ def score_planet(
         cloud_cover:       Cloud cover percentage 0–100.
         moon_illumination: Moon illumination fraction 0.0–1.0.
         moon_separation:   Angular separation between moon and planet in degrees.
+        limiting_mag:      Faintest naked-eye magnitude visible at zenith for the
+                           current sun altitude, from calculate_sun_penalty()
+                           ["limiting_magnitude"].  Defaults to 6.5 (full dark sky)
+                           so callers that omit it get no magnitude-aware scaling.
 
     Returns:
         Tuple of (score, reasons) where score is an integer in range 0–100 and
@@ -61,11 +80,22 @@ def score_planet(
 
     # Daytime is a hard zero: sun_penalty_pts == 50 means the sun is above the
     # horizon.  (calculate_sun_penalty caps the penalty at 50.)
+    # This check uses the ORIGINAL sun_penalty_pts, never the scaled value.
     if sun_penalty_pts >= 50:
         reasons.append("dagsljus")
 
     if reasons:
         return (0, reasons)
+
+    # --- Magnitude-aware sun penalty ---
+    # Scale the penalty by how easily the planet overcomes the sky brightness.
+    # A planet much brighter than the sky limit (large positive headroom) gets
+    # a near-zero penalty; a faint planet near the sky limit gets the full one.
+    # The daylight hard-zero above already handles sun_penalty_pts >= 50, so
+    # here we are in the twilight / darkness regime (0 <= sun_penalty_pts < 50).
+    mag_headroom = limiting_mag - planet.magnitude
+    scale = max(0.0, min(1.0, 1.0 - mag_headroom / 5.0))
+    effective_sun_penalty_pts = sun_penalty_pts * scale
 
     # --- Altitude component (0–40 pts) ---
     # Linear ramp: 0 pts at 0°, 40 pts at 45°; clamped to 40 above 45°.
@@ -89,9 +119,8 @@ def score_planet(
         cloud_score = 0.0  # unreachable here; handled by hard-zero above
 
     # --- Sun penalty (-50 to 0) ---
-    # sun_penalty_pts is a positive number (0–50) supplied by the caller;
-    # negate it so it subtracts from the total.
-    sun_penalty = -sun_penalty_pts
+    # Use the magnitude-aware effective penalty; negate so it subtracts from total.
+    sun_penalty = -effective_sun_penalty_pts
 
     # --- Atmospheric extinction penalty (-10 to 0) ---
     # Linear from -10 at 0° altitude to 0 at 10° altitude; 0 above 10°.
@@ -124,7 +153,7 @@ def score_planet(
         # cloud_cover < 75 is guaranteed here (hard-zero already handled >=75)
         reasons.append("molnighet")
 
-    if sun_penalty_pts > 0:
+    if effective_sun_penalty_pts > 0:
         # sun_penalty_pts < 50 is guaranteed here (hard-zero already handled >=50)
         reasons.append("dagsljus")
 
@@ -186,12 +215,16 @@ def apply_scores(
     A planet is declared visible when:
         - altitude_deg > 0
         - visibility_score > 15
-        - sun_altitude < -12  (nautical twilight or darker)
+        - planet.magnitude < limiting_mag  (planet is brighter than the sky limit)
+
+    The limiting_mag is taken from sun_data["limiting_magnitude"] as returned by
+    calculate_sun_penalty().  It reflects how faint a zenith object can be and
+    still be seen naked-eye at the current sun altitude.
 
     Args:
         planets:     List of PlanetPosition objects from calculate_planet_positions().
         sun_data:    Dict returned by calculate_sun_penalty(), containing at
-                     minimum "elevation_deg" and "penalty_pts".
+                     minimum "elevation_deg", "penalty_pts", and "limiting_magnitude".
         moon_data:   Dict returned by calculate_moon_penalty(), containing at
                      minimum "illumination", "elevation_deg", and "azimuth_deg".
         cloud_cover: Cloud cover percentage 0–100.
@@ -200,8 +233,8 @@ def apply_scores(
         The same list with visibility_score, is_visible, and visibility_reasons
         populated on each item.
     """
-    sun_altitude = sun_data["elevation_deg"]
     sun_penalty_pts = sun_data["penalty_pts"]
+    limiting_mag: float = sun_data["limiting_magnitude"]
 
     moon_illumination = moon_data["illumination"]
     moon_alt_deg = moon_data["elevation_deg"]
@@ -221,6 +254,7 @@ def apply_scores(
             cloud_cover=cloud_cover,
             moon_illumination=moon_illumination,
             moon_separation=separation,
+            limiting_mag=limiting_mag,
         )
 
         planet.visibility_score = score
@@ -228,7 +262,7 @@ def apply_scores(
         planet.is_visible = (
             planet.altitude_deg > 0
             and score > 15
-            and sun_altitude < -12
+            and planet.magnitude < limiting_mag
         )
 
     return planets

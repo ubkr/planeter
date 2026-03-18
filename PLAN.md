@@ -325,9 +325,8 @@ The backend has no dead code or duplicate computation. Each request triggers exa
 
 ---
 
-## Phase 12: Magnitude-Aware Twilight Visibility
+## Phase 12: Magnitude-Aware Twilight Visibility — ✅
 
-**Status:** Pending
 **Depends on:** Phase 9
 **Parallelisable with:** Phase B1, Phase B2
 
