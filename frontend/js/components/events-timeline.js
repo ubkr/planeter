@@ -2,7 +2,9 @@
  * events-timeline.js - Renders a chronological timeline of upcoming astronomical events.
  *
  * Expects event objects matching the AstronomicalEvent schema from the backend.
- * Field names used: event_type, description_sv, date, days_away.
+ * Field names used: event_type, description_sv, date, days_away,
+ *   best_time_start, best_time_end, altitude_deg, azimuth_deg,
+ *   compass_direction_sv, observation_tip_sv.
  */
 
 // Number of skeleton rows to show while loading.
@@ -73,6 +75,36 @@ function formatMonthHeading(key) {
 }
 
 /**
+ * Format an ISO 8601 UTC string to "HH:MM" in Europe/Stockholm timezone.
+ *
+ * @param {string} isoStr - Full ISO 8601 UTC timestamp string.
+ * @returns {string} e.g. "21:30"
+ */
+function formatTimeStockholm(isoStr) {
+    const date = new Date(isoStr);
+    return new Intl.DateTimeFormat('sv-SE', {
+        timeZone: 'Europe/Stockholm',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+    }).format(date);
+}
+
+/**
+ * Return true if the event has any guidance fields worth showing.
+ *
+ * @param {Object} event - AstronomicalEvent object from the API.
+ * @returns {boolean}
+ */
+function hasGuidance(event) {
+    return (
+        event.observation_tip_sv != null ||
+        event.altitude_deg != null ||
+        event.compass_direction_sv != null
+    );
+}
+
+/**
  * Build the DOM element for the days-away badge.
  *
  * @param {number} daysAway
@@ -99,7 +131,49 @@ function buildDaysBadge(daysAway) {
 }
 
 /**
+ * Build the collapsible detail panel for guidance information.
+ *
+ * @param {Object} event - AstronomicalEvent object from the API.
+ * @returns {HTMLElement}
+ */
+function buildDetailPanel(event) {
+    const detail = document.createElement('div');
+    detail.className = 'events-timeline__detail';
+    // Start collapsed. The --expanded modifier class controls visibility.
+    detail.setAttribute('aria-hidden', 'true');
+
+    if (event.best_time_start != null && event.best_time_end != null) {
+        const timeEl = document.createElement('p');
+        timeEl.className = 'events-timeline__detail-line';
+        const startStr = formatTimeStockholm(event.best_time_start);
+        const endStr = formatTimeStockholm(event.best_time_end);
+        timeEl.textContent = `B\u00e4sta tid: ${startStr}\u2013${endStr}`;
+        detail.appendChild(timeEl);
+    }
+
+    if (event.compass_direction_sv != null && event.altitude_deg != null) {
+        const dirEl = document.createElement('p');
+        dirEl.className = 'events-timeline__detail-line';
+        const altRounded = Math.round(event.altitude_deg);
+        dirEl.textContent = `Riktning: ${event.compass_direction_sv}, h\u00f6jd: ${altRounded}\u00b0`;
+        detail.appendChild(dirEl);
+    }
+
+    if (event.observation_tip_sv != null) {
+        const tipEl = document.createElement('p');
+        tipEl.className = 'events-timeline__detail-tip';
+        tipEl.textContent = event.observation_tip_sv;
+        detail.appendChild(tipEl);
+    }
+
+    return detail;
+}
+
+/**
  * Build the DOM element for one event row.
+ *
+ * If the event has guidance fields, the row becomes interactive: clicking it
+ * expands or collapses a detail panel below the row content.
  *
  * @param {Object} event - AstronomicalEvent object from the API.
  * @returns {HTMLElement}
@@ -108,6 +182,9 @@ function buildEventRow(event) {
     const date = parseDateStr(event.date);
     const dayNum = date.getUTCDate();
     const weekdayAbbr = WEEKDAY_ABBR_SV[date.getUTCDay()];
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'events-timeline__event-wrapper';
 
     const row = document.createElement('div');
     row.className = 'events-timeline__event';
@@ -133,7 +210,48 @@ function buildEventRow(event) {
     row.appendChild(descEl);
     row.appendChild(badge);
 
-    return row;
+    if (hasGuidance(event)) {
+        // Make the row interactive.
+        row.classList.add('events-timeline__event--expandable');
+        row.setAttribute('role', 'button');
+        row.setAttribute('tabindex', '0');
+        row.setAttribute('aria-expanded', 'false');
+
+        const chevronEl = document.createElement('span');
+        chevronEl.className = 'events-timeline__chevron';
+        chevronEl.textContent = '\u25be'; // ▾
+        chevronEl.setAttribute('aria-hidden', 'true');
+        row.appendChild(chevronEl);
+
+        const detail = buildDetailPanel(event);
+        wrapper.appendChild(row);
+        wrapper.appendChild(detail);
+
+        // Toggle handler shared by click and keyboard.
+        function toggleDetail() {
+            if (!row.isConnected) return;
+            const expanded = row.getAttribute('aria-expanded') === 'true';
+            const nowExpanded = !expanded;
+            row.setAttribute('aria-expanded', String(nowExpanded));
+            detail.setAttribute('aria-hidden', String(!nowExpanded));
+            detail.classList.toggle('events-timeline__detail--expanded', nowExpanded);
+            chevronEl.classList.toggle('events-timeline__chevron--expanded', nowExpanded);
+        }
+
+        row.addEventListener('click', toggleDetail);
+
+        // Keyboard: trigger on Enter or Space, matching standard button behaviour.
+        row.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                toggleDetail();
+            }
+        });
+    } else {
+        wrapper.appendChild(row);
+    }
+
+    return wrapper;
 }
 
 /**

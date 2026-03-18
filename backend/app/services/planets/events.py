@@ -24,14 +24,15 @@ other are merged into a single event, keeping the sample with the most extreme
 value (tightest separation, highest elongation, etc.).
 """
 
+import copy
 import math
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import ephem
 
-from ...models.planet import AstronomicalEvent
+from ...models.planet import AstronomicalEvent, azimuth_to_compass_sv
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +129,214 @@ def _ecliptic_lon_deg(body, epoch) -> float:
 
 
 # ---------------------------------------------------------------------------
+# Observation guidance helper
+# ---------------------------------------------------------------------------
+
+# Altitude threshold (degrees) below which the body is considered not observable.
+_OBS_MIN_ALT_DEG = 5.0
+# Sun altitude thresholds (degrees) for twilight classification.
+_CIVIL_TWILIGHT_DEG = -6.0
+_NAUTICAL_TWILIGHT_DEG = -12.0
+# Sample step for the best-window search (minutes).
+_WINDOW_STEP_MINUTES = 15
+# Half-width of the search window around the event peak (hours).
+_WINDOW_HALF_HOURS = 12
+
+
+def _compute_observation_guidance(
+    observer: ephem.Observer,
+    event_dt: datetime,
+    primary_body_name: str,
+    event_type: str,
+) -> Dict:
+    """
+    Compute position and observation guidance for the primary body at event_dt.
+
+    Returns a dict with keys:
+        altitude_deg, azimuth_deg, compass_direction_sv,
+        observation_tip_sv, best_time_start, best_time_end
+    All values may be None if the computation fails.
+
+    The caller's observer is never mutated; a copy is used internally.
+    """
+    result: Dict = {
+        "altitude_deg": None,
+        "azimuth_deg": None,
+        "compass_direction_sv": None,
+        "observation_tip_sv": None,
+        "best_time_start": None,
+        "best_time_end": None,
+    }
+
+    try:
+        # Work on a local copy so the caller's observer.date is not affected.
+        obs = copy.copy(observer)
+
+        # Ensure naive UTC.
+        if event_dt.tzinfo is not None:
+            event_dt = event_dt.astimezone(timezone.utc).replace(tzinfo=None)
+
+        # ----------------------------------------------------------------
+        # 1. Compute primary body position at event peak.
+        # ----------------------------------------------------------------
+        _KNOWN_BODIES = {"Mercury", "Venus", "Mars", "Jupiter", "Saturn", "Moon", "Sun"}
+        if primary_body_name not in _KNOWN_BODIES:
+            raise ValueError(f"Unknown body: {primary_body_name}")
+
+        obs.date = ephem.Date(event_dt)
+        body = getattr(ephem, primary_body_name)()
+        body.compute(obs)
+        altitude_deg = round(math.degrees(float(body.alt)), 1)
+        azimuth_deg = round(math.degrees(float(body.az)), 1) % 360.0
+        compass_sv = azimuth_to_compass_sv(azimuth_deg)
+
+        result["altitude_deg"] = altitude_deg
+        result["azimuth_deg"] = azimuth_deg
+        result["compass_direction_sv"] = compass_sv
+
+        # ----------------------------------------------------------------
+        # 2. Compute sun altitude at event peak to classify conditions.
+        # ----------------------------------------------------------------
+        sun = ephem.Sun()
+        sun.compute(obs)
+        sun_alt_deg = math.degrees(float(sun.alt))
+
+        daytime = sun_alt_deg > _NAUTICAL_TWILIGHT_DEG  # > -12°
+
+        # ----------------------------------------------------------------
+        # 3. Find the best viewing window (±12 h, 15-min steps).
+        # ----------------------------------------------------------------
+        window_start = event_dt - timedelta(hours=_WINDOW_HALF_HOURS)
+        window_end = event_dt + timedelta(hours=_WINDOW_HALF_HOURS)
+
+        step = timedelta(minutes=_WINDOW_STEP_MINUTES)
+        sample_time = window_start
+        in_window = False
+        current_start: Optional[datetime] = None
+        last_valid_time: Optional[datetime] = None
+        best_start: Optional[datetime] = None
+        best_end: Optional[datetime] = None
+
+        # We want the window that contains event_dt, or the one closest to it
+        # when the event_dt itself is not inside a valid window.
+        candidate_windows: List[Tuple[datetime, datetime]] = []
+
+        while sample_time <= window_end:
+            sample_obs = copy.copy(obs)
+            sample_obs.date = ephem.Date(sample_time)
+
+            sample_body = getattr(ephem, primary_body_name)()
+            sample_body.compute(sample_obs)
+            sample_alt = math.degrees(float(sample_body.alt))
+
+            sample_sun = ephem.Sun()
+            sample_sun.compute(sample_obs)
+            sample_sun_alt = math.degrees(float(sample_sun.alt))
+
+            observable = (
+                sample_alt >= _OBS_MIN_ALT_DEG
+                and sample_sun_alt < _NAUTICAL_TWILIGHT_DEG
+            )
+
+            if observable and not in_window:
+                in_window = True
+                current_start = sample_time
+            elif not observable and in_window:
+                in_window = False
+                if current_start is not None and last_valid_time is not None:
+                    candidate_windows.append((current_start, last_valid_time))
+                    current_start = None
+
+            if observable:
+                last_valid_time = sample_time
+
+            sample_time += step
+
+        # Close any window still open at the end of the search range.
+        if in_window and current_start is not None and last_valid_time is not None:
+            candidate_windows.append((current_start, last_valid_time))
+
+        if candidate_windows:
+            # Prefer the window that contains event_dt; otherwise pick the
+            # closest one (by distance from event_dt to window midpoint).
+            containing = [
+                (s, e) for (s, e) in candidate_windows if s <= event_dt <= e
+            ]
+            if containing:
+                chosen_start, chosen_end = containing[0]
+            else:
+                def _midpoint_distance(window: Tuple[datetime, datetime]) -> float:
+                    s, e = window
+                    mid = s + (e - s) / 2
+                    return abs((mid - event_dt).total_seconds())
+
+                chosen_start, chosen_end = min(candidate_windows, key=_midpoint_distance)
+
+            best_start = chosen_start
+            best_end = chosen_end
+
+        result["best_time_start"] = _dt_to_iso(best_start) if best_start else None
+        result["best_time_end"] = _dt_to_iso(best_end) if best_end else None
+
+        # ----------------------------------------------------------------
+        # 4. Generate Swedish observation tip.
+        # ----------------------------------------------------------------
+        if altitude_deg < 0:
+            tip = "Händelsen sker under horisonten från din plats och är inte synlig."
+        elif daytime and event_type != "venus_brilliancy":
+            tip = "Händelsen sker under dagtid och är svår att observera med blotta ögat."
+        elif event_type == "conjunction":
+            tip = (
+                f"Titta mot {compass_sv} på {altitude_deg}° höjd "
+                "för att se planeterna nära varandra."
+            )
+        elif event_type == "opposition":
+            tip = (
+                f"Planeten är synlig hela natten och når sin högsta punkt "
+                f"mot {compass_sv} på {altitude_deg}° höjd."
+            )
+        elif event_type == "mercury_elongation":
+            tip = (
+                f"Merkurius syns bäst i skymningen mot {compass_sv} "
+                f"på {altitude_deg}° höjd."
+            )
+        elif event_type == "alignment":
+            tip = (
+                f"Planeterna bildar en rad på himlen – sök mot {compass_sv} "
+                f"på {altitude_deg}° höjd."
+            )
+        elif event_type == "venus_brilliancy":
+            tip = (
+                f"Venus är ovanligt ljusstark och syns mot {compass_sv} "
+                f"på {altitude_deg}° höjd."
+            )
+            if daytime:
+                tip += " Kan till och med ses på dagtid med blotta ögat."
+        elif event_type == "moon_occultation":
+            tip = (
+                f"Titta noga mot {compass_sv} på {altitude_deg}° höjd "
+                "precis vid angiven tid."
+            )
+        else:
+            tip = (
+                f"Titta mot {compass_sv} på {altitude_deg}° höjd vid angiven tid."
+            )
+
+        result["observation_tip_sv"] = tip
+
+    except Exception as exc:
+        logger.warning(
+            "_compute_observation_guidance failed for %s/%s at %s: %s",
+            event_type,
+            primary_body_name,
+            event_dt,
+            exc,
+        )
+
+    return result
+
+
+# ---------------------------------------------------------------------------
 # Detector sub-functions
 # ---------------------------------------------------------------------------
 
@@ -165,6 +374,7 @@ def _detect_conjunctions(observer: ephem.Observer, dt: datetime) -> List[Astrono
             if sep < CONJUNCTION_THRESHOLD_DEG:
                 sv1 = PLANET_NAMES_SV[n1]
                 sv2 = PLANET_NAMES_SV[n2]
+                guidance = _compute_observation_guidance(observer, dt, n1, "conjunction")
                 events.append(AstronomicalEvent(
                     event_type="conjunction",
                     bodies=[n1, n2],
@@ -172,6 +382,12 @@ def _detect_conjunctions(observer: ephem.Observer, dt: datetime) -> List[Astrono
                     description_sv=f"{sv1} och {sv2} i konjunktion ({sep:.1f}° separation)",
                     separation_deg=round(sep, 2),
                     event_icon=EVENT_ICONS["conjunction"],
+                    altitude_deg=guidance["altitude_deg"],
+                    azimuth_deg=guidance["azimuth_deg"],
+                    compass_direction_sv=guidance["compass_direction_sv"],
+                    observation_tip_sv=guidance["observation_tip_sv"],
+                    best_time_start=guidance["best_time_start"],
+                    best_time_end=guidance["best_time_end"],
                 ))
 
     # Planet-Moon pairs (5 checks).
@@ -180,6 +396,7 @@ def _detect_conjunctions(observer: ephem.Observer, dt: datetime) -> List[Astrono
         if sep < CONJUNCTION_THRESHOLD_DEG:
             sv = PLANET_NAMES_SV[name]
             sv_moon = PLANET_NAMES_SV["Moon"]
+            guidance = _compute_observation_guidance(observer, dt, name, "conjunction")
             events.append(AstronomicalEvent(
                 event_type="conjunction",
                 bodies=[name, "Moon"],
@@ -187,6 +404,12 @@ def _detect_conjunctions(observer: ephem.Observer, dt: datetime) -> List[Astrono
                 description_sv=f"{sv_moon} och {sv} i konjunktion ({sep:.1f}° separation)",
                 separation_deg=round(sep, 2),
                 event_icon=EVENT_ICONS["conjunction"],
+                altitude_deg=guidance["altitude_deg"],
+                azimuth_deg=guidance["azimuth_deg"],
+                compass_direction_sv=guidance["compass_direction_sv"],
+                observation_tip_sv=guidance["observation_tip_sv"],
+                best_time_start=guidance["best_time_start"],
+                best_time_end=guidance["best_time_end"],
             ))
 
     return events
@@ -211,6 +434,7 @@ def _detect_oppositions(observer: ephem.Observer, dt: datetime) -> List[Astronom
         if elong_deg > OPPOSITION_THRESHOLD_DEG:
             name = type(body).__name__
             sv = PLANET_NAMES_SV[name]
+            guidance = _compute_observation_guidance(observer, dt, name, "opposition")
             events.append(AstronomicalEvent(
                 event_type="opposition",
                 bodies=[name],
@@ -218,6 +442,12 @@ def _detect_oppositions(observer: ephem.Observer, dt: datetime) -> List[Astronom
                 description_sv=f"{sv} i opposition – bästa tillfället att observera planeten",
                 elongation_deg=round(elong_deg, 2),
                 event_icon=EVENT_ICONS["opposition"],
+                altitude_deg=guidance["altitude_deg"],
+                azimuth_deg=guidance["azimuth_deg"],
+                compass_direction_sv=guidance["compass_direction_sv"],
+                observation_tip_sv=guidance["observation_tip_sv"],
+                best_time_start=guidance["best_time_start"],
+                best_time_end=guidance["best_time_end"],
             ))
 
     return events
@@ -279,6 +509,7 @@ def _detect_mercury_elongation(observer: ephem.Observer, dt: datetime) -> List[A
     else:
         desc_sv = "Bästa tillfället att se Merkurius – titta lågt i öster strax före soluppgång"
 
+    guidance = _compute_observation_guidance(observer, dt, "Mercury", "mercury_elongation")
     return [AstronomicalEvent(
         event_type="mercury_elongation",
         bodies=["Mercury"],
@@ -286,6 +517,12 @@ def _detect_mercury_elongation(observer: ephem.Observer, dt: datetime) -> List[A
         description_sv=desc_sv,
         elongation_deg=round(abs(elong_deg), 2),
         event_icon=EVENT_ICONS["mercury_elongation"],
+        altitude_deg=guidance["altitude_deg"],
+        azimuth_deg=guidance["azimuth_deg"],
+        compass_direction_sv=guidance["compass_direction_sv"],
+        observation_tip_sv=guidance["observation_tip_sv"],
+        best_time_start=guidance["best_time_start"],
+        best_time_end=guidance["best_time_end"],
     )]
 
 
@@ -395,6 +632,8 @@ def _detect_alignment(observer: ephem.Observer, dt: datetime) -> List[Astronomic
     sky_word = "kvälls" if evening else "morgon"
     desc_sv = f"{best_count} planeter syns på rad i {sky_word}himlen!"
 
+    middle_body = best_group[len(best_group) // 2]
+    guidance = _compute_observation_guidance(observer, dt, middle_body, "alignment")
     return [AstronomicalEvent(
         event_type="alignment",
         bodies=best_group,
@@ -402,6 +641,12 @@ def _detect_alignment(observer: ephem.Observer, dt: datetime) -> List[Astronomic
         description_sv=desc_sv,
         alignment_count=best_count,
         event_icon=EVENT_ICONS["alignment"],
+        altitude_deg=guidance["altitude_deg"],
+        azimuth_deg=guidance["azimuth_deg"],
+        compass_direction_sv=guidance["compass_direction_sv"],
+        observation_tip_sv=guidance["observation_tip_sv"],
+        best_time_start=guidance["best_time_start"],
+        best_time_end=guidance["best_time_end"],
     )]
 
 
@@ -419,6 +664,7 @@ def _detect_venus_brilliancy(observer: ephem.Observer, dt: datetime) -> List[Ast
     if mag >= VENUS_BRILLIANCY_THRESHOLD:
         return []
 
+    guidance = _compute_observation_guidance(observer, dt, "Venus", "venus_brilliancy")
     return [AstronomicalEvent(
         event_type="venus_brilliancy",
         bodies=["Venus"],
@@ -426,6 +672,12 @@ def _detect_venus_brilliancy(observer: ephem.Observer, dt: datetime) -> List[Ast
         description_sv="Venus är nu på sin ljusaste – den syns till och med i dagsljus!",
         magnitude=round(mag, 2),
         event_icon=EVENT_ICONS["venus_brilliancy"],
+        altitude_deg=guidance["altitude_deg"],
+        azimuth_deg=guidance["azimuth_deg"],
+        compass_direction_sv=guidance["compass_direction_sv"],
+        observation_tip_sv=guidance["observation_tip_sv"],
+        best_time_start=guidance["best_time_start"],
+        best_time_end=guidance["best_time_end"],
     )]
 
 
@@ -450,6 +702,7 @@ def _detect_moon_occultation(observer: ephem.Observer, dt: datetime) -> List[Ast
         if sep < MOON_OCCULTATION_THRESHOLD_DEG:
             name = type(body).__name__
             sv_name = PLANET_NAMES_SV[name]
+            guidance = _compute_observation_guidance(observer, dt, name, "moon_occultation")
             events.append(AstronomicalEvent(
                 event_type="moon_occultation",
                 bodies=["Moon", name],
@@ -457,6 +710,12 @@ def _detect_moon_occultation(observer: ephem.Observer, dt: datetime) -> List[Ast
                 description_sv=f"Månen täcker {sv_name} – ett sällsynt skådespel",
                 separation_deg=round(sep, 4),
                 event_icon=EVENT_ICONS["moon_occultation"],
+                altitude_deg=guidance["altitude_deg"],
+                azimuth_deg=guidance["azimuth_deg"],
+                compass_direction_sv=guidance["compass_direction_sv"],
+                observation_tip_sv=guidance["observation_tip_sv"],
+                best_time_start=guidance["best_time_start"],
+                best_time_end=guidance["best_time_end"],
             ))
 
     return events

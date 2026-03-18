@@ -661,7 +661,7 @@ A third "Kommande" tab shows all six event types across the next 60 days as a sc
 
 ---
 
-#### Phase B6: Event Detail — Observation Guidance
+#### Phase B6: Event Detail — Observation Guidance — ✅
 
 **Depends on:** Phase B4, Phase B5
 **Parallelisable with:** Phase B1, Phase B2, Phase E7

@@ -305,13 +305,22 @@ Same structure as above but includes visibility windows: when each planet rises,
 ```json
 {
   "location": { "lat": 55.7, "lon": 13.4, "name": "Södra Sandby" },
-  "generated_at": "2026-03-16T10:00:00Z",
+  "timestamp": "2026-03-16T10:00:00Z",
   "events": [
     {
-      "type": "opposition",
-      "planet": "Mars",
-      "date": "2026-03-20",
-      "description": "Mars i opposition — bästa synlighet"
+      "event_type": "opposition",
+      "bodies": ["Mars"],
+      "date": "2026-04-15T00:00:00Z",
+      "description_sv": "Mars i opposition – bästa tillfället att observera planeten",
+      "elongation_deg": 178.5,
+      "days_away": 30,
+      "event_icon": "opposition",
+      "best_time_start": "2026-04-15T21:30:00Z",
+      "best_time_end": "2026-04-15T23:45:00Z",
+      "altitude_deg": 42.3,
+      "azimuth_deg": 195.7,
+      "compass_direction_sv": "syd",
+      "observation_tip_sv": "Planeten är synlig hela natten och når sin högsta punkt mot syd på 42° höjd."
     }
   ]
 }

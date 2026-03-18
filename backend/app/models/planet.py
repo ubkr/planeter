@@ -19,6 +19,26 @@ _COMPASS_DIRECTIONS = [
     "W", "WNW", "NW", "NNW",
 ]
 
+# Swedish equivalents for the 16-point compass rose, same order as above.
+_COMPASS_DIRECTIONS_SV = [
+    "nord",          # N      0°
+    "nord-nordost",  # NNE   22.5°
+    "nordost",       # NE    45°
+    "ost-nordost",   # ENE   67.5°
+    "ost",           # E     90°
+    "ost-sydost",    # ESE  112.5°
+    "sydost",        # SE   135°
+    "syd-sydost",    # SSE  157.5°
+    "syd",           # S    180°
+    "syd-sydväst",   # SSW  202.5°
+    "sydväst",       # SW   225°
+    "väst-sydväst",  # WSW  247.5°
+    "väst",          # W    270°
+    "väst-nordväst", # WNW  292.5°
+    "nordväst",      # NW   315°
+    "nord-nordväst", # NNW  337.5°
+]
+
 
 def azimuth_to_compass(azimuth_deg: float) -> str:
     """
@@ -32,6 +52,20 @@ def azimuth_to_compass(azimuth_deg: float) -> str:
     # Each sector is 360 / 16 = 22.5 degrees wide.
     index = round(azimuth_deg / 22.5) % 16
     return _COMPASS_DIRECTIONS[index]
+
+
+def azimuth_to_compass_sv(azimuth_deg: float) -> str:
+    """
+    Convert a 0–360 degree azimuth to a Swedish 16-point compass direction string.
+
+    Uses the same binning logic as azimuth_to_compass(): normalise to [0, 360),
+    divide by 22.5, round to nearest integer, take mod 16 as the sector index.
+    """
+    # Normalise to [0, 360)
+    azimuth_deg = azimuth_deg % 360.0
+    # Each sector is 360 / 16 = 22.5 degrees wide.
+    index = round(azimuth_deg / 22.5) % 16
+    return _COMPASS_DIRECTIONS_SV[index]
 
 
 class PlanetPosition(BaseModel):
@@ -162,6 +196,24 @@ class AstronomicalEvent(BaseModel):
             "Icon key hint: 'conjunction' | 'opposition' | 'elongation' | "
             "'alignment' | 'brilliancy' | 'occultation'"
         ),
+    )
+    best_time_start: Optional[str] = Field(
+        None, description="ISO 8601 UTC string for start of best viewing window"
+    )
+    best_time_end: Optional[str] = Field(
+        None, description="ISO 8601 UTC string for end of best viewing window"
+    )
+    altitude_deg: Optional[float] = Field(
+        None, description="Altitude of primary body at event peak in degrees"
+    )
+    azimuth_deg: Optional[float] = Field(
+        None, description="Azimuth of primary body at event peak in degrees"
+    )
+    compass_direction_sv: Optional[str] = Field(
+        None, description="Swedish compass direction string (e.g. 'sydväst')"
+    )
+    observation_tip_sv: Optional[str] = Field(
+        None, description="Swedish prose observation tip for this event"
     )
 
 

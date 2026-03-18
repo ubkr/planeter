@@ -24,7 +24,7 @@ These are the only agents you can call. Each has a specific role:
 
 - **Planner** — Creates implementation strategies and technical plans
 - **Coder** — Writes code, fixes bugs, implements logic
-- **Designer** — Creates UI/UX, styling, visual design
+- **Designer** — Creates UI/UX, styling, visual design, and user-facing text. The planner may specify a Designer when the task involves user-facing changes, but if you see any design work in a plan that doesn't have an assigned Designer, spawn one via `Task` immediately. There might be a need to redo the plan after the Designer provides their output, so be ready to call Planner again if the design significantly changes the implementation approach.
 - **Reviewer** — Reviews code and documentation for accuracy, quality, maintainability, and standards
 - **Explore** — Read-only codebase research agent. Use it to answer questions about the codebase, locate files, understand patterns, or summarise a module without spawning a full Planner or Coder. Safe to run in parallel with any other agent. When calling Explore, include a thoroughness level in your prompt: `quick`, `medium`, or `thorough`.
 

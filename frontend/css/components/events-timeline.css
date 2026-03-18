@@ -27,6 +27,16 @@
     letter-spacing: 0.08em;
 }
 
+/* --- Event Wrapper (holds row + optional detail panel) --- */
+
+.events-timeline__event-wrapper {
+    border-bottom: 1px solid var(--border-color);
+}
+
+.events-timeline__event-wrapper:last-child {
+    border-bottom: none;
+}
+
 /* --- Event Row --- */
 
 .events-timeline__event {
@@ -34,16 +44,24 @@
     align-items: center;
     gap: var(--space-sm);
     padding: var(--space-sm) var(--space-md);
-    border-bottom: 1px solid var(--border-color);
     transition: background-color var(--transition-fast);
-}
-
-.events-timeline__event:last-child {
-    border-bottom: none;
 }
 
 .events-timeline__event:hover {
     background-color: var(--color-bg-surface-hover);
+}
+
+/* --- Expandable row modifier --- */
+
+.events-timeline__event--expandable {
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.events-timeline__event--expandable:focus-visible {
+    outline: 2px solid var(--color-accent-primary);
+    outline-offset: -2px;
 }
 
 /* --- Date Column --- */
@@ -108,6 +126,71 @@
     font-weight: 600;
 }
 
+/* --- Chevron indicator --- */
+
+.events-timeline__chevron {
+    display: inline-block;
+    flex-shrink: 0;
+    margin-left: var(--space-2xs);
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    line-height: 1;
+    transition: transform var(--transition-fast), color var(--transition-fast);
+}
+
+.events-timeline__chevron--expanded {
+    transform: rotate(180deg);
+    color: var(--color-text-secondary);
+}
+
+/* --- Detail Panel (collapsible guidance content) --- */
+
+.events-timeline__detail {
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition:
+        max-height var(--transition-normal),
+        opacity var(--transition-normal);
+}
+
+.events-timeline__detail--expanded {
+    max-height: 12rem;
+    opacity: 1;
+}
+
+.events-timeline__detail-line {
+    margin: 0 0 var(--space-2xs) 0;
+    padding: 0 var(--space-md) 0 calc(var(--space-md) + 4rem + var(--space-sm));
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+}
+
+.events-timeline__detail-line:first-child {
+    padding-top: var(--space-xs);
+    border-top: 1px solid var(--border-color);
+}
+
+.events-timeline__detail-tip {
+    margin: 0 0 var(--space-xs) 0;
+    padding: 0 var(--space-md) 0 calc(var(--space-md) + 4rem + var(--space-sm));
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    font-style: italic;
+    line-height: 1.5;
+}
+
+.events-timeline__detail-tip:first-child {
+    padding-top: var(--space-xs);
+    border-top: 1px solid var(--border-color);
+}
+
+.events-timeline__detail-tip:last-child,
+.events-timeline__detail-line:last-child {
+    padding-bottom: var(--space-xs);
+}
+
 /* --- Empty State --- */
 
 .events-timeline__empty {
@@ -135,6 +218,7 @@
         rgba(255, 255, 255, 0.04) 100%
     );
     background-size: 200% 100%;
+    /* @keyframes shimmer defined in frontend/css/base.css */
     animation: shimmer 1.8s ease-in-out infinite;
     border-radius: var(--radius-sm);
     border-color: transparent;
