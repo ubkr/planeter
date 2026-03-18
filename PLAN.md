@@ -325,6 +325,39 @@ The backend has no dead code or duplicate computation. Each request triggers exa
 
 ---
 
+## Phase 12: Magnitude-Aware Twilight Visibility
+
+**Status:** Pending
+**Depends on:** Phase 9
+**Parallelisable with:** Phase B1, Phase B2
+
+### Tasks
+- Research and implement a continuous twilight limiting-magnitude model in `backend/app/utils/sun.py` — replace the current step-function penalty (50/40/20/8/0 pts at discrete twilight band boundaries) with a continuous function that returns both a penalty value and a twilight limiting magnitude as a function of sun altitude; reference Schaefer (1993) "Astronomy and the Limits of Vision" (Vistas in Astronomy, Vol. 36, pp. 311-361) and Stellarium's SkyBright implementation for the empirical relationship between sun depression angle and sky brightness
+- Modify `backend/app/services/scoring.py` `score_planet()` — make the sun penalty magnitude-aware so that bright planets (low apparent magnitude) receive a smaller penalty during twilight than faint planets; Venus at mag -3.8 should receive near-zero sun penalty during nautical twilight while Saturn at mag +0.5 should still receive a substantial penalty
+- Modify `backend/app/services/scoring.py` `apply_scores()` — replace the hard `sun_altitude < -12` gate on `is_visible` with a magnitude-dependent threshold: a planet is potentially visible when its apparent magnitude is brighter than the limiting magnitude for the current sun altitude
+- Add unit tests in `backend/tests/` — test the new twilight limiting-magnitude function against known empirical data points (Venus visible at sun altitude -4°, Jupiter at -7°, first-magnitude stars at -6°, sixth-magnitude stars at -18°); test that `apply_scores()` marks Venus and Jupiter visible when sun altitude is -8°
+- Update `ARCHITECTURE.md` — revise the "Visibility Scoring Algorithm" table and the `is_visible` description to document the magnitude-aware twilight model and cite the Schaefer reference
+
+> **Note:** `ARCHITECTURE.md` is at project root, not under `backend/` or `frontend/`. Documentation file — path exception is intentional.
+
+### Intended Outcome
+The visibility scorer accounts for planet brightness when evaluating twilight conditions. Bright planets like Venus and Jupiter are correctly reported as visible during early twilight (sun at −5 to −8° below horizon), while faint planets still require deeper darkness. The sun penalty is a continuous function of sun altitude rather than a coarse step function, and the `is_visible` gate uses a magnitude-dependent threshold derived from the empirical relationship between sky brightness and sun depression angle documented in Schaefer (1993). The net effect is that the app no longer produces false negatives for the two brightest planets during the most common evening observation window.
+
+### Definition of Done
+- [ ] `calculate_sun_penalty()` in `backend/app/utils/sun.py` returns a `limiting_magnitude` float field alongside existing fields
+- [ ] Limiting magnitude at sun altitude −6° (end of civil twilight) ≈ magnitude −1 to 0 (first-magnitude stars become visible empirically)
+- [ ] Limiting magnitude at sun altitude −12° (end of nautical twilight) ≈ magnitude +3 to +4
+- [ ] Limiting magnitude at sun altitude −18° (end of astronomical twilight) ≈ magnitude +5.5 to +6.5
+- [ ] `apply_scores()` sets `is_visible = True` for Venus (mag −3.8) at sun altitude −8° when planet is above the horizon with clear skies
+- [ ] `apply_scores()` sets `is_visible = True` for Jupiter (mag −2.2) at sun altitude −8° when planet is above the horizon with clear skies
+- [ ] `apply_scores()` sets `is_visible = False` for Saturn (mag +0.5) at sun altitude −8°, sky still too bright
+- [ ] `score_planet()` produces a higher score for Venus than for Saturn at identical sun altitude −8°, all other factors equal
+- [ ] Sun penalty in `score_planet()` is a continuous function — no abrupt score jumps when sun altitude crosses −6°, −12°, or −18° boundaries
+- [ ] All existing unit tests in `backend/tests/` continue to pass
+- [ ] `ARCHITECTURE.md` scoring table documents the magnitude-aware twilight model and references Schaefer (1993)
+
+---
+
 ## Confirmed Decisions
 
 | Question | Decision |
