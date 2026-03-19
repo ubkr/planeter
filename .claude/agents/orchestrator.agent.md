@@ -162,6 +162,7 @@ Available skills:
 - **`sky-map-feature`** — Adding a visual layer or interaction to the 2D/3D sky map
 - **`cleanup-refactor`** — Dead code removal and internal quality improvement (no behavior change)
 - **`docs-sync`** — Update project documentation to match current implementation (no code changes)
+- **`phase-reviewer`** — Audit a specific completed phase: verify every Task, Intended Outcome, and Definition of Done item against the actual source code; run tests; write a structured pass/fail report to a caller-supplied file
 
 **How to reference a skill in a delegation prompt:**
 Include this line at the start of the task description:
