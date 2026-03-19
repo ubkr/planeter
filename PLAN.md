@@ -689,6 +689,26 @@ Clicking or tapping an event row (in either the Kommande timeline or the alert c
 
 ---
 
+#### Phase B7: Platsanpassad Händelsefiltrering
+
+**Depends on:** Phase B6
+**Parallelisable with:** Phase E8
+
+**Intended Outcome**
+The `/api/v1/events` endpoint filters out astronomical events that are geometrically unobservable from the queried location before returning the response. Events where the primary body has a negative `altitude_deg` at event peak (i.e. below the horizon for that observer) are excluded from `EventsResponse.events`. Events where `altitude_deg` is `null` (not computed for that event type) are retained. The frontend already handles an empty event list via the "Inga speciella händelser de närmaste 60 dagarna 🌙" empty state, so no frontend changes are required.
+
+**Definition of Done**
+- [ ] `GET /api/v1/events?lat=55.7&lon=13.4` returns no event objects where `altitude_deg` is a negative number; verified by inspecting the JSON response body.
+- [ ] Events where `altitude_deg` is `null` in the JSON response are still present in the returned `events` array (conservative pass-through for event types where altitude is not computed).
+- [ ] Switching to a location in the southern hemisphere (e.g. `lat=-33.9&lon=18.4`) produces a different (non-identical) events list than `lat=55.7&lon=13.4` for the same date, confirming the filter is location-dependent.
+- [ ] When all detected events are filtered out, `GET /api/v1/events` returns `{"events": [], ...}` with HTTP 200, and the frontend renders the "Inga speciella händelser de närmaste 60 dagarna 🌙" empty-state message.
+- [ ] The 1-hour cache in `routes/events.py` stores the already-filtered list (no behaviour change to cache key or TTL required).
+
+**Key files**
+- Modify `backend/app/api/routes/events.py` — after calling `detect_events()`, filter the resulting list to exclude events where `altitude_deg is not None and altitude_deg < 0`, then pass the filtered list to `EventsResponse`
+
+---
+
 ### Phase C: Extended Bodies
 
 **Status: Deferred** — These phases are planned for a future iteration and are not yet scheduled for implementation. See Phase E for the current development track.
@@ -898,3 +918,27 @@ The user can zoom in and out in both the 2D and 3D sky map using pinch/scroll ge
 
 ---
 
+#### Phase E8: Stjärnbilder — Aktivering och Intensitetskontroll
+
+**Depends on:** Phase E7
+**Parallelisable with:** None
+
+**Intended Outcome**
+The sky map panel gains two constellation controls visible in both the 2D and 3D views: a toggle that immediately shows or hides all constellation lines and labels without a full re-render, and an intensity slider that adjusts constellation line opacity in real time from nearly invisible to fully opaque. Both settings are persisted in `localStorage` and restored on page load. The hardcoded `opacity: 0.25` literals in `sky-map.css` and `opacity: 0.5` in `sky-map-3d.js` are replaced by the slider-driven value, making the slider the single source of truth for constellation brightness.
+
+**Definition of Done**
+- [ ] A toggle (`<input type="checkbox">`) labelled "Stjärnbilder" appears in the sky map controls area in `frontend/index.html`; unchecking it immediately hides all constellation SVG elements in the 2D view and sets `_constellationsGroup.visible = false` in the 3D view without requiring a full API re-fetch or re-render.
+- [ ] A range slider (`<input type="range" min="0" max="1" step="0.05">`) labelled "Intensitet" appears alongside the toggle; dragging it updates the `opacity` attribute on the `<g class="sky-map-constellations">` group (2D) and the `LineBasicMaterial.opacity` on children of `_constellationsGroup` (3D) in real time.
+- [ ] The enabled state and opacity value are written to `localStorage` under keys `planet_constellation_enabled` and `planet_constellation_opacity` and are read back on page load, restoring the user's last preference.
+- [ ] The hardcoded `opacity: 0.25` in `frontend/css/components/sky-map.css` on `.sky-map-constellation-line` and `.sky-map-constellation-label` is removed so the slider is the sole opacity source.
+- [ ] The hardcoded `opacity: 0.5` in the `THREE.LineBasicMaterial` constructor inside `sky-map-3d.js` `plotConstellations()` is replaced by the stored or current slider value.
+- [ ] The new controls are styled consistently with the existing `.sky-map-zoom-controls` and `.sky-map-expand-btn` in `frontend/css/components/sky-map.css`.
+
+**Key files**
+- Modify `frontend/index.html` — add constellation toggle checkbox and intensity slider markup inside `.sky-map-panel`
+- Modify `frontend/js/main.js` — add `localStorage` read/write for `planet_constellation_enabled` and `planet_constellation_opacity`; wire slider `input` and checkbox `change` events; pass current values to `skyMap` and `skyMap3d` on each update
+- Modify `frontend/js/components/sky-map.js` — accept an `opacity` parameter in `plotConstellations()` and apply it to the `<g class="sky-map-constellations">` group; add `setConstellationsVisible(bool)` to show/hide the group instantly
+- Modify `frontend/js/components/sky-map-3d.js` — accept an `opacity` parameter in `plotConstellations()` and apply it to the `LineBasicMaterial`; add `setConstellationsVisible(bool)` toggling `_constellationsGroup.visible`
+- Modify `frontend/css/components/sky-map.css` — remove hardcoded `opacity: 0.25` from constellation rules; add styles for the new toggle and slider controls
+
+---
