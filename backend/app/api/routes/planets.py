@@ -315,6 +315,15 @@ def _pick_best_positions(
     return best
 
 
+def _filter_above_horizon(events):
+    """Remove events confirmed below the horizon (altitude_deg < 0).
+
+    Events with altitude_deg = None are retained as a conservative pass-through.
+    NaN altitudes fail the >= 0 check and are treated as below-horizon and filtered out.
+    """
+    return [e for e in events if e.altitude_deg is None or e.altitude_deg >= 0]
+
+
 @router.get("/visible", response_model=PlanetsResponse)
 async def get_visible_planets(
     lat: float = Query(..., ge=-90, le=90, description="Latitude in decimal degrees"),
@@ -350,6 +359,8 @@ async def get_visible_planets(
     except Exception as exc:
         logger.warning(f"detect_events failed for ({lat}, {lon}): {exc}")
         events = []
+
+    events = _filter_above_horizon(events)
 
     sun_info = _build_sun_info(sun_data)
     moon_info = _build_moon_info(moon_data)
@@ -445,6 +456,8 @@ async def get_tonight_planets(
     except Exception as exc:
         logger.warning(f"detect_events failed for ({lat}, {lon}): {exc}")
         events = []
+
+    events = _filter_above_horizon(events)
 
     # Use the pre-computed sun/moon data so metadata reflects the same moment
     # used for scoring, not the wall-clock time of the HTTP request.
