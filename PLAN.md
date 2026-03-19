@@ -689,7 +689,7 @@ Clicking or tapping an event row (in either the Kommande timeline or the alert c
 
 ---
 
-#### Phase B7: Platsanpassad Händelsefiltrering
+#### Phase B7: Platsanpassad Händelsefiltrering — ✅
 
 **Depends on:** Phase B6
 **Parallelisable with:** Phase E8
@@ -698,11 +698,11 @@ Clicking or tapping an event row (in either the Kommande timeline or the alert c
 The `/api/v1/events` endpoint filters out astronomical events that are geometrically unobservable from the queried location before returning the response. Events where the primary body has a negative `altitude_deg` at event peak (i.e. below the horizon for that observer) are excluded from `EventsResponse.events`. Events where `altitude_deg` is `null` (not computed for that event type) are retained. The frontend already handles an empty event list via the "Inga speciella händelser de närmaste 60 dagarna 🌙" empty state, so no frontend changes are required.
 
 **Definition of Done**
-- [ ] `GET /api/v1/events?lat=55.7&lon=13.4` returns no event objects where `altitude_deg` is a negative number; verified by inspecting the JSON response body.
-- [ ] Events where `altitude_deg` is `null` in the JSON response are still present in the returned `events` array (conservative pass-through for event types where altitude is not computed).
-- [ ] Switching to a location in the southern hemisphere (e.g. `lat=-33.9&lon=18.4`) produces a different (non-identical) events list than `lat=55.7&lon=13.4` for the same date, confirming the filter is location-dependent.
-- [ ] When all detected events are filtered out, `GET /api/v1/events` returns `{"events": [], ...}` with HTTP 200, and the frontend renders the "Inga speciella händelser de närmaste 60 dagarna 🌙" empty-state message.
-- [ ] The 1-hour cache in `routes/events.py` stores the already-filtered list (no behaviour change to cache key or TTL required).
+- ✅ `GET /api/v1/events?lat=55.7&lon=13.4` returns no event objects where `altitude_deg` is a negative number; verified by inspecting the JSON response body.
+- ✅ Events where `altitude_deg` is `null` in the JSON response are still present in the returned `events` array (conservative pass-through for event types where altitude is not computed).
+- ✅ Switching to a location in the southern hemisphere (e.g. `lat=-33.9&lon=18.4`) produces a different (non-identical) events list than `lat=55.7&lon=13.4` for the same date, confirming the filter is location-dependent.
+- ✅ When all detected events are filtered out, `GET /api/v1/events` returns `{"events": [], ...}` with HTTP 200, and the frontend renders the "Inga speciella händelser de närmaste 60 dagarna 🌙" empty-state message.
+- ✅ The 1-hour cache in `routes/events.py` stores the already-filtered list (no behaviour change to cache key or TTL required).
 
 **Key files**
 - Modify `backend/app/api/routes/events.py` — after calling `detect_events()`, filter the resulting list to exclude events where `altitude_deg is not None and altitude_deg < 0`, then pass the filtered list to `EventsResponse`

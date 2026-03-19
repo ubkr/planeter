@@ -39,6 +39,8 @@ async def get_events(
     Detects conjunctions, oppositions, Mercury elongations, planet alignments,
     Venus brilliancy peaks, and Moon occultations.  Events are sorted by date
     and deduplicated.  Results are cached for 1 hour per 0.1°-rounded location.
+    Events with a confirmed below-horizon altitude (altitude_deg < 0) are
+    excluded before caching.
     """
     logger.info(f"GET /api/v1/events lat={lat} lon={lon}")
 
@@ -65,6 +67,21 @@ async def get_events(
         f"Events detected for ({lat}, {lon}): {len(events)} events "
         f"over the next {_LOOKAHEAD_DAYS} days"
     )
+
+    # Remove events whose primary body is confirmed below the horizon.
+    # Events where altitude_deg is None are kept (conservative pass-through —
+    # some event types may not compute altitude).
+    # Events where altitude_deg == 0.0 (exactly on horizon) are also kept.
+    # NaN altitudes (computation errors) are also filtered as a conservative
+    # fallback — NaN fails the >= 0 check, so they are treated the same as
+    # confirmed-negatives.
+    before_filter = len(events)
+    events = [
+        e for e in events
+        if e.altitude_deg is None or e.altitude_deg >= 0
+    ]
+    filtered_count = before_filter - len(events)
+    logger.info(f"Filtered {filtered_count} below-horizon events")
 
     response = EventsResponse(
         timestamp=timestamp,
