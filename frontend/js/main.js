@@ -168,6 +168,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // calls _handleResize() to size the WebGL canvas.
                 applyViewMode('3d');
                 skyMap3d.activate();
+                skyMap3d.resetZoom();
                 if (lastApiData !== null) {
                     skyMap3d.plotBodies(lastApiData.planets, lastApiData.sun, lastApiData.moon, lastApiData.events || []);
                 }
@@ -186,6 +187,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 skyMap3d.deactivate();
             }
             applyViewMode('2d');
+            skyMap?.resetZoom();
             localStorage.setItem(VIEW_MODE_KEY, '2d');
         }
     }
@@ -230,6 +232,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (expandBtn) {
         expandBtn.addEventListener('click', toggleSkyMapExpanded);
+    }
+
+    // --- Sky map zoom buttons ---
+    // Query all zoom buttons and route clicks to the active map instance.
+    const zoomBtns = Array.from(document.querySelectorAll('.sky-map-zoom-btn'));
+    for (const btn of zoomBtns) {
+        btn.addEventListener('click', () => {
+            const direction = btn.dataset.zoom;
+            const is3D = skyMap3d !== null && skyMap3dContainerEl?.classList.contains('active');
+            if (is3D) {
+                if (direction === 'in') {
+                    skyMap3d?.zoomIn();
+                } else {
+                    skyMap3d?.zoomOut();
+                }
+            } else {
+                if (direction === 'in') {
+                    skyMap?.zoomIn();
+                } else {
+                    skyMap?.zoomOut();
+                }
+            }
+        });
     }
 
     // Collapse the expanded map when the user presses Escape.
@@ -311,6 +336,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
+            skyMap?.resetZoom();
+            skyMap3d?.resetZoom();
+
             const timeString = new Intl.DateTimeFormat('sv-SE', {
                 hour: '2-digit',
                 minute: '2-digit',
@@ -366,6 +394,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const storedMode = localStorage.getItem(VIEW_MODE_KEY) || '2d';
                 if (storedMode === '3d') {
                     skyMap3d.activate();
+                    skyMap3d.resetZoom();
                 }
             }
         } else {

@@ -249,6 +249,88 @@ export class SkyMap {
         this._rendered = false;
         this._pendingPlanets = null;
         this._pendingConstellations = null;
+
+        // Zoom state. The SVG coordinate space is always 500×500; the viewBox
+        // shrinks or grows around the centre to implement zoom. Min 200, max 500.
+        this._viewBoxSize = 500;
+        // Guard so the wheel listener is only attached once per instance.
+        this._wheelListenerAttached = false;
+        // Touch pinch-zoom state. _pinchStartDistance holds the pixel distance
+        // between the two touch points at the start of a pinch gesture.
+        this._pinchStartDistance = null;
+        // Guard so the touch listeners are only attached once per instance.
+        this._touchListenerAttached = false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Zoom controls
+    // -------------------------------------------------------------------------
+
+    /**
+     * Zoom in by reducing the viewBox size. The viewBox origin is recomputed so
+     * the zoom is always centred on the chart centre (250, 250).
+     *
+     * Safe to call before render() — if the SVG does not exist yet the method
+     * updates _viewBoxSize so the correct viewBox is applied when render() runs.
+     *
+     * @param {number} [step=50] - Number of SVG units to reduce the viewBox by.
+     */
+    zoomIn(step = 50) {
+        this._viewBoxSize = Math.max(200, this._viewBoxSize - step);
+        this._applyViewBox();
+    }
+
+    /**
+     * Zoom out by increasing the viewBox size. The viewBox origin is recomputed
+     * so the zoom is always centred on the chart centre (250, 250).
+     *
+     * @param {number} [step=50] - Number of SVG units to increase the viewBox by.
+     */
+    zoomOut(step = 50) {
+        this._viewBoxSize = Math.min(500, this._viewBoxSize + step);
+        this._applyViewBox();
+    }
+
+    /**
+     * Reset zoom to the default 1:1 viewBox (0 0 500 500).
+     */
+    resetZoom() {
+        this._viewBoxSize = 500;
+        this._applyViewBox();
+    }
+
+    /**
+     * Compute the pixel distance between two touch points.
+     *
+     * @param {TouchList} touches - The TouchList from a TouchEvent. Must have
+     *   at least two entries.
+     * @returns {number} Euclidean distance in CSS pixels.
+     */
+    _getTouchDistance(touches) {
+        if (touches.length < 2) return 0;
+        return Math.hypot(
+            touches[0].clientX - touches[1].clientX,
+            touches[0].clientY - touches[1].clientY,
+        );
+    }
+
+    /**
+     * Apply the current _viewBoxSize to the SVG element's viewBox attribute.
+     *
+     * The origin is computed so that the zoom is centred: when _viewBoxSize is
+     * less than 500 the origin is positive, shifting the visible window inward
+     * symmetrically on both axes.
+     *
+     * Formula:  origin = 250 - _viewBoxSize / 2
+     *
+     * This is a no-op if the SVG has not been rendered yet; render() sets the
+     * initial viewBox from _viewBoxSize so the state is not lost.
+     */
+    _applyViewBox() {
+        const svg = this.container.querySelector('svg');
+        if (!svg) return;
+        const origin = 250 - this._viewBoxSize / 2;
+        svg.setAttribute('viewBox', `${origin} ${origin} ${this._viewBoxSize} ${this._viewBoxSize}`);
     }
 
     /**
@@ -305,6 +387,60 @@ export class SkyMap {
         svg.appendChild(buildZenithDot());
 
         this.container.appendChild(svg);
+
+        // Apply the viewBox from _viewBoxSize. This is normally "0 0 500 500"
+        // but may differ if zoomIn/zoomOut was called before render().
+        this._applyViewBox();
+
+        // Attach the wheel-to-zoom listener once per instance. Wheel events on
+        // the SVG itself zoom in/out; preventDefault stops the page from scrolling.
+        if (!this._wheelListenerAttached) {
+            svg.addEventListener('wheel', (event) => {
+                event.preventDefault();
+                if (event.deltaY < 0) {
+                    this.zoomIn();
+                } else if (event.deltaY > 0) {
+                    this.zoomOut();
+                }
+            }, { passive: false });
+            this._wheelListenerAttached = true;
+        }
+
+        // Attach touch pinch-zoom listeners once per instance. Two-finger
+        // pinch gestures zoom in/out; { passive: false } is required so
+        // preventDefault() can suppress native scroll and browser zoom.
+        if (!this._touchListenerAttached) {
+            svg.addEventListener('touchstart', (event) => {
+                if (event.touches.length === 2) {
+                    this._pinchStartDistance = this._getTouchDistance(event.touches);
+                    event.preventDefault();
+                }
+            }, { passive: false });
+
+            svg.addEventListener('touchmove', (event) => {
+                if (event.touches.length === 2 && this._pinchStartDistance !== null) {
+                    const currentDistance = this._getTouchDistance(event.touches);
+                    const delta = currentDistance - this._pinchStartDistance;
+                    // Only trigger zoom when the finger movement exceeds 5 px to
+                    // reduce jitter from small fluctuations in touch coordinates.
+                    if (delta > 5) {
+                        this.zoomIn();
+                        this._pinchStartDistance = currentDistance;
+                    } else if (delta < -5) {
+                        this.zoomOut();
+                        this._pinchStartDistance = currentDistance;
+                    }
+                    event.preventDefault();
+                }
+            }, { passive: false });
+
+            const resetPinch = () => { this._pinchStartDistance = null; };
+            svg.addEventListener('touchend',    resetPinch);
+            svg.addEventListener('touchcancel', resetPinch);
+
+            this._touchListenerAttached = true;
+        }
+
         this._rendered = true;
 
         // If plotConstellations() was called before render() completed, replay it now.

@@ -43,6 +43,9 @@ const GRID_RADIUS = SPHERE_RADIUS * 0.98;
 /** Constellation lines sit slightly inside the grid to render behind it. */
 const CONSTELLATION_RADIUS = SPHERE_RADIUS * 0.96;
 
+/** Default camera field-of-view in degrees. Matches the initial PerspectiveCamera argument. */
+const DEFAULT_FOV = 60;
+
 /** Cardinal label definitions: text (Swedish), azimuth, and canvas text colour. */
 const CARDINALS = [
     { text: 'N', azimuth: 0   },
@@ -269,6 +272,14 @@ export default class SkyMap3D {
         // double-registration of the window resize listener.
         this._active = false;
 
+        // Guard against duplicate wheel event listener registration.
+        this._wheelListenerAttached = false;
+        // Touch pinch-zoom state. _pinchStartDistance holds the pixel distance
+        // between the two touch points at the start of a pinch gesture.
+        this._pinchStartDistance = null;
+        // Guard against duplicate touch event listener registration.
+        this._touchListenerAttached = false;
+
         // Bound resize handler so it can be removed cleanly.
         this._onResize = this._handleResize.bind(this);
 
@@ -452,6 +463,37 @@ export default class SkyMap3D {
         }
 
         // TODO E4: render event indicators
+    }
+
+    /**
+     * Decrease camera FOV to zoom in, clamped to a minimum of 20°.
+     *
+     * @param {number} [step=10] - Degrees to decrease FOV by.
+     */
+    zoomIn(step = 10) {
+        if (this._camera === null) return;
+        this._camera.fov = Math.max(20, this._camera.fov - step);
+        this._camera.updateProjectionMatrix();
+    }
+
+    /**
+     * Increase camera FOV to zoom out, clamped to a maximum of 90°.
+     *
+     * @param {number} [step=10] - Degrees to increase FOV by.
+     */
+    zoomOut(step = 10) {
+        if (this._camera === null) return;
+        this._camera.fov = Math.min(90, this._camera.fov + step);
+        this._camera.updateProjectionMatrix();
+    }
+
+    /**
+     * Reset camera FOV to the default value (DEFAULT_FOV = 60°).
+     */
+    resetZoom() {
+        if (this._camera === null) return;
+        this._camera.fov = DEFAULT_FOV;
+        this._camera.updateProjectionMatrix();
     }
 
     /**
@@ -719,6 +761,59 @@ export default class SkyMap3D {
             }
         });
 
+        // Register wheel event for FOV-based zoom. { passive: false } is
+        // required so that event.preventDefault() can suppress page scroll.
+        // The guard prevents duplicate listeners if _initScene were ever called
+        // more than once.
+        if (!this._wheelListenerAttached) {
+            renderer.domElement.addEventListener('wheel', (event) => {
+                event.preventDefault();
+                if (event.deltaY < 0) {
+                    this.zoomIn();
+                } else if (event.deltaY > 0) {
+                    this.zoomOut();
+                }
+            }, { passive: false });
+            this._wheelListenerAttached = true;
+        }
+
+        // Register touch pinch-zoom listeners once. OrbitControls uses
+        // pointermove for single-finger rotation; touch events are distinct,
+        // so two-finger pinch detection here does not interfere with drag.
+        // { passive: false } is required so preventDefault() can suppress
+        // native browser pinch-to-zoom on the canvas element.
+        if (!this._touchListenerAttached) {
+            renderer.domElement.addEventListener('touchstart', (event) => {
+                if (event.touches.length === 2) {
+                    this._pinchStartDistance = this._getTouchDistance(event.touches);
+                    event.preventDefault();
+                }
+            }, { passive: false });
+
+            renderer.domElement.addEventListener('touchmove', (event) => {
+                if (event.touches.length === 2 && this._pinchStartDistance !== null) {
+                    const currentDistance = this._getTouchDistance(event.touches);
+                    const delta = currentDistance - this._pinchStartDistance;
+                    // Only trigger zoom when finger movement exceeds 5 px to
+                    // reduce jitter from small fluctuations in touch coordinates.
+                    if (delta > 5) {
+                        this.zoomIn();
+                        this._pinchStartDistance = currentDistance;
+                    } else if (delta < -5) {
+                        this.zoomOut();
+                        this._pinchStartDistance = currentDistance;
+                    }
+                    event.preventDefault();
+                }
+            }, { passive: false });
+
+            const resetPinch = () => { this._pinchStartDistance = null; };
+            renderer.domElement.addEventListener('touchend',    resetPinch);
+            renderer.domElement.addEventListener('touchcancel', resetPinch);
+
+            this._touchListenerAttached = true;
+        }
+
         // this._renderer and this._cssRenderer are assigned last so that the
         // null check in activate() is a reliable sentinel for complete
         // initialisation — any earlier throw leaves them null.
@@ -891,6 +986,25 @@ export default class SkyMap3D {
         labelObject.position.set(x, y + SPHERE_RADIUS * 0.04, z);
 
         this._labelsGroup.add(labelObject);
+    }
+
+    // -----------------------------------------------------------------------
+    // Private — touch helpers
+    // -----------------------------------------------------------------------
+
+    /**
+     * Compute the pixel distance between two touch points.
+     *
+     * @param {TouchList} touches - The TouchList from a TouchEvent. Must have
+     *   at least two entries.
+     * @returns {number} Euclidean distance in CSS pixels.
+     */
+    _getTouchDistance(touches) {
+        if (touches.length < 2) return 0;
+        return Math.hypot(
+            touches[0].clientX - touches[1].clientX,
+            touches[0].clientY - touches[1].clientY,
+        );
     }
 
     // -----------------------------------------------------------------------

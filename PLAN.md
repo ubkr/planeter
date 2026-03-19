@@ -491,7 +491,7 @@ The sky map displays constellation stick-figure lines for all constellations wit
 
 ### Phase B: Observation Tips
 
-#### Phase B1: Best Viewing Times
+#### Phase B1: Best Viewing Times — ✅
 
 **Depends on:** Phase 5 (API Layer), Phase 6 (Frontend)
 **Parallelisable with:** Phase B2, Phase B3
@@ -501,17 +501,17 @@ The sky map displays constellation stick-figure lines for all constellations wit
 Each planet card gains a "Bästa observationstid" section showing the optimal viewing window during tonight's darkness. The backend computes, for each planet, the time interval when the planet is above 10° altitude while the sun is below −12° (nautical twilight or darker), and identifies the moment of peak altitude within that window. The `/visible` and `/tonight` endpoints both include this data so the UI always shows it. Planets that never enter the dark window display "Ej synlig ikväll" instead of a time range.
 
 **Definition of Done**
-- [ ] `PlanetPosition` model includes `best_time: Optional[str]` (UTC ISO 8601 timestamp of the planet's **peak altitude** within the dark window), `dark_rise_time: Optional[str]`, and `dark_set_time: Optional[str]`
-- [ ] The `/visible` endpoint response includes non-null `best_time` for a planet that is above 10° altitude during tonight's dark window
-- [ ] A planet that sets before nautical twilight begins has `best_time: null`, `dark_rise_time: null`, `dark_set_time: null`
-- [ ] During midnight sun conditions (no dark window), all planets have null best-time fields
-- [ ] The planet card shows "Bästa tid: HH:MM–HH:MM" (in Europe/Stockholm time) beneath the existing rise/transit/set row when `dark_rise_time` and `dark_set_time` are non-null
-- [ ] The peak time within the window is visually emphasised (bold or accent colour)
-- [ ] When all three best-time fields are null, the card shows "Ej synlig ikväll" in `--color-text-muted`
-- [ ] The `/tonight` endpoint also populates the best-time fields using its existing night-window sampling logic
-- [ ] No regressions in existing planet card layout on 375 px and 1200 px viewports
-- [ ] No new API endpoints are introduced; the fields are added to the existing response schema
-- [ ] `dark_rise_time`, `dark_set_time`, and `best_time` are stored as UTC ISO 8601 strings, consistent with all other time fields; the existing `formatTime()` helper in `planet-cards.js` handles conversion to Europe/Stockholm for display — no backend timezone conversion is added
+- [x] `PlanetPosition` model includes `best_time: Optional[str]` (UTC ISO 8601 timestamp of the planet's **peak altitude** within the dark window), `dark_rise_time: Optional[str]`, and `dark_set_time: Optional[str]`
+- [x] The `/visible` endpoint response includes non-null `best_time` for a planet that is above 10° altitude during tonight's dark window
+- [x] A planet that sets before nautical twilight begins has `best_time: null`, `dark_rise_time: null`, `dark_set_time: null`
+- [x] During midnight sun conditions (no dark window), all planets have null best-time fields
+- [x] The planet card shows "Bästa tid: HH:MM–HH:MM" (in Europe/Stockholm time) beneath the existing rise/transit/set row when `dark_rise_time` and `dark_set_time` are non-null
+- [x] The peak time within the window is visually emphasised (bold or accent colour)
+- [x] When all three best-time fields are null, the card shows "Ej synlig ikväll" in `--color-text-muted`
+- [x] The `/tonight` endpoint also populates the best-time fields using its existing night-window sampling logic
+- [x] No regressions in existing planet card layout on 375 px and 1200 px viewports
+- [x] No new API endpoints are introduced; the fields are added to the existing response schema
+- [x] `dark_rise_time`, `dark_set_time`, and `best_time` are stored as UTC ISO 8601 strings, consistent with all other time fields; the existing `formatTime()` helper in `planet-cards.js` handles conversion to Europe/Stockholm for display — no backend timezone conversion is added
 
 **Key files**
 - Modify `backend/app/models/planet.py` — add `best_time`, `dark_rise_time`, `dark_set_time` optional string fields to `PlanetPosition`
@@ -521,7 +521,7 @@ Each planet card gains a "Bästa observationstid" section showing the optimal vi
 
 ---
 
-#### Phase B2: Observation Descriptions ("What to Look For")
+#### Phase B2: Observation Descriptions ("What to Look For") — ✅
 
 **Depends on:** Phase 6 (Frontend)
 **Parallelisable with:** Phase B1, Phase B3
@@ -531,18 +531,18 @@ Each planet card gains a "Bästa observationstid" section showing the optimal vi
 Each planet card gains a collapsible "Vad ska man leta efter?" section containing a short Swedish-language description of the planet's visual appearance: characteristic colour, typical brightness compared to nearby stars, and how to distinguish it from stars (steady light vs. twinkling). The descriptions are static factual content stored in a frontend data file — no backend changes are needed. The section is collapsed by default to keep cards compact and can be expanded by clicking a toggle.
 
 **Definition of Done**
-- [ ] `frontend/js/data/planet-descriptions.js` exists and exports an object keyed by English planet name (Mercury, Venus, Mars, Jupiter, Saturn)
-- [ ] Each entry contains at minimum: `color_sv` (string, e.g. "Gulvit"), `appearance_sv` (1–2 sentence description), `identification_tip_sv` (1–2 sentences on how to spot the planet)
-- [ ] Each planet card renders a "Vad ska man leta efter?" toggle below the visibility pill
-- [ ] Clicking the toggle expands a section showing the planet's colour, appearance, and identification tip
-- [ ] Clicking again collapses the section
-- [ ] The toggle uses a chevron icon (▸ collapsed, ▾ expanded) and the expanded state is visually distinct
-- [ ] The section is collapsed by default on page load
-- [ ] Descriptions use correct Swedish astronomical terminology (e.g. "magnitud", "stjärnbild", "fast sken")
-- [ ] Descriptions are factually accurate for the current epoch (2020s)
-- [ ] Cards for planets below the horizon still show the description toggle (the information is useful regardless of current visibility)
-- [ ] No backend changes are required
-- [ ] No JavaScript console errors when toggling descriptions rapidly
+- [x] `frontend/js/data/planet-descriptions.js` exists and exports an object keyed by English planet name (Mercury, Venus, Mars, Jupiter, Saturn)
+- [x] Each entry contains at minimum: `color_sv` (string, e.g. "Gulvit"), `appearance_sv` (1–2 sentence description), `identification_tip_sv` (1–2 sentences on how to spot the planet)
+- [x] Each planet card renders a "Vad ska man leta efter?" toggle below the visibility pill
+- [x] Clicking the toggle expands a section showing the planet's colour, appearance, and identification tip
+- [x] Clicking again collapses the section
+- [x] The toggle uses a chevron icon (▸ collapsed, ▾ expanded) and the expanded state is visually distinct
+- [x] The section is collapsed by default on page load
+- [x] Descriptions use correct Swedish astronomical terminology (e.g. "magnitud", "stjärnbild", "fast sken")
+- [x] Descriptions are factually accurate for the current epoch (2020s)
+- [x] Cards for planets below the horizon still show the description toggle (the information is useful regardless of current visibility)
+- [x] No backend changes are required
+- [x] No JavaScript console errors when toggling descriptions rapidly
 
 **Key files**
 - Create `frontend/js/data/planet-descriptions.js` — static object with Swedish descriptions for each planet
@@ -870,7 +870,7 @@ Användaren kan expandera stjärnkartan (2D eller 3D) så att den fyller hela we
 
 ---
 
-#### Phase E7: Zoom in the 2D and 3D Sky Map
+#### Phase E7: Zoom in the 2D and 3D Sky Map — ✅
 
 **Depends on:** Phase E6
 **Parallelisable with:** Phase B1, Phase B2
@@ -879,15 +879,15 @@ Användaren kan expandera stjärnkartan (2D eller 3D) så att den fyller hela we
 The user can zoom in and out in both the 2D and 3D sky map using pinch/scroll gestures and via +/− buttons in the map view. In the 2D view the SVG's `viewBox` is adjusted around the map centre to zoom without changing the projection maths. In the 3D view the camera's `fov` (field of view) is changed instead of moving the camera, because the camera sits at the origin inside the sphere. The zoom level is reset on view switch (2D/3D) and on new data fetch to avoid disorientation.
 
 **Definition of Done**
-- [ ] Two buttons labelled "+" and "−" are visible in `.sky-map-panel` in both 2D and 3D mode, positioned without overlapping the existing expand/collapse button
-- [ ] Clicking "+" zooms in (shows a smaller portion of the sky in greater detail); clicking "−" zooms out (shows a larger portion of the sky)
-- [ ] Pinch-zoom on mobile devices and scroll wheel on desktop zoom in/out in both views
-- [ ] In the 2D view the SVG's `viewBox` attribute is adjusted dynamically around the centre point `(250, 250)` within the range 200×200 (maximum zoom-in) to 500×500 (default, fully zoomed out)
-- [ ] In the 3D view `PerspectiveCamera.fov` is adjusted within the range 20° (maximum zoom-in) to 90° (maximum zoom-out), with a default value of 60°
-- [ ] The camera in the 3D view stays at the origin `(0, 0, 0.001)` regardless of zoom level — dolly-zoom via OrbitControls remains disabled (`enableZoom = false`); FOV zoom is handled manually
-- [ ] The zoom level is reset to the default on switching between 2D and 3D and on new data fetch (location change)
-- [ ] The zoom buttons work correctly in both normal mode and expanded fullscreen mode (`.sky-map-panel--expanded`)
-- [ ] No JavaScript console errors on rapid repeated zoom or on zooming an empty map (before API data has loaded)
+- [x] Two buttons labelled "+" and "−" are visible in `.sky-map-panel` in both 2D and 3D mode, positioned without overlapping the existing expand/collapse button
+- [x] Clicking "+" zooms in (shows a smaller portion of the sky in greater detail); clicking "−" zooms out (shows a larger portion of the sky)
+- [x] Pinch-zoom on mobile devices and scroll wheel on desktop zoom in/out in both views
+- [x] In the 2D view the SVG's `viewBox` attribute is adjusted dynamically around the centre point `(250, 250)` within the range 200×200 (maximum zoom-in) to 500×500 (default, fully zoomed out)
+- [x] In the 3D view `PerspectiveCamera.fov` is adjusted within the range 20° (maximum zoom-in) to 90° (maximum zoom-out), with a default value of 60°
+- [x] The camera in the 3D view stays at the origin `(0, 0, 0.001)` regardless of zoom level — dolly-zoom via OrbitControls remains disabled (`enableZoom = false`); FOV zoom is handled manually
+- [x] The zoom level is reset to the default on switching between 2D and 3D and on new data fetch (location change)
+- [x] The zoom buttons work correctly in both normal mode and expanded fullscreen mode (`.sky-map-panel--expanded`)
+- [x] No JavaScript console errors on rapid repeated zoom or on zooming an empty map (before API data has loaded)
 
 **Key files**
 - Modify `frontend/index.html` — add +/− zoom buttons inside `.sky-map-panel`
