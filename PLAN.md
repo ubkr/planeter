@@ -918,7 +918,7 @@ The user can zoom in and out in both the 2D and 3D sky map using pinch/scroll ge
 
 ---
 
-#### Phase E8: Stjärnbilder — Aktivering och Intensitetskontroll
+#### Phase E8: Stjärnbilder — Aktivering och Intensitetskontroll — ✅
 
 **Depends on:** Phase E7
 **Parallelisable with:** None

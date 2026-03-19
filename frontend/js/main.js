@@ -24,6 +24,12 @@ const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 /** localStorage key for the user's preferred sky-map view mode. */
 const VIEW_MODE_KEY = 'planet_view_mode';
 
+/** localStorage key for constellation visibility toggle. */
+const CONSTELLATION_ENABLED_KEY = 'planet_constellation_enabled';
+
+/** localStorage key for constellation line opacity. */
+const CONSTELLATION_OPACITY_KEY = 'planet_constellation_opacity';
+
 /**
  * Constellation line data loaded once at startup from data/constellations.json.
  * Null if the fetch failed or has not completed yet.
@@ -64,6 +70,32 @@ document.addEventListener('DOMContentLoaded', () => {
     const skyMap = new SkyMap(document.getElementById('skyMapContainer'));
     const eventAlerts = new EventAlerts(document.getElementById('eventAlerts'));
     const eventsTimeline = new EventsTimeline(document.getElementById('eventsTimelineContainer'));
+
+    // --- Constellation controls ---
+    const constellationToggleEl = document.getElementById('constellationToggle');
+    const constellationIntensityEl = document.getElementById('constellationIntensity');
+
+    /** Current constellation opacity from slider (0-1). */
+    let constellationOpacity = 0.25;
+
+    // Load constellation settings from localStorage and apply to controls.
+    try {
+        const storedEnabled = localStorage.getItem(CONSTELLATION_ENABLED_KEY);
+        const storedOpacity = localStorage.getItem(CONSTELLATION_OPACITY_KEY);
+
+        // Default: enabled = true
+        const enabled = storedEnabled !== null ? storedEnabled === 'true' : true;
+        constellationToggleEl.checked = enabled;
+
+        // Default: opacity = 0.25, clamped to [0, 1]
+        if (storedOpacity !== null) {
+            const parsed = parseFloat(storedOpacity);
+            constellationOpacity = isNaN(parsed) ? 0.25 : Math.max(0, Math.min(1, parsed));
+        }
+        constellationIntensityEl.value = constellationOpacity.toString();
+    } catch (err) {
+        console.warn('Constellation controls: failed to load from localStorage', err);
+    }
 
     // --- 3D sky map state ---
 
@@ -173,7 +205,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     skyMap3d.plotBodies(lastApiData.planets, lastApiData.sun, lastApiData.moon, lastApiData.events || []);
                 }
                 if (constellationData !== null && lastApiData !== null) {
-                    skyMap3d.plotConstellations(constellationData, currentLocation.lat, currentLocation.lon, new Date(lastApiData.timestamp));
+                    skyMap3d.plotConstellations(constellationData, currentLocation.lat, currentLocation.lon, new Date(lastApiData.timestamp), constellationOpacity);
                 }
                 localStorage.setItem(VIEW_MODE_KEY, '3d');
             } catch (err) {
@@ -330,9 +362,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (constellationData !== null) {
-                skyMap.plotConstellations(constellationData, location.lat, location.lon, new Date(data.timestamp));
+                skyMap.plotConstellations(constellationData, location.lat, location.lon, new Date(data.timestamp), constellationOpacity);
                 if (skyMap3d !== null) {
-                    skyMap3d.plotConstellations(constellationData, location.lat, location.lon, new Date(data.timestamp));
+                    skyMap3d.plotConstellations(constellationData, location.lat, location.lon, new Date(data.timestamp), constellationOpacity);
                 }
             }
 
@@ -439,10 +471,16 @@ document.addEventListener('DOMContentLoaded', () => {
         .then((parsed) => {
             constellationData = parsed;
             if (lastApiData !== null) {
-                skyMap.plotConstellations(constellationData, currentLocation.lat, currentLocation.lon, new Date(lastApiData.timestamp));
+                skyMap.plotConstellations(constellationData, currentLocation.lat, currentLocation.lon, new Date(lastApiData.timestamp), constellationOpacity);
                 if (skyMap3d !== null) {
-                    skyMap3d.plotConstellations(constellationData, currentLocation.lat, currentLocation.lon, new Date(lastApiData.timestamp));
+                    skyMap3d.plotConstellations(constellationData, currentLocation.lat, currentLocation.lon, new Date(lastApiData.timestamp), constellationOpacity);
                 }
+            }
+            // Apply initial visibility state after constellation data loads.
+            const initialEnabled = constellationToggleEl.checked;
+            skyMap.setConstellationsVisible(initialEnabled);
+            if (skyMap3d !== null) {
+                skyMap3d.setConstellationsVisible(initialEnabled);
             }
         })
         .catch((err) => {
@@ -450,5 +488,55 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
     loadData(currentLocation);
+
+    // --- Constellation control event handlers ---
+
+    // Wire checkbox: toggle constellation visibility in both renderers.
+    constellationToggleEl.addEventListener('change', () => {
+        const enabled = constellationToggleEl.checked;
+        skyMap.setConstellationsVisible(enabled);
+        if (skyMap3d !== null) {
+            skyMap3d.setConstellationsVisible(enabled);
+        }
+        try {
+            localStorage.setItem(CONSTELLATION_ENABLED_KEY, enabled.toString());
+        } catch (err) {
+            console.warn('Constellation toggle: failed to persist to localStorage', err);
+        }
+    });
+
+    // Wire slider: update constellation opacity in both renderers.
+    constellationIntensityEl.addEventListener('input', () => {
+        const newOpacity = parseFloat(constellationIntensityEl.value);
+        if (isNaN(newOpacity)) return;
+
+        constellationOpacity = newOpacity;
+
+        // Re-render constellations with new opacity if data is available.
+        if (constellationData !== null && lastApiData !== null && currentLocation !== null) {
+            skyMap.plotConstellations(
+                constellationData,
+                currentLocation.lat,
+                currentLocation.lon,
+                new Date(lastApiData.timestamp),
+                constellationOpacity
+            );
+            if (skyMap3d !== null) {
+                skyMap3d.plotConstellations(
+                    constellationData,
+                    currentLocation.lat,
+                    currentLocation.lon,
+                    new Date(lastApiData.timestamp),
+                    constellationOpacity
+                );
+            }
+        }
+
+        try {
+            localStorage.setItem(CONSTELLATION_OPACITY_KEY, constellationOpacity.toString());
+        } catch (err) {
+            console.warn('Constellation opacity: failed to persist to localStorage', err);
+        }
+    });
 
 });

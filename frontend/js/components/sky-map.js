@@ -299,6 +299,28 @@ export class SkyMap {
         this._applyViewBox();
     }
 
+    // -------------------------------------------------------------------------
+    // Constellation controls
+    // -------------------------------------------------------------------------
+
+    /**
+     * Show or hide the constellation layer.
+     *
+     * Safe to call before render() or before plotConstellations() has been
+     * called — the method guards against a null constellation group.
+     *
+     * @param {boolean} enabled - If true, show constellations; if false, hide them.
+     */
+    setConstellationsVisible(enabled) {
+        const svg = this.container.querySelector('svg');
+        if (!svg) return;
+
+        const consGroup = svg.querySelector('.sky-map-constellations');
+        if (!consGroup) return;
+
+        consGroup.style.display = enabled ? '' : 'none';
+    }
+
     /**
      * Compute the pixel distance between two touch points.
      *
@@ -446,8 +468,8 @@ export class SkyMap {
         // If plotConstellations() was called before render() completed, replay it now.
         // Constellations are replayed before bodies so layering is correct.
         if (this._pendingConstellations !== null) {
-            const { constellationData, lat, lon, utcTimestamp } = this._pendingConstellations;
-            this.plotConstellations(constellationData, lat, lon, utcTimestamp);
+            const { constellationData, lat, lon, utcTimestamp, opacity } = this._pendingConstellations;
+            this.plotConstellations(constellationData, lat, lon, utcTimestamp, opacity);
         }
 
         // If plotBodies() was called before render() completed, replay it now.
@@ -477,11 +499,12 @@ export class SkyMap {
      * @param {number} lat          - Observer latitude in degrees (positive North).
      * @param {number} lon          - Observer longitude in degrees (positive East).
      * @param {Date|number} utcTimestamp - UTC instant as a JS Date or Unix ms.
+     * @param {number} [opacity=0.25] - Opacity for the entire constellation layer (0–1).
      */
-    plotConstellations(constellationData, lat, lon, utcTimestamp) {
+    plotConstellations(constellationData, lat, lon, utcTimestamp, opacity = 0.25) {
         // Defer if the SVG grid has not been rendered yet.
         if (!this._rendered || !this.container.querySelector('svg')) {
-            this._pendingConstellations = { constellationData, lat, lon, utcTimestamp };
+            this._pendingConstellations = { constellationData, lat, lon, utcTimestamp, opacity };
             return;
         }
 
@@ -512,6 +535,11 @@ export class SkyMap {
                 consGroup.removeChild(consGroup.firstChild);
             }
         }
+
+        // Apply opacity to the entire constellation layer. This cascades to
+        // all child lines and labels, so we don't need to set opacity on
+        // individual elements.
+        consGroup.setAttribute('opacity', opacity);
 
         for (const constellation of constellationData) {
             const { iau, lines } = constellation;

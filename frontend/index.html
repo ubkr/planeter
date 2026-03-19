@@ -96,6 +96,17 @@
             <button class="skymap-view-toggle__btn active" data-view="2d" aria-pressed="true">2D</button>
             <button class="skymap-view-toggle__btn" data-view="3d" aria-pressed="false">3D Vy</button>
           </div>
+          <!-- Constellation controls -->
+          <div class="sky-map-constellation-controls">
+            <label>
+              <input type="checkbox" id="constellationToggle" checked>
+              Stjärnbilder
+            </label>
+            <label>
+              <input type="range" id="constellationIntensity" min="0" max="1" step="0.05" value="0.25">
+              Intensitet
+            </label>
+          </div>
           <!-- Zoom controls -->
           <div class="sky-map-zoom-controls">
             <button class="sky-map-zoom-btn" data-zoom="in" aria-label="Zooma in" title="Zooma in">+</button>

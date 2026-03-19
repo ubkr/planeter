@@ -497,6 +497,16 @@ export default class SkyMap3D {
     }
 
     /**
+     * Toggle visibility of constellation lines and labels.
+     *
+     * @param {boolean} enabled - True to show constellations, false to hide.
+     */
+    setConstellationsVisible(enabled) {
+        if (this._constellationsGroup === null) return;
+        this._constellationsGroup.visible = enabled;
+    }
+
+    /**
      * Plot constellation lines and IAU abbreviation labels into the 3D scene.
      *
      * Converts each star endpoint from equatorial (RA/Dec) to horizontal
@@ -518,8 +528,9 @@ export default class SkyMap3D {
      * @param {number}      lat           - Observer latitude in degrees.
      * @param {number}      lon           - Observer longitude in degrees.
      * @param {Date|number} utcTimestamp  - UTC instant as a Date or Unix ms.
+     * @param {number}      [opacity=0.25] - Line opacity (0-1), default 0.25.
      */
-    plotConstellations(constellationData, lat, lon, utcTimestamp) {
+    plotConstellations(constellationData, lat, lon, utcTimestamp, opacity = 0.25) {
         if (this._scene === null) {
             console.warn('SkyMap3D: plotConstellations called before scene was initialised — data dropped');
             return;
@@ -535,7 +546,7 @@ export default class SkyMap3D {
         const lineMat = new THREE.LineBasicMaterial({
             color:       0x334455,
             transparent: true,
-            opacity:     0.5,
+            opacity:     opacity,
         });
 
         for (const constellation of constellationData) {
