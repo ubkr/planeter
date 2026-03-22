@@ -39,6 +39,9 @@ _MIN_ALTITUDE_DEG = 10
 # Sampling interval in minutes for best-viewing-time calculations.
 _BEST_TIME_SAMPLE_INTERVAL_MINUTES = 15
 
+# Sun altitude threshold (degrees) below which the sky is nautically dark.
+_NAUTICAL_SUN_THRESHOLD_DEG = -12
+
 
 def _utc_iso() -> str:
     """Return the current UTC time as an ISO 8601 string."""
@@ -61,6 +64,70 @@ def _build_moon_info(moon_data: dict) -> MoonInfo:
         elevation_deg=moon_data["elevation_deg"],
         azimuth_deg=moon_data["azimuth_deg"],
     )
+
+
+def _compute_next_visible_time(
+    planet_name: str, lat: float, lon: float, current_dt: datetime
+) -> Optional[str]:
+    """
+    Return the first upcoming moment (within 24 hours) when the planet is
+    observable: altitude > 10° AND sun altitude < _NAUTICAL_SUN_THRESHOLD_DEG.
+
+    Samples at _BEST_TIME_SAMPLE_INTERVAL_MINUTES intervals starting from
+    current_dt.  Returns an ISO 8601 UTC string on the first qualifying sample,
+    or None if no qualifying sample is found within 24 hours.
+
+    Returns None naturally for midnight-sun conditions (no sample will have
+    sun below the threshold) and for planets that stay below the horizon.
+
+    Args:
+        planet_name: English title-cased planet name (e.g. "Mars").
+        lat:         Observer latitude in decimal degrees.
+        lon:         Observer longitude in decimal degrees.
+        current_dt:  Search start (timezone-aware UTC datetime).
+    """
+    planet_classes = {
+        "Mercury": ephem.Mercury,
+        "Venus": ephem.Venus,
+        "Mars": ephem.Mars,
+        "Jupiter": ephem.Jupiter,
+        "Saturn": ephem.Saturn,
+    }
+
+    planet_cls = planet_classes.get(planet_name)
+    if planet_cls is None:
+        return None
+
+    observer = ephem.Observer()
+    observer.lat = str(lat)
+    observer.lon = str(lon)
+    observer.pressure = 0
+
+    # Strip timezone for ephem (it works with naive UTC datetimes).
+    start_naive = current_dt.replace(tzinfo=None)
+    interval = timedelta(minutes=_BEST_TIME_SAMPLE_INTERVAL_MINUTES)
+    end_naive = start_naive + timedelta(hours=24)
+
+    fmt = "%Y-%m-%dT%H:%M:%SZ"
+    sample = start_naive
+    while sample <= end_naive:
+        observer.date = sample
+
+        sun = ephem.Sun()
+        sun.compute(observer)
+        sun_alt_deg = math.degrees(float(sun.alt))
+
+        if sun_alt_deg < _NAUTICAL_SUN_THRESHOLD_DEG:
+            body = planet_cls()
+            body.compute(observer)
+            planet_alt_deg = math.degrees(float(body.alt))
+
+            if planet_alt_deg > _MIN_ALTITUDE_DEG:
+                return sample.strftime(fmt)
+
+        sample += interval
+
+    return None
 
 
 def _compute_tonight_window(lat: float, lon: float) -> tuple:
@@ -349,6 +416,13 @@ async def get_visible_planets(
 
     planets = apply_scores(planets, sun_data, moon_data, weather_data.cloud_cover)
 
+    # Compute next visible time for non-visible planets.
+    for planet in planets:
+        if not planet.is_visible:
+            planet.next_visible_time = _compute_next_visible_time(
+                planet.name, lat, lon, now_utc
+            )
+
     # Compute best viewing times within the nautical dark window.
     dark_start, dark_end = _compute_nautical_dark_window(lat, lon)
     if dark_start is not None:
@@ -438,6 +512,13 @@ async def get_tonight_planets(
 
         planets = apply_scores(planets, sun_data, moon_data, weather_data.cloud_cover)
         tonight = score_tonight(planets)
+
+        # next_visible_time is intentionally not computed here.
+        # The /tonight endpoint projects best positions across tonight's window,
+        # not the current moment — computing "next visible time" relative to now
+        # would be misleading.  The frontend renders planet cards exclusively
+        # from the /visible endpoint (fetchVisiblePlanets in api.js), so this
+        # field is never read from /tonight responses and the UI is unaffected.
 
         # Compute best viewing times within the nautical dark window.
         dark_start, dark_end = _compute_nautical_dark_window(lat, lon)

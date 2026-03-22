@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planet Cards — next_visible_time tooltip test</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .test-results {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            background: #f5f5f5;
+        }
+        .pass { color: green; }
+        .fail { color: red; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>Planet Cards — next_visible_time tooltip test</h1>
+    <div class="test-results" id="results"></div>
+
+    <script type="module">
+        import { PlanetCards } from '../js/components/planet-cards.js';
+
+        // Minimal planet fixture factory.
+        function makePlanet(overrides) {
+            return Object.assign({
+                name: 'mars',
+                name_sv: 'Mars',
+                visibility_score: 0,
+                is_visible: false,
+                is_above_horizon: true,
+                altitude_deg: 10,
+                azimuth_deg: 180,
+                direction: 'S',
+                magnitude: 1.0,
+                constellation: 'Aries',
+                rise_time: null,
+                transit_time: null,
+                set_time: null,
+                dark_rise_time: null,
+                dark_set_time: null,
+                best_time: null,
+                visibility_reasons: [],
+                next_visible_time: null,
+            }, overrides);
+        }
+
+        const container = document.createElement('div');
+        document.body.appendChild(container);
+        const cards = new PlanetCards(container);
+
+        const results = [];
+
+        function assert(description, condition) {
+            results.push({ description, pass: !!condition });
+        }
+
+        // --- Helper: render a single planet and return its visibility element. ---
+        function renderOne(planet) {
+            cards.render([planet]);
+            return container.querySelector('.planet-card__visibility');
+        }
+
+        // --- Test 1: Non-visible planet with next_visible_time set ---
+        // The tooltip title must start with "Nästa synlig: " and be formatted HH:MM.
+        const futureUtc = '2026-03-22T20:00:00Z';
+        const pillWithTime = renderOne(makePlanet({ next_visible_time: futureUtc }));
+
+        assert(
+            'Non-visible planet with next_visible_time: pill has info-icon class',
+            pillWithTime.classList.contains('info-icon')
+        );
+        assert(
+            'Non-visible planet with next_visible_time: pill has tabIndex 0',
+            pillWithTime.tabIndex === 0
+        );
+        assert(
+            'Non-visible planet with next_visible_time: title starts with Nästa synlig:',
+            (pillWithTime.getAttribute('title') || pillWithTime.dataset.tooltipTitle || '').startsWith('N\u00e4sta synlig:')
+        );
+
+        // --- Test 2: Non-visible planet with next_visible_time null ---
+        const pillNoTime = renderOne(makePlanet({ next_visible_time: null }));
+
+        assert(
+            'Non-visible planet without next_visible_time: pill has info-icon class',
+            pillNoTime.classList.contains('info-icon')
+        );
+        assert(
+            'Non-visible planet without next_visible_time: title is Ej synlig nästa 24h',
+            (pillNoTime.getAttribute('title') || pillNoTime.dataset.tooltipTitle || '') === 'Ej synlig n\u00e4sta 24h'
+        );
+
+        // --- Test 3: Non-visible planet with visibility_reasons AND next_visible_time ---
+        // The tooltip must combine both, separated by newline.
+        const pillCombined = renderOne(makePlanet({
+            next_visible_time: futureUtc,
+            visibility_reasons: ['atmosfärisk_dämpning'],
+        }));
+        const combinedTitle = pillCombined.getAttribute('title') || pillCombined.dataset.tooltipTitle || '';
+
+        assert(
+            'Combined tooltip contains visibility reasons text',
+            combinedTitle.length > 0
+        );
+        assert(
+            'Combined tooltip contains newline separator',
+            combinedTitle.includes('\n')
+        );
+        assert(
+            'Combined tooltip ends with Nästa synlig: ...',
+            combinedTitle.split('\n').pop().startsWith('N\u00e4sta synlig:')
+        );
+
+        // --- Test 4: Non-visible planet below horizon with next_visible_time null ---
+        const pillBelow = renderOne(makePlanet({ is_above_horizon: false, next_visible_time: null }));
+
+        assert(
+            'Below-horizon planet: pill text is Under horisonten',
+            pillBelow.textContent === 'Under horisonten'
+        );
+        assert(
+            'Below-horizon planet: pill has info-icon class (next-visible fallback)',
+            pillBelow.classList.contains('info-icon')
+        );
+
+        // --- Test 5: Visible (full) planet must NOT get a next-visible tooltip ---
+        const pillVisible = renderOne(makePlanet({
+            is_visible: true,
+            visibility_score: 80,
+            visibility_reasons: ['goda_f\u00f6rh\u00e5llanden'],
+            // next_visible_time must be null for visible planets per the API contract,
+            // but we set it to a non-null value here to ensure the card code ignores it.
+            next_visible_time: futureUtc,
+        }));
+
+        assert(
+            'Visible planet: pill text is Synlig',
+            pillVisible.textContent === 'Synlig'
+        );
+        assert(
+            'Visible planet: pill does NOT have info-icon class',
+            !pillVisible.classList.contains('info-icon')
+        );
+        assert(
+            'Visible planet: pill has no title attribute',
+            !pillVisible.getAttribute('title') && !pillVisible.dataset.tooltipTitle
+        );
+
+        // --- Render results ---
+        const resultsDiv = document.getElementById('results');
+        const passCount = results.filter(r => r.pass).length;
+        resultsDiv.innerHTML =
+            `<h3>Results: ${passCount}/${results.length} passed</h3>` +
+            results.map(r =>
+                `<div class="${r.pass ? 'pass' : 'fail'}">${r.pass ? '\u2713' : '\u2717'} ${r.description}</div>`
+            ).join('');
+
+        console.log(`Tests complete: ${passCount}/${results.length} passed`);
+        if (passCount < results.length) {
+            console.error('Some tests FAILED. See page for details.');
+        }
+    </script>
+</body>
+</html>

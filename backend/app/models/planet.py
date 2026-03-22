@@ -84,6 +84,7 @@ class PlanetPosition(BaseModel):
     best_time: Optional[str] = Field(None, description="UTC ISO 8601 timestamp of peak altitude within the nautical-dark window, or null if not computed")
     dark_rise_time: Optional[str] = Field(None, description="UTC ISO 8601 timestamp when the planet first exceeds 10° altitude during the dark window, or null if not computed")
     dark_set_time: Optional[str] = Field(None, description="UTC ISO 8601 timestamp when the planet drops below 10° altitude during the dark window, or null if not computed")
+    next_visible_time: Optional[str] = Field(None, description="ISO 8601 UTC timestamp of next visibility window in next 24h, or null if none found")
     is_above_horizon: bool = Field(..., description="True when altitude_deg > 0")
     # Filled by Phase 4 scoring module; None until scoring has been applied.
     visibility_score: Optional[int] = Field(None, ge=0, le=100, description="0–100 visibility score; None before scoring")
@@ -120,6 +121,7 @@ class PlanetPosition(BaseModel):
                 "best_time": "2026-02-28T22:10:00Z",
                 "dark_rise_time": "2026-02-28T19:50:00Z",
                 "dark_set_time": "2026-03-01T03:20:00Z",
+                "next_visible_time": None,
                 "is_above_horizon": True,
                 "visibility_score": 85,
                 "is_visible": True,

@@ -3,7 +3,8 @@
  *
  * Expects planet objects matching the PlanetsResponse schema from the backend.
  * Field names used: name, name_sv, visibility_score, is_visible, is_above_horizon,
- * altitude_deg, azimuth_deg, direction, magnitude, constellation, rise_time, transit_time, set_time.
+ * altitude_deg, azimuth_deg, direction, magnitude, constellation, rise_time, transit_time, set_time,
+ * next_visible_time (ISO 8601 UTC string or null; non-null only on non-visible planets).
  */
 
 import { scoreToLevel, formatVisibilityReasons, getEquipmentRecommendation } from '../utils.js';
@@ -156,8 +157,21 @@ function buildCard(planet) {
     );
     const tooltipText = formatVisibilityReasons(actionableReasons);
 
+    // For non-visible (compact) cards, append a next-visibility line to the
+    // tooltip. This always produces a non-empty tooltip on compact cards, so
+    // the dashed-underline affordance is always present for them.
+    let combinedTooltipText = tooltipText;
+    if (isCompact) {
+        const nextVisibleText = planet.next_visible_time
+            ? 'N\u00e4sta synlig: ' + formatTime(planet.next_visible_time)
+            : 'Ej synlig n\u00e4sta 24h';
+        combinedTooltipText = tooltipText
+            ? tooltipText + '\n' + nextVisibleText
+            : nextVisibleText;
+    }
+
     const visibilityEl = document.createElement('div');
-    visibilityEl.className = tooltipText
+    visibilityEl.className = combinedTooltipText
         ? 'planet-card__visibility info-icon'
         : 'planet-card__visibility';
     visibilityEl.dataset.visible = isVisible;
@@ -168,9 +182,9 @@ function buildCard(planet) {
     } else {
         visibilityEl.textContent = 'Ej synlig';
     }
-    if (tooltipText) {
+    if (combinedTooltipText) {
         visibilityEl.tabIndex = 0;
-        visibilityEl.title = tooltipText;
+        visibilityEl.title = combinedTooltipText;
     }
     card.appendChild(visibilityEl);
 

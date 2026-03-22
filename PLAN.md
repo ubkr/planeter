@@ -720,15 +720,15 @@ Planets that are currently not visible (either below the horizon or hidden by da
 
 **Definition of Done**
 
-- [ ] `PlanetPosition` includes a new optional field `next_visible_time: Optional[str]` (UTC ISO 8601 string or null)
-- [ ] The `/visible` endpoint computes `next_visible_time` for every planet where `is_visible == False` by sampling the next 24 hours at 15-minute intervals; the first sample where both `altitude_deg > 10` and `sun_altitude < -12` (nautical darkness) is captured as the next visible time
-- [ ] A planet that never meets both conditions within 24 hours has `next_visible_time: null` in the JSON response
-- [ ] A planet currently visible (`is_visible == True`) has `next_visible_time: null` (no need to show future time when already observable)
-- [ ] Compact planet cards (`.planet-card--compact`) show the visibility pill with a tooltip; hovering or tapping the pill reveals either "Nästa synlig: HH:MM" (in Europe/Stockholm time, formatted via the existing `formatTime()` helper) or "Ej synlig nästa 24h" when `next_visible_time` is null
-- [ ] Full (non-compact) planet cards do not show the next-visible-time information (it's only relevant when the planet is currently hidden and the card is in compact mode)
-- [ ] The tooltip reuses the existing `tooltip.js` component for consistent interaction and accessibility
-- [ ] No regressions in existing planet card layout on 375 px and 1200 px viewports
-- [ ] Sampling the next 24 hours adds no more than 100 ms to the `/visible` endpoint median latency (profiled on a mid-range CPU with live ephem calls)
+- [x] `PlanetPosition` includes a new optional field `next_visible_time: Optional[str]` (UTC ISO 8601 string or null)
+- [x] The `/visible` endpoint computes `next_visible_time` for every planet where `is_visible == False` by sampling the next 24 hours at 15-minute intervals; the first sample where both `altitude_deg > 10` and `sun_altitude < -12` (nautical darkness) is captured as the next visible time
+- [x] A planet that never meets both conditions within 24 hours has `next_visible_time: null` in the JSON response
+- [x] A planet currently visible (`is_visible == True`) has `next_visible_time: null` (no need to show future time when already observable)
+- [x] Compact planet cards (`.planet-card--compact`) show the visibility pill with a tooltip; hovering or tapping the pill reveals either "Nästa synlig: HH:MM" (in Europe/Stockholm time, formatted via the existing `formatTime()` helper) or "Ej synlig nästa 24h" when `next_visible_time` is null
+- [x] Full (non-compact) planet cards do not show the next-visible-time information (it's only relevant when the planet is currently hidden and the card is in compact mode)
+- [x] The tooltip reuses the existing `tooltip.js` component for consistent interaction and accessibility
+- [x] No regressions in existing planet card layout on 375 px and 1200 px viewports
+- [x] Sampling the next 24 hours adds no more than 100 ms to the `/visible` endpoint median latency (profiled on a mid-range CPU with live ephem calls)
 
 **Key files**
 - Modify `backend/app/models/planet.py` — add `next_visible_time: Optional[str]` field to `PlanetPosition` model

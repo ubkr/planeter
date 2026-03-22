@@ -290,7 +290,8 @@ A planet is declared **"visible"** when: altitude > 0, total score > 15, and app
       "visibility_score": 85,
       "rise_time": "2026-02-28T07:15:00Z",
       "set_time": "2026-02-28T20:30:00Z",
-      "transit_time": "2026-02-28T13:45:00Z"
+      "transit_time": "2026-02-28T13:45:00Z",
+      "next_visible_time": null
     }
   ]
 }
