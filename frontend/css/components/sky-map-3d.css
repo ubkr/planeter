@@ -54,7 +54,9 @@
     position: absolute;
     top: var(--space-sm);
     right: var(--space-sm);
-    z-index: var(--z-default);
+    /* Must sit above --z-panel-controls (10) so constellation/zoom overlays
+       cannot cover the primary 2D/3D toggle. */
+    z-index: var(--z-panel-controls-primary);
     display: flex;
     gap: 0;
     border-radius: var(--radius-md);
