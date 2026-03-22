@@ -709,7 +709,7 @@ The `/api/v1/events` endpoint filters out astronomical events that are geometric
 
 ---
 
-#### Phase B8: Nästa Synlighetstid för Dolda Planeter
+#### Phase B8: Nästa Synlighetstid för Dolda Planeter — ✅
 
 **Depends on:** Phase B1, Phase 6
 **Parallelisable with:** Phase E series

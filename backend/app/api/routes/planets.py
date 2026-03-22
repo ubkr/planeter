@@ -21,7 +21,7 @@ from ...services.planets.events import detect_events
 from ...services.scoring import apply_scores, score_tonight
 from ...utils.logger import setup_logger
 from ...utils.moon import calculate_moon_penalty
-from ...utils.sun import calculate_sun_penalty
+from ...utils.sun import calculate_sun_penalty, limiting_magnitude
 
 logger = setup_logger(__name__)
 
@@ -38,9 +38,6 @@ _MIN_ALTITUDE_DEG = 10
 
 # Sampling interval in minutes for best-viewing-time calculations.
 _BEST_TIME_SAMPLE_INTERVAL_MINUTES = 15
-
-# Sun altitude threshold (degrees) below which the sky is nautically dark.
-_NAUTICAL_SUN_THRESHOLD_DEG = -12
 
 
 def _utc_iso() -> str:
@@ -66,19 +63,55 @@ def _build_moon_info(moon_data: dict) -> MoonInfo:
     )
 
 
+def _is_planet_observable(
+    sun_alt_deg: float,
+    planet_alt_deg: float,
+    planet_mag: float,
+    min_altitude_deg: float = 5.0,
+) -> bool:
+    """Check if a planet is observable given current sky conditions.
+
+    Uses the same magnitude-aware limiting magnitude model as the scoring system.
+    A planet is observable when:
+    - It is above min_altitude_deg (default 5°, avoids horizon extinction)
+    - The sun is below the horizon (sun_alt_deg < 0)
+    - The planet is brighter than the sky's limiting magnitude at the current
+      sun altitude
+
+    Note: the 5° altitude minimum here is intentionally stricter than the
+    altitude_deg > 0° gate used by apply_scores in the scoring pipeline.  The
+    extra margin avoids extreme horizon extinction, which can make even a bright
+    planet undetectable in the lowest degree or two above the horizon.
+    """
+    if planet_alt_deg <= min_altitude_deg:
+        return False
+    if sun_alt_deg >= 0:
+        return False
+    lim_mag = limiting_magnitude(sun_alt_deg)
+    return planet_mag < lim_mag
+
+
 def _compute_next_visible_time(
     planet_name: str, lat: float, lon: float, current_dt: datetime
 ) -> Optional[str]:
     """
     Return the first upcoming moment (within 24 hours) when the planet is
-    observable: altitude > 10° AND sun altitude < _NAUTICAL_SUN_THRESHOLD_DEG.
+    observable, using the same magnitude-aware sky-brightness model as the
+    scoring system.
+
+    A sample qualifies when _is_planet_observable() returns True, which
+    requires the planet to be above 5° altitude, the sun to be below the
+    horizon, and the planet to be brighter than the sky's limiting magnitude
+    at the current sun altitude (derived from limiting_magnitude()).  This
+    allows bright planets such as Venus to qualify during civil or nautical
+    twilight, while faint planets like Saturn require a darker sky.
 
     Samples at _BEST_TIME_SAMPLE_INTERVAL_MINUTES intervals starting from
     current_dt.  Returns an ISO 8601 UTC string on the first qualifying sample,
     or None if no qualifying sample is found within 24 hours.
 
-    Returns None naturally for midnight-sun conditions (no sample will have
-    sun below the threshold) and for planets that stay below the horizon.
+    Returns None naturally for midnight-sun conditions and for planets that
+    stay below the horizon or are always outshone by the sky.
 
     Args:
         planet_name: English title-cased planet name (e.g. "Mars").
@@ -117,13 +150,26 @@ def _compute_next_visible_time(
         sun.compute(observer)
         sun_alt_deg = math.degrees(float(sun.alt))
 
-        if sun_alt_deg < _NAUTICAL_SUN_THRESHOLD_DEG:
-            body = planet_cls()
-            body.compute(observer)
-            planet_alt_deg = math.degrees(float(body.alt))
+        # Quick-skip daytime samples — no need to compute planet position.
+        if sun_alt_deg >= 0:
+            sample += interval
+            continue
 
-            if planet_alt_deg > _MIN_ALTITUDE_DEG:
-                return sample.strftime(fmt)
+        body = planet_cls()
+        body.compute(observer)
+        planet_alt_deg = math.degrees(float(body.alt))
+        planet_mag = float(body.mag)
+
+        # Guard against invalid magnitudes returned by ephem.  ephem can return
+        # nonsensical magnitudes for planets near inferior conjunction or at
+        # extreme orbital geometry; magnitudes above 6.0 are beyond naked-eye
+        # visibility anyway, so skip those samples.
+        if math.isnan(planet_mag) or planet_mag > 6.0:
+            sample += interval
+            continue
+
+        if _is_planet_observable(sun_alt_deg, planet_alt_deg, planet_mag):
+            return sample.strftime(fmt)
 
         sample += interval
 

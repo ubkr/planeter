@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sky Map Constellation Controls Test</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        #skyMapContainer svg {
+            width: 500px;
+            height: 500px;
+            border: 1px solid #ccc;
+        }
+        .controls {
+            margin: 20px 0;
+        }
+        .controls button {
+            margin: 5px;
+            padding: 8px 16px;
+        }
+        .test-results {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            background: #f5f5f5;
+        }
+        .pass { color: green; }
+        .fail { color: red; }
+    </style>
+</head>
+<body>
+    <h1>Sky Map Constellation Controls Test</h1>
+    
+    <div class="controls">
+        <button id="btnShow">Show Constellations</button>
+        <button id="btnHide">Hide Constellations</button>
+        <button id="btnOpacity025">Opacity 0.25</button>
+        <button id="btnOpacity050">Opacity 0.50</button>
+        <button id="btnOpacity100">Opacity 1.0</button>
+    </div>
+    
+    <div id="skyMapContainer"></div>
+    
+    <div class="test-results" id="results"></div>
+
+    <script type="module">
+        import { SkyMap } from '../js/components/sky-map.js';
+
+        const container = document.getElementById('skyMapContainer');
+        const resultsDiv = document.getElementById('results');
+        const skyMap = new SkyMap(container);
+
+        // Test constellation data (simplified)
+        const testData = [
+            {
+                iau: 'UMa',
+                name: 'Ursa Major',
+                lines: [
+                    [165.93, 61.75, 154.27, 53.69], // Sample line
+                ]
+            }
+        ];
+
+        const lat = 59.33;
+        const lon = 18.07;
+        const timestamp = new Date();
+
+        // Render the sky map
+        skyMap.render();
+
+        // Run tests
+        const results = [];
+
+        // Test 1: Default opacity
+        skyMap.plotConstellations(testData, lat, lon, timestamp);
+        let consGroup = container.querySelector('.sky-map-constellations');
+        if (consGroup && consGroup.getAttribute('opacity') === '0.25') {
+            results.push('✓ Default opacity 0.25 applied correctly');
+        } else {
+            results.push('✗ Default opacity 0.25 NOT applied');
+        }
+
+        // Test 2: Custom opacity 0.5
+        skyMap.plotConstellations(testData, lat, lon, timestamp, 0.5);
+        consGroup = container.querySelector('.sky-map-constellations');
+        if (consGroup && consGroup.getAttribute('opacity') === '0.5') {
+            results.push('✓ Custom opacity 0.5 applied correctly');
+        } else {
+            results.push('✗ Custom opacity 0.5 NOT applied');
+        }
+
+        // Test 3: setConstellationsVisible(false)
+        skyMap.setConstellationsVisible(false);
+        consGroup = container.querySelector('.sky-map-constellations');
+        if (consGroup && consGroup.style.display === 'none') {
+            results.push('✓ setConstellationsVisible(false) hides constellation group');
+        } else {
+            results.push('✗ setConstellationsVisible(false) did NOT hide group');
+        }
+
+        // Test 4: setConstellationsVisible(true)
+        skyMap.setConstellationsVisible(true);
+        consGroup = container.querySelector('.sky-map-constellations');
+        if (consGroup && consGroup.style.display === '') {
+            results.push('✓ setConstellationsVisible(true) shows constellation group');
+        } else {
+            results.push('✗ setConstellationsVisible(true) did NOT show group');
+        }
+
+        // Test 5: Guard against null (before render)
+        const skyMap2 = new SkyMap(document.createElement('div'));
+        try {
+            skyMap2.setConstellationsVisible(true);
+            results.push('✓ setConstellationsVisible guards against null (no error thrown)');
+        } catch (e) {
+            results.push('✗ setConstellationsVisible threw error when group is null: ' + e.message);
+        }
+
+        // Display results
+        resultsDiv.innerHTML = '<h3>Test Results:</h3>' + 
+            results.map(r => `<div class="${r.startsWith('✓') ? 'pass' : 'fail'}">${r}</div>`).join('');
+
+        // Wire up UI controls
+        document.getElementById('btnShow').onclick = () => skyMap.setConstellationsVisible(true);
+        document.getElementById('btnHide').onclick = () => skyMap.setConstellationsVisible(false);
+        document.getElementById('btnOpacity025').onclick = () => skyMap.plotConstellations(testData, lat, lon, timestamp, 0.25);
+        document.getElementById('btnOpacity050').onclick = () => skyMap.plotConstellations(testData, lat, lon, timestamp, 0.5);
+        document.getElementById('btnOpacity100').onclick = () => skyMap.plotConstellations(testData, lat, lon, timestamp, 1.0);
+
+        console.log('Test complete. Check the page for results.');
+    </script>
+</body>
+</html>
