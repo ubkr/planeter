@@ -972,7 +972,7 @@ The sky map panel gains two constellation controls visible in both the 2D and 3D
 
 ---
 
-#### Phase E9: Ljusstarka Stjärnor i Stjärnkartan
+#### Phase E9: Ljusstarka Stjärnor i Stjärnkartan — ✅
 
 **Depends on:** Phase E8, Phase 12, Phase A3
 **Parallelisable with:** None

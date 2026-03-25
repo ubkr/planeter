@@ -51,6 +51,7 @@ def _build_sun_info(sun_data: dict) -> SunInfo:
         elevation_deg=sun_data["elevation_deg"],
         azimuth_deg=sun_data["azimuth_deg"],
         twilight_phase=sun_data["twilight_phase"],
+        limiting_magnitude=sun_data["limiting_magnitude"],
     )
 
 

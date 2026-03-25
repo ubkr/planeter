@@ -387,6 +387,18 @@
     user-select: none;
 }
 
+/* --- Bright star dots --- */
+
+.sky-map-stars {
+    /* Group wrapper for all star circles; no visual styles needed. */
+}
+
+.sky-map-star {
+    fill: var(--color-star);
+    opacity: 0.75;
+    pointer-events: none;
+}
+
 /* --- Event indicators --- */
 
 /* Dashed line connecting two bodies involved in a conjunction or occultation. */

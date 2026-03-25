@@ -22,6 +22,9 @@
     --color-text-muted: #53627d;
     --color-text-inverse: #050814;
 
+    /* Celestial object colors */
+    --color-star: #c8d6e5;
+
     /* Metrics Colors */
     --color-metric-planet: #f5c842;
     --color-metric-clouds: #4d96ff;

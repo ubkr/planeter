@@ -39,6 +39,14 @@ const CONSTELLATION_OPACITY_KEY = 'planet_constellation_opacity';
 let constellationData = null;
 
 /**
+ * Star catalog loaded once at startup from data/bright-stars.json.
+ * Null if the fetch failed or has not completed yet.
+ *
+ * @type {Object[]|null}
+ */
+let starCatalog = null;
+
+/**
  * Most recent successful API response. Retained so the constellation fetch
  * callback can immediately paint constellations when constellations.json
  * arrives after the planet data (resolving the parallel-fetch race condition).
@@ -207,6 +215,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (constellationData !== null && lastApiData !== null) {
                     skyMap3d.plotConstellations(constellationData, currentLocation.lat, currentLocation.lon, new Date(lastApiData.timestamp), constellationOpacity);
                 }
+                if (starCatalog !== null && lastApiData !== null) {
+                    skyMap3d.plotStars(starCatalog, lastApiData.sun.limiting_magnitude, currentLocation.lat, currentLocation.lon, new Date(lastApiData.timestamp));
+                }
                 localStorage.setItem(VIEW_MODE_KEY, '3d');
             } catch (err) {
                 console.error('Sky map 3D: failed to load or initialise', err);
@@ -368,6 +379,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
+            if (starCatalog !== null) {
+                skyMap.plotStars(starCatalog, data.sun.limiting_magnitude, location.lat, location.lon, new Date(data.timestamp));
+                if (skyMap3d !== null) {
+                    skyMap3d.plotStars(starCatalog, data.sun.limiting_magnitude, location.lat, location.lon, new Date(data.timestamp));
+                }
+            }
+
             skyMap?.resetZoom();
             skyMap3d?.resetZoom();
 
@@ -485,6 +503,21 @@ document.addEventListener('DOMContentLoaded', () => {
         })
         .catch((err) => {
             console.warn('Sky map: failed to load constellation data, running without constellation lines', err);
+        });
+
+    fetch('data/bright-stars.json')
+        .then((response) => response.json())
+        .then((parsed) => {
+            starCatalog = parsed;
+            if (lastApiData !== null) {
+                skyMap.plotStars(starCatalog, lastApiData.sun.limiting_magnitude, currentLocation.lat, currentLocation.lon, new Date(lastApiData.timestamp));
+                if (skyMap3d !== null) {
+                    skyMap3d.plotStars(starCatalog, lastApiData.sun.limiting_magnitude, currentLocation.lat, currentLocation.lon, new Date(lastApiData.timestamp));
+                }
+            }
+        })
+        .catch((err) => {
+            console.warn('Sky map: failed to load star catalog', err);
         });
 
     loadData(currentLocation);

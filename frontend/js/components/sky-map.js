@@ -249,6 +249,7 @@ export class SkyMap {
         this._rendered = false;
         this._pendingPlanets = null;
         this._pendingConstellations = null;
+        this._pendingStars = null;
 
         // Zoom state. The SVG coordinate space is always 500×500; the viewBox
         // shrinks or grows around the centre to implement zoom. Min 200, max 500.
@@ -472,6 +473,14 @@ export class SkyMap {
             this.plotConstellations(constellationData, lat, lon, utcTimestamp, opacity);
         }
 
+        // If plotStars() was called before render() completed, replay it now.
+        // Stars are replayed after constellations and before bodies so they
+        // render behind planets.
+        if (this._pendingStars !== null) {
+            const { stars, limitingMagnitude, lat, lon, utcTimestamp } = this._pendingStars;
+            this.plotStars(stars, limitingMagnitude, lat, lon, utcTimestamp);
+        }
+
         // If plotBodies() was called before render() completed, replay it now.
         if (this._pendingPlanets !== null) {
             this.plotBodies(this._pendingPlanets, this._pendingSun, this._pendingMoon, this._pendingEvents || []);
@@ -612,6 +621,104 @@ export class SkyMap {
             });
             label.textContent = iau;
             consGroup.appendChild(label);
+        }
+    }
+
+    /**
+     * Plot background stars onto the sky map as small filled circles.
+     *
+     * Stars are decorative — they have no labels or tooltips. They are rendered
+     * in a dedicated layer behind planets, the Sun, and the Moon, but in front
+     * of constellation lines.
+     *
+     * Safe to call before render() — arguments are stored and replayed once
+     * the SVG grid is ready. Safe to call multiple times — the star layer is
+     * fully rebuilt on every call.
+     *
+     * @param {Object[]} stars           - Array of star objects. Each must have:
+     *   ra_deg {number}, dec_deg {number}, magnitude {number}.
+     * @param {number} limitingMagnitude - Stars fainter than this value are skipped.
+     * @param {number} lat               - Observer latitude in degrees (positive North).
+     * @param {number} lon               - Observer longitude in degrees (positive East).
+     * @param {Date|number} utcTimestamp - UTC instant as a JS Date or Unix ms.
+     */
+    plotStars(stars, limitingMagnitude, lat, lon, utcTimestamp) {
+        // Defer if the SVG grid has not been rendered yet.
+        if (!this._rendered) {
+            this._pendingStars = { stars, limitingMagnitude, lat, lon, utcTimestamp };
+            return;
+        }
+
+        if (!Array.isArray(stars)) return;
+
+        // Clear pending state — we are rendering now.
+        this._pendingStars = null;
+
+        const svg = this.container.querySelector('svg');
+
+        // Reuse or create the star layer group. Clear it so each call is
+        // idempotent: old circles are removed before rebuilding.
+        let starsGroup = svg.querySelector('.sky-map-stars');
+        if (!starsGroup) {
+            starsGroup = document.createElementNS(SVG_NS, 'g');
+            starsGroup.setAttribute('class', 'sky-map-stars');
+
+            // Insert after .sky-map-constellations (stars in front of
+            // constellation lines) and before .sky-map-bodies (stars behind
+            // planets). Handle the case where either layer may not exist yet.
+            const consGroup = svg.querySelector('.sky-map-constellations');
+            const bodiesGroup = svg.querySelector('.sky-map-bodies');
+
+            if (consGroup) {
+                // Insert immediately after the constellation group. SVG has no
+                // insertAfter, so we use the next sibling as the reference node.
+                const nextSibling = consGroup.nextSibling;
+                if (nextSibling) {
+                    svg.insertBefore(starsGroup, nextSibling);
+                } else {
+                    svg.appendChild(starsGroup);
+                }
+            } else if (bodiesGroup) {
+                svg.insertBefore(starsGroup, bodiesGroup);
+            } else {
+                svg.appendChild(starsGroup);
+            }
+        } else {
+            while (starsGroup.firstChild) {
+                starsGroup.removeChild(starsGroup.firstChild);
+            }
+        }
+
+        for (const star of stars) {
+            // Skip stars that are too faint for the current sky brightness.
+            if (star.magnitude > limitingMagnitude) continue;
+
+            const { altitude_deg, azimuth_deg } = raDecToAltAz(
+                star.ra_deg,
+                star.dec_deg,
+                lat,
+                lon,
+                utcTimestamp,
+            );
+
+            // Skip stars below the horizon.
+            if (altitude_deg <= 0) continue;
+
+            // Guard against bad coordinate data.
+            if (isNaN(altitude_deg) || isNaN(azimuth_deg)) continue;
+
+            const { x, y } = altAzToXY(altitude_deg, azimuth_deg, CENTER_X, CENTER_Y, HORIZON_RADIUS);
+
+            // Radius scales inversely with magnitude: brighter (lower) → larger.
+            // Clamped to [1, 4] so faint stars are still visible as single pixels.
+            const radius = Math.max(1, Math.min(4, 3 - star.magnitude * 0.7));
+
+            const circle = document.createElementNS(SVG_NS, 'circle');
+            circle.setAttribute('class', 'sky-map-star');
+            circle.setAttribute('cx', x);
+            circle.setAttribute('cy', y);
+            circle.setAttribute('r', radius);
+            starsGroup.appendChild(circle);
         }
     }
 

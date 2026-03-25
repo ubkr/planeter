@@ -43,6 +43,9 @@ const GRID_RADIUS = SPHERE_RADIUS * 0.98;
 /** Constellation lines sit slightly inside the grid to render behind it. */
 const CONSTELLATION_RADIUS = SPHERE_RADIUS * 0.96;
 
+/** Background stars sit slightly inside the constellation sphere so they render behind lines. */
+const STAR_RADIUS = SPHERE_RADIUS * 0.95;
+
 /** Default camera field-of-view in degrees. Matches the initial PerspectiveCamera argument. */
 const DEFAULT_FOV = 60;
 
@@ -255,10 +258,11 @@ export default class SkyMap3D {
         this._camera      = null;
         this._controls    = null;
 
-        // Body, label, and constellation groups — created once in _initScene().
+        // Body, label, constellation, and star groups — created once in _initScene().
         this._bodiesGroup        = null;
         this._labelsGroup        = null;
         this._constellationsGroup = null;
+        this._starsGroup         = null;
 
         // Raycaster for cursor feedback on body sprites.
         this._raycaster = null;
@@ -285,6 +289,12 @@ export default class SkyMap3D {
 
         // Deferred plotBodies arguments stored when activate() has not yet run.
         this._pendingBodies = null;
+
+        // Deferred plotStars arguments stored when activate() has not yet run.
+        this._pendingStars = null;
+
+        // Deferred plotConstellations arguments stored when activate() has not yet run.
+        this._pendingConstellations = null;
     }
 
     // -----------------------------------------------------------------------
@@ -322,6 +332,20 @@ export default class SkyMap3D {
             const { planets, sun, moon, events } = this._pendingBodies;
             this._pendingBodies = null;
             this.plotBodies(planets, sun, moon, events);
+        }
+
+        // Replay any plotStars() call that arrived before the scene was ready.
+        if (this._pendingStars !== null) {
+            const p = this._pendingStars;
+            this._pendingStars = null;
+            this.plotStars(...p);
+        }
+
+        // Replay any plotConstellations() call that arrived before the scene was ready.
+        if (this._pendingConstellations !== null) {
+            const p = this._pendingConstellations;
+            this._pendingConstellations = null;
+            this.plotConstellations(...p);
         }
     }
 
@@ -366,6 +390,12 @@ export default class SkyMap3D {
         this._controls            = null;
         this._camera              = null;
         this._scene               = null;
+
+        if (this._starsGroup !== null) {
+            this._clearStars();
+            this._starsGroup = null;
+        }
+
         this._bodiesGroup         = null;
         this._labelsGroup         = null;
         this._constellationsGroup = null;
@@ -532,7 +562,7 @@ export default class SkyMap3D {
      */
     plotConstellations(constellationData, lat, lon, utcTimestamp, opacity = 0.25) {
         if (this._scene === null) {
-            console.warn('SkyMap3D: plotConstellations called before scene was initialised — data dropped');
+            this._pendingConstellations = [constellationData, lat, lon, utcTimestamp, opacity];
             return;
         }
         if (!Array.isArray(constellationData)) return;
@@ -618,6 +648,65 @@ export default class SkyMap3D {
         } else {
             // No visible segments — dispose the material to avoid a GPU leak.
             lineMat.dispose();
+        }
+    }
+
+    /**
+     * Plot background stars as small glow sprites in the 3D scene.
+     *
+     * Stars are rendered at STAR_RADIUS (slightly inside the constellation
+     * sphere) so they appear behind constellation lines.  No labels or
+     * interactivity are attached — stars are purely visual.
+     *
+     * Safe to call before activate() — arguments are stored and replayed once
+     * the scene is ready.  Safe to call multiple times — previous sprites are
+     * disposed before rebuilding.
+     *
+     * Stars above limitingMagnitude are skipped, as are any whose computed
+     * altitude is at or below the horizon.
+     *
+     * @param {Object[]} stars          - Array of star objects.
+     *   Each must have: ra_deg {number}, dec_deg {number}, magnitude {number}.
+     * @param {number}   limitingMagnitude - Faintest magnitude to render (inclusive).
+     * @param {number}   lat            - Observer latitude in degrees.
+     * @param {number}   lon            - Observer longitude in degrees.
+     * @param {Date|number} utcTimestamp - UTC instant as a Date or Unix ms.
+     */
+    plotStars(stars, limitingMagnitude, lat, lon, utcTimestamp) {
+        // Defer if the scene has not been initialised yet.
+        if (this._scene === null) {
+            this._pendingStars = [stars, limitingMagnitude, lat, lon, utcTimestamp];
+            return;
+        }
+
+        if (!Array.isArray(stars)) return;
+
+        this._clearStars();
+
+        for (const star of stars) {
+            if (star.magnitude > limitingMagnitude) continue;
+
+            const { altitude_deg, azimuth_deg } = raDecToAltAz(
+                star.ra_deg, star.dec_deg, lat, lon, utcTimestamp,
+            );
+
+            if (isNaN(altitude_deg) || isNaN(azimuth_deg) || altitude_deg <= 0) continue;
+
+            const { x, y, z } = altAzToCartesian(altitude_deg, azimuth_deg, STAR_RADIUS);
+
+            const texture  = buildBodyTexture('#d0e8ff');
+            const material = new THREE.SpriteMaterial({
+                map:         texture,
+                transparent: true,
+                depthWrite:  false,
+            });
+            const sprite = new THREE.Sprite(material);
+
+            const scale = SPHERE_RADIUS * Math.max(0.008, Math.min(0.02, 0.015 - star.magnitude * 0.003));
+            sprite.scale.set(scale, scale, 1);
+            sprite.position.set(x, y, z);
+
+            this._starsGroup.add(sprite);
         }
     }
 
@@ -708,15 +797,21 @@ export default class SkyMap3D {
         // --- Cardinal direction labels ---
         scene.add(buildCardinalLabels());
 
+        // --- Constellation group (line segments and IAU abbreviation labels) ---
+        // Added first so constellation lines render behind stars, planets, and labels.
+        const constellationsGroup = new THREE.Group();
+        scene.add(constellationsGroup);
+
+        // --- Star group (background star sprites, rendered behind planets) ---
+        const starsGroup = new THREE.Group();
+        scene.add(starsGroup);
+
         // --- Body groups (sprites and CSS2D labels) ---
+        // bodiesGroup is added before labelsGroup so labels render on top.
         const bodiesGroup = new THREE.Group();
         const labelsGroup = new THREE.Group();
         scene.add(bodiesGroup);
         scene.add(labelsGroup);
-
-        // --- Constellation group (line segments and IAU abbreviation labels) ---
-        const constellationsGroup = new THREE.Group();
-        scene.add(constellationsGroup);
 
         // --- Raycaster for cursor feedback ---
         const raycaster = new THREE.Raycaster();
@@ -728,6 +823,7 @@ export default class SkyMap3D {
         this._scene               = scene;
         this._camera              = camera;
         this._controls            = controls;
+        this._starsGroup          = starsGroup;
         this._bodiesGroup         = bodiesGroup;
         this._labelsGroup         = labelsGroup;
         this._constellationsGroup = constellationsGroup;
@@ -946,6 +1042,24 @@ export default class SkyMap3D {
             }
         }
         this._constellationsGroup.clear();
+    }
+
+    /**
+     * Remove and dispose all star sprites from _starsGroup.
+     *
+     * SpriteMaterial and CanvasTexture are explicitly disposed to prevent
+     * GPU memory leaks on each plotStars() call.
+     */
+    _clearStars() {
+        for (const child of this._starsGroup.children) {
+            if (child.material) {
+                if (child.material.map) {
+                    child.material.map.dispose();
+                }
+                child.material.dispose();
+            }
+        }
+        this._starsGroup.clear();
     }
 
     /**
