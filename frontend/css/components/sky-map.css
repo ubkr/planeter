@@ -396,7 +396,14 @@
 .sky-map-star {
     fill: var(--color-star);
     opacity: 0.75;
-    pointer-events: none;
+    cursor: pointer;
+    transition: opacity var(--transition-fast), filter var(--transition-fast);
+}
+
+.sky-map-star:hover,
+.sky-map-star:focus-visible {
+    opacity: 1;
+    filter: drop-shadow(0 0 3px var(--color-star, #fff));
 }
 
 /* --- Event indicators --- */

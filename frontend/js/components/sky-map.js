@@ -16,6 +16,7 @@
  */
 
 import { raDecToAltAz } from '../astro-projection.js';
+import { azimuthToCompass } from '../utils.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -701,11 +702,8 @@ export class SkyMap {
                 utcTimestamp,
             );
 
-            // Skip stars below the horizon.
-            if (altitude_deg <= 0) continue;
-
-            // Guard against bad coordinate data.
-            if (isNaN(altitude_deg) || isNaN(azimuth_deg)) continue;
+            // Guard against bad coordinate data and skip stars below the horizon.
+            if (isNaN(altitude_deg) || isNaN(azimuth_deg) || altitude_deg <= 0) continue;
 
             const { x, y } = altAzToXY(altitude_deg, azimuth_deg, CENTER_X, CENTER_Y, HORIZON_RADIUS);
 
@@ -713,11 +711,22 @@ export class SkyMap {
             // Clamped to [1, 4] so faint stars are still visible as single pixels.
             const radius = Math.max(1, Math.min(4, 3 - star.magnitude * 0.7));
 
+            const compassDirection = azimuthToCompass(azimuth_deg);
+            const tooltipText =
+                `${star.name}\n` +
+                `Höjd: ${altitude_deg.toFixed(1)}°\n` +
+                `Riktning: ${compassDirection}\n` +
+                `Magnitud: ${star.magnitude.toFixed(2)}`;
+
             const circle = document.createElementNS(SVG_NS, 'circle');
-            circle.setAttribute('class', 'sky-map-star');
+            circle.setAttribute('class', 'sky-map-star info-icon');
             circle.setAttribute('cx', x);
             circle.setAttribute('cy', y);
             circle.setAttribute('r', radius);
+            circle.setAttribute('tabindex', '0');
+            circle.setAttribute('role', 'img');
+            circle.setAttribute('aria-label', star.name);
+            circle.dataset.tooltipTitle = tooltipText;
             starsGroup.appendChild(circle);
         }
     }

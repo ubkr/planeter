@@ -1002,7 +1002,7 @@ The sky map — both the 2D SVG view and the 3D dome — displays the brightest 
 
 ---
 
-#### Phase E10: Tooltips for Visible Stars in the Sky Map
+#### Phase E10: Tooltips for Visible Stars in the Sky Map — ✅
 
 **Depends on:** Phase E9
 **Parallelisable with:** None

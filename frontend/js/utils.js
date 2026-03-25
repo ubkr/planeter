@@ -102,3 +102,21 @@ export function getEquipmentRecommendation(planet) {
 
   return 'naked_eye';
 }
+
+/**
+ * Converts an azimuth in degrees to a Swedish 16-point compass direction string.
+ *
+ * 0/360 = North, 90 = East, 180 = South, 270 = West.
+ * Each sector spans 22.5 degrees.
+ *
+ * Matches the backend azimuth_to_compass() function in planet.py.
+ *
+ * @param {number} azimuth_deg - Azimuth in degrees (0–360).
+ * @returns {string} Swedish compass direction, e.g. 'N', 'NNO', 'SO'.
+ */
+export function azimuthToCompass(azimuth_deg) {
+  if (isNaN(azimuth_deg)) return '–';
+  const labels = ['N', 'NNO', 'NO', 'ONO', 'O', 'OSO', 'SO', 'SSO', 'S', 'SSV', 'SV', 'VSV', 'V', 'VNV', 'NV', 'NNV'];
+  const index = Math.round(azimuth_deg / 22.5) % 16;
+  return labels[index];
+}

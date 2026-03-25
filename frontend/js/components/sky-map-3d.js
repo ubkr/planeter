@@ -17,6 +17,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { altAzToCartesian, raDecToAltAz } from '../astro-projection.js';
+import { azimuthToCompass } from '../utils.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -264,6 +265,10 @@ export default class SkyMap3D {
         this._constellationsGroup = null;
         this._starsGroup         = null;
 
+        // Tracks only the CSS2DObjects added by _addBodySprite(), so _clearBodies()
+        // can remove them from _labelsGroup without touching star label objects.
+        this._bodyLabelsArray = [];
+
         // Raycaster for cursor feedback on body sprites.
         this._raycaster = null;
         this._pointer   = null;
@@ -399,6 +404,7 @@ export default class SkyMap3D {
         this._bodiesGroup         = null;
         this._labelsGroup         = null;
         this._constellationsGroup = null;
+        this._bodyLabelsArray     = [];
         this._raycaster           = null;
         this._pointer             = null;
     }
@@ -655,18 +661,21 @@ export default class SkyMap3D {
      * Plot background stars as small glow sprites in the 3D scene.
      *
      * Stars are rendered at STAR_RADIUS (slightly inside the constellation
-     * sphere) so they appear behind constellation lines.  No labels or
-     * interactivity are attached — stars are purely visual.
+     * sphere) so they appear behind constellation lines.  Each star receives a
+     * CSS2D label object (with class `sky-map-3d-star-label info-icon`) that
+     * carries a data-tooltip-title attribute, making it raycaster-interactive
+     * via the same TooltipManager path used by planet labels.
      *
      * Safe to call before activate() — arguments are stored and replayed once
-     * the scene is ready.  Safe to call multiple times — previous sprites are
-     * disposed before rebuilding.
+     * the scene is ready.  Safe to call multiple times — previous sprites and
+     * their CSS2D labels are disposed before rebuilding.
      *
      * Stars above limitingMagnitude are skipped, as are any whose computed
      * altitude is at or below the horizon.
      *
      * @param {Object[]} stars          - Array of star objects.
-     *   Each must have: ra_deg {number}, dec_deg {number}, magnitude {number}.
+     *   Each must have: ra_deg {number}, dec_deg {number}, magnitude {number},
+     *   name {string}.
      * @param {number}   limitingMagnitude - Faintest magnitude to render (inclusive).
      * @param {number}   lat            - Observer latitude in degrees.
      * @param {number}   lon            - Observer longitude in degrees.
@@ -706,6 +715,27 @@ export default class SkyMap3D {
             sprite.scale.set(scale, scale, 1);
             sprite.position.set(x, y, z);
 
+            // Build CSS2D label for tooltip interactivity.
+            const compassDirection = azimuthToCompass(azimuth_deg);
+            const tooltipText =
+                `${star.name}\n` +
+                `Höjd: ${altitude_deg.toFixed(1)}°\n` +
+                `Riktning: ${compassDirection}\n` +
+                `Magnitud: ${star.magnitude.toFixed(2)}`;
+
+            const labelEl = document.createElement('div');
+            labelEl.className = 'sky-map-3d-label sky-map-3d-star-label info-icon';
+            labelEl.textContent = star.name;
+            labelEl.dataset.tooltipTitle = tooltipText;
+            labelEl.style.pointerEvents = 'none';
+
+            const labelObject = new CSS2DObject(labelEl);
+            labelObject.position.set(x, y, z);
+
+            // Keep a reference on the sprite for cleanup and raycaster hit handling.
+            sprite.userData.labelObject = labelObject;
+
+            this._labelsGroup.add(labelObject);
             this._starsGroup.add(sprite);
         }
     }
@@ -859,9 +889,13 @@ export default class SkyMap3D {
             const pointer = new THREE.Vector2(ndcX, ndcY);
             this._raycaster.setFromCamera(pointer, this._camera);
 
-            const hits = this._raycaster.intersectObjects(this._bodiesGroup.children);
+            // Bodies are listed first so they take priority over stars when overlapping.
+            const starsChildren = this._starsGroup !== null ? this._starsGroup.children : [];
+            const hits = this._raycaster.intersectObjects([...this._bodiesGroup.children, ...starsChildren]);
             if (hits.length > 0) {
-                const labelEl = hits[0].object.userData.labelEl;
+                const hit = hits[0].object;
+                // Resolve label element: planets use userData.labelEl; stars use userData.labelObject.element.
+                const labelEl = hit.userData.labelEl ?? (hit.userData.labelObject ? hit.userData.labelObject.element : null);
                 if (labelEl) {
                     labelEl.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, cancelable: true }));
                 }
@@ -1022,7 +1056,12 @@ export default class SkyMap3D {
 
         // CSS2DObjects do not hold GPU resources, but their DOM elements are
         // removed from the overlay when the object leaves the scene graph.
-        this._labelsGroup.clear();
+        // Only remove body labels — star labels are owned by _starsGroup and
+        // must not be disturbed here.
+        for (const labelObj of this._bodyLabelsArray) {
+            this._labelsGroup.remove(labelObj);
+        }
+        this._bodyLabelsArray = [];
     }
 
     /**
@@ -1052,6 +1091,10 @@ export default class SkyMap3D {
      */
     _clearStars() {
         for (const child of this._starsGroup.children) {
+            // Remove the CSS2DObject from _labelsGroup before clearing sprites.
+            if (child.userData.labelObject && this._labelsGroup !== null) {
+                this._labelsGroup.remove(child.userData.labelObject);
+            }
             if (child.material) {
                 if (child.material.map) {
                     child.material.map.dispose();
@@ -1111,6 +1154,7 @@ export default class SkyMap3D {
         labelObject.position.set(x, y + SPHERE_RADIUS * 0.04, z);
 
         this._labelsGroup.add(labelObject);
+        this._bodyLabelsArray.push(labelObject);
     }
 
     // -----------------------------------------------------------------------
@@ -1151,10 +1195,14 @@ export default class SkyMap3D {
 
         this._raycaster.setFromCamera(this._pointer, this._camera);
 
-        const hits = this._raycaster.intersectObjects(this._bodiesGroup.children);
+        // Bodies are listed first so they take priority over stars when overlapping.
+        const starsChildren = this._starsGroup !== null ? this._starsGroup.children : [];
+        const hits = this._raycaster.intersectObjects([...this._bodiesGroup.children, ...starsChildren]);
 
         if (hits.length > 0) {
-            const labelEl = hits[0].object.userData.labelEl;
+            const hit = hits[0].object;
+            // Resolve label element: planets use userData.labelEl; stars use userData.labelObject.element.
+            const labelEl = hit.userData.labelEl ?? (hit.userData.labelObject ? hit.userData.labelObject.element : null);
             if (labelEl && labelEl !== this._hoveredLabel) {
                 labelEl.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, cancelable: true }));
             }
