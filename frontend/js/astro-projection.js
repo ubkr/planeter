@@ -120,10 +120,14 @@ function gmstDeg(jd) {
  *
  *   sin(alt) = sin(dec)·sin(lat) + cos(dec)·cos(lat)·cos(HA)
  *
- *   az = atan2(sin(HA),  cos(lat)·tan(dec) − sin(lat)·cos(HA)) + 180°
+ *   sin(az) = -cos(dec)·sin(HA) / cos(alt)
+ *   cos(az) = (sin(dec) − sin(alt)·sin(lat)) / (cos(alt)·cos(lat))
+ *   az      = atan2(sin(az), cos(az))
  *
  * Azimuth is measured from North (0°) clockwise through East (90°), matching
- * the compass convention used throughout this project.
+ * the compass convention used throughout this project. The azimuth is derived
+ * from both sine and cosine components to stay stable for near-polar stars
+ * such as Polaris, where tan(dec) becomes numerically awkward.
  *
  * @param {number}      ra_deg        - Right Ascension in degrees (0–360).
  * @param {number}      dec_deg       - Declination in degrees (−90 to +90).
@@ -160,16 +164,28 @@ export function raDecToAltAz(ra_deg, dec_deg, lat, lon, utc_timestamp) {
     // Altitude.
     const sinAlt = Math.sin(dec) * Math.sin(phi)
                  + Math.cos(dec) * Math.cos(phi) * Math.cos(ha);
-    const altitude_deg = toDeg(Math.asin(sinAlt));
 
-    // Azimuth — use atan2 for correct quadrant resolution (Meeus Eq. 13.5).
-    // Numerator:   sin(HA)
-    // Denominator: cos(lat)·tan(dec) − sin(lat)·cos(HA)
-    // Adding 180° converts the astronomical azimuth (South=0°) to the compass
-    // azimuth convention (North=0°, East=90°, clockwise).
-    const az_num = Math.sin(ha);
-    const az_den = Math.cos(phi) * Math.tan(dec) - Math.sin(phi) * Math.cos(ha);
-    const azimuth_deg = normDeg(toDeg(Math.atan2(az_num, az_den)) + 180);
+    // Azimuth — derive separate sine/cosine components from the solved altitude
+    // instead of using tan(dec). This avoids flipping near-polar stars into the
+    // wrong hemisphere due to tan(dec) instability as dec approaches +/-90°.
+    const alt = Math.asin(Math.max(-1, Math.min(1, sinAlt)));
+    const altitude_deg = toDeg(alt);
+    const cosAlt = Math.cos(alt);
+
+    let azimuth_deg = 0;
+    if (Math.abs(cosAlt) > 1e-12) {
+        const sinAz = -(Math.cos(dec) * Math.sin(ha)) / cosAlt;
+        const cosAz = (Math.sin(dec) - Math.sin(alt) * Math.sin(phi))
+            / (cosAlt * Math.cos(phi));
+        azimuth_deg = normDeg(
+            toDeg(
+                Math.atan2(
+                    Math.max(-1, Math.min(1, sinAz)),
+                    Math.max(-1, Math.min(1, cosAz)),
+                )
+            )
+        );
+    }
 
     return { altitude_deg, azimuth_deg };
 }

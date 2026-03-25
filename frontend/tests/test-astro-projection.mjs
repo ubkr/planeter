@@ -139,10 +139,11 @@ testAltAz(
 
 // Test 2 — Sirius
 // RA 101.2917°, Dec -16.7161° from lat=59°N lon=18°E on 2024-01-15 20:00:00 UTC.
-// Sirius transits low in the south from Stockholm-latitude observers; expected
-// altitude 10–25°, azimuth 170–220° (broadly southward).
+// At this instant Sirius is low in the south-southeast from Stockholm-latitude
+// observers. Cross-checks against the backend ephem library place it near
+// altitude 10.8°, azimuth 152°.
 testAzimuthInRange(
-    'Sirius: altitude in [10°, 25°], azimuth in [170°, 220°] (southward)',
+    'Sirius: altitude in [10°, 25°], azimuth in [140°, 165°] (south-southeast)',
     {
         ra_deg  : 101.2917,
         dec_deg : -16.7161,
@@ -150,8 +151,8 @@ testAzimuthInRange(
         lon     : 18,
         utc_iso : '2024-01-15T20:00:00.000Z',
     },
-    /* minAz */ 170,
-    /* maxAz */ 220,
+    /* minAz */ 140,
+    /* maxAz */ 165,
     /* altMin */ 10,
     /* altMax */ 25
 );

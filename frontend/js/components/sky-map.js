@@ -708,8 +708,9 @@ export class SkyMap {
             const { x, y } = altAzToXY(altitude_deg, azimuth_deg, CENTER_X, CENTER_Y, HORIZON_RADIUS);
 
             // Radius scales inversely with magnitude: brighter (lower) → larger.
-            // Clamped to [1, 4] so faint stars are still visible as single pixels.
-            const radius = Math.max(1, Math.min(4, 3 - star.magnitude * 0.7));
+            // Keep a slightly larger minimum so stars remain tappable/hoverable
+            // on dense parts of the map, especially near Polaris.
+            const radius = Math.max(1.75, Math.min(4, 3 - star.magnitude * 0.7));
 
             const compassDirection = azimuthToCompass(azimuth_deg);
             const tooltipText =

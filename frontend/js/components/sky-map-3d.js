@@ -715,7 +715,7 @@ export default class SkyMap3D {
             });
             const sprite = new THREE.Sprite(material);
 
-            const scale = SPHERE_RADIUS * Math.max(0.008, Math.min(0.02, 0.015 - star.magnitude * 0.003));
+            const scale = SPHERE_RADIUS * Math.max(0.012, Math.min(0.02, 0.015 - star.magnitude * 0.003));
             sprite.scale.set(scale, scale, 1);
             sprite.position.set(x, y, z);
 

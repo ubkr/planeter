@@ -43,6 +43,7 @@
   { "name": "Alhena",          "ra_deg":  99.428, "dec_deg":  16.400, "magnitude":  1.93 },
   { "name": "Peacock",         "ra_deg": 306.412, "dec_deg": -56.735, "magnitude":  1.94 },
   { "name": "Mirzam",          "ra_deg":  95.675, "dec_deg": -17.956, "magnitude":  1.98 },
+  { "name": "Polaris",         "ra_deg":  37.955, "dec_deg":  89.264, "magnitude":  1.98 },
   { "name": "Alphard",         "ra_deg": 141.897, "dec_deg":  -8.659, "magnitude":  1.99 },
   { "name": "Hamal",           "ra_deg":  31.793, "dec_deg":  23.462, "magnitude":  2.01 },
   { "name": "Algieba",         "ra_deg": 154.993, "dec_deg":  19.841, "magnitude":  2.01 },

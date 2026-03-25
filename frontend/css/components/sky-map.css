@@ -396,7 +396,10 @@
 .sky-map-star {
     fill: var(--color-star);
     opacity: 0.75;
+    stroke: rgba(200, 214, 229, 0.001);
+    stroke-width: 8;
     cursor: pointer;
+    pointer-events: all;
     transition: opacity var(--transition-fast), filter var(--transition-fast);
 }
 
