@@ -207,6 +207,7 @@ After the code block, state the exact location in PLAN.md where this entry shoul
 Verify that the insertion point appears after all phases listed in "Depends on" within the PLAN.md file — not just by phase number, but by actual position in the document. If a dependency appears later in the file (e.g. in a deferred section), note the inconsistency to the user.
 
 Do NOT insert the entry into PLAN.md. Wait for the user to explicitly confirm or request edits.
+Use the ask tool for this.
 
 Once the user approves the entry, suggest the appropriate downstream implementation skill based on the feature's scope:
 - `full-stack-feature` — changes to both backend and frontend
