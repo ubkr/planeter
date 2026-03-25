@@ -47,6 +47,9 @@ const CONSTELLATION_RADIUS = SPHERE_RADIUS * 0.96;
 /** Background stars sit slightly inside the constellation sphere so they render behind lines. */
 const STAR_RADIUS = SPHERE_RADIUS * 0.95;
 
+/** Constellation line colour — must match --color-text-muted in tokens.css. */
+const CONSTELLATION_LINE_COLOR = 0x53627d;
+
 /** Default camera field-of-view in degrees. Matches the initial PerspectiveCamera argument. */
 const DEFAULT_FOV = 60;
 
@@ -580,7 +583,7 @@ export default class SkyMap3D {
         const segmentPositions = [];
 
         const lineMat = new THREE.LineBasicMaterial({
-            color:       0x334455,
+            color:       CONSTELLATION_LINE_COLOR,
             transparent: true,
             opacity:     opacity,
         });
@@ -635,8 +638,9 @@ export default class SkyMap3D {
             }
 
             const labelEl = document.createElement('div');
-            labelEl.className = 'constellation-label';
+            labelEl.className = 'sky-map-3d-constellation-label';
             labelEl.textContent = constellation.iau;
+            labelEl.style.opacity = opacity;
 
             const labelObj = new CSS2DObject(labelEl);
             labelObj.position.set(cx, cy, cz);

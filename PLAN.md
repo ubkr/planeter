@@ -1028,7 +1028,7 @@ The bright stars already plotted in both the 2D SVG sky map and the 3D dome beco
 
 ---
 
-#### Phase E11: Match Maximum Constellation Intensity Between 2D and 3D
+#### Phase E11: Match Maximum Constellation Intensity Between 2D and 3D — ✅
 
 **Depends on:** Phase E8
 **Parallelisable with:** None

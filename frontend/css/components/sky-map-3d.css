@@ -163,3 +163,17 @@
     opacity: 0.7;
 }
 
+/* --- Constellation labels (CSS2DRenderer overlays) --- */
+
+.sky-map-3d-constellation-label {
+    font-family: var(--font-family-base);
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    white-space: nowrap;
+    pointer-events: none;
+    user-select: none;
+    text-shadow:
+        0 1px 3px rgba(0, 0, 0, 0.9),
+        0 0 6px rgba(0, 0, 0, 0.6);
+}
+

@@ -152,7 +152,7 @@ SkyMap tab (panelSkyMap)
         +-- <canvas>              -- WebGL renderer output (aria-hidden)
         +-- CSS2DRenderer <div>   -- HTML label overlay (pointerEvents: none)
               +-- .sky-map-3d-label  -- per-body CSS2D labels
-              +-- .constellation-label  -- IAU abbreviation labels
+              +-- .sky-map-3d-constellation-label  -- IAU abbreviation labels
 ```
 
 `SkyMap3D` is not imported at page load. `main.js` lazy-loads it via `await import('./components/sky-map-3d.js')` the first time the user activates 3D mode, so Three.js (~150 KB gzipped) does not affect initial page load.
