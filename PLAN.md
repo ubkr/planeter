@@ -971,3 +971,33 @@ The sky map panel gains two constellation controls visible in both the 2D and 3D
 - Modify `frontend/css/components/sky-map.css` — remove hardcoded `opacity: 0.25` from constellation rules; add styles for the new toggle and slider controls
 
 ---
+
+#### Phase E9: Ljusstarka Stjärnor i Stjärnkartan
+
+**Depends on:** Phase E8, Phase 12, Phase A3
+**Parallelisable with:** None
+
+**Intended Outcome**
+
+The sky map — both the 2D SVG view and the 3D dome — displays the brightest naked-eye stars from a static catalog whenever those stars are actually visible from the observer's sky. Visibility uses the same twilight limiting-magnitude criterion as the planetary scorer (Phase 12): a star is rendered only when its altitude is above 0° and its apparent magnitude is brighter than the sky's current limiting magnitude derived from the sun's elevation angle. Weather is deliberately excluded — a completely overcast sky still shows the theoretically visible stars, exactly as the planetary `is_visible` flag excludes weather. Stars are rendered as small white dots/sprites layered between the constellation lines and the planetary bodies, sized proportionally to brightness. Named stars are labelled with their internationally recognised name (most have no distinct Swedish equivalent, but the label uses the accepted name). The sky's `limiting_magnitude` is added to the `SunInfo` API response so the frontend can apply the same threshold the backend already uses for planets.
+
+**Definition of Done**
+- [ ] `SunInfo` in the `GET /api/v1/planets/visible` JSON response contains a `limiting_magnitude` float field; its value is approximately 6.5 when `sun.elevation_deg` is −20° and approximately −1 when `sun.elevation_deg` is −6°, matching the Phase 12 Schaefer model
+- [ ] `frontend/data/bright-stars.json` exists and contains at least 40 stars with visual magnitude ≤ 2.5, each with fields `ra_deg`, `dec_deg`, `magnitude`, and `name` (internationally recognised name string)
+- [ ] In the 2D sky map, the star Sirius (RA 101.3°, Dec −16.7°, mag −1.46) renders as an SVG dot in the `.sky-map-stars` group at the correct computed altitude/azimuth position when it is above the horizon and the sun is below −18°; no dot appears when the sun is above 0°
+- [ ] In the 3D sky map, the same visibility filter applies and the same stars visible in the 2D view are visible in the 3D view at matching positions
+- [ ] Stars with altitude ≤ 0° are not rendered in either view
+- [ ] Star dots are visually smaller than planet dots; the brightest star (Sirius, mag −1.46) has a smaller dot radius than Venus (mag −4) in the 2D view and a smaller sprite scale in the 3D view
+- [ ] Both `SkyMap.plotStars()` and `SkyMap3D.plotStars()` accept the identical parameter signature `(stars, limitingMagnitude, lat, lon, utcTimestamp)`, consistent with the `plotBodies`/`plotConstellations` pairing convention
+- [ ] No JavaScript console errors when `plotStars()` is called with an empty array (e.g. during daytime when no stars clear the limiting-magnitude threshold)
+- [ ] The star layer renders behind all planetary bodies in both views; planets, Sun, and Moon are never occluded by a star dot
+
+**Key files**
+- Modify `backend/app/models/planet.py` — add `limiting_magnitude: float` field to `SunInfo`
+- Modify `backend/app/api/routes/planets.py` — pass `sun_data["limiting_magnitude"]` from `calculate_sun_penalty()` into `_build_sun_info()` constructor
+- Create `frontend/data/bright-stars.json` — static catalog of ≥ 40 stars with magnitude ≤ 2.5, fields: `ra_deg`, `dec_deg`, `magnitude`, `name`
+- Modify `frontend/js/components/sky-map.js` — add `plotStars(stars, limitingMagnitude, lat, lon, utcTimestamp)` method; use `raDecToAltAz()` to compute positions; render visible stars as `<circle>` elements in a new `<g class="sky-map-stars">` group inserted after the constellation group and before the bodies group; dot radius = `3 - magnitude * 0.7` (clamped to 1–4 px equivalent)
+- Modify `frontend/js/components/sky-map-3d.js` — add `plotStars(stars, limitingMagnitude, lat, lon, utcTimestamp)` method; use `raDecToAltAz()` and `altAzToCartesian()` to position white sprites on the sphere surface; call before `_bodiesGroup` is added so stars render behind planets
+- Modify `frontend/js/main.js` — fetch `bright-stars.json` once on startup; call `skyMap.plotStars()` and `skyMap3d.plotStars()` after each data refresh, passing `data.sun.limiting_magnitude`, `location.lat`, `location.lon`, and the API timestamp
+
+---
