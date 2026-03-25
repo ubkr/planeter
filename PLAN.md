@@ -1001,3 +1001,55 @@ The sky map — both the 2D SVG view and the 3D dome — displays the brightest 
 - Modify `frontend/js/main.js` — fetch `bright-stars.json` once on startup; call `skyMap.plotStars()` and `skyMap3d.plotStars()` after each data refresh, passing `data.sun.limiting_magnitude`, `location.lat`, `location.lon`, and the API timestamp
 
 ---
+
+#### Phase E10: Tooltips for Visible Stars in the Sky Map
+
+**Depends on:** Phase E9
+**Parallelisable with:** None
+
+**Intended Outcome**
+
+The bright stars already plotted in both the 2D SVG sky map and the 3D dome become interactive in the same way as the planets. When the user hovers a visible star on desktop, or taps it in the 3D view, a tooltip appears via the existing `tooltip.js` mechanism. The tooltip identifies the star by name and shows concrete observation data in Swedish formatting, so the star layer is no longer purely decorative and becomes useful for sky orientation.
+
+**Definition of Done**
+- [ ] Visible stars in the 2D view render as interactive tooltip targets inside `.sky-map-stars` instead of purely decorative `<circle>` elements; hover or keyboard focus shows a tooltip with the star's name, altitude (`Höjd: X°`), direction (`Riktning: ...`), and magnitude
+- [ ] Visible stars in the 3D view participate in the same raycaster flow as the planets, so hovering or tapping a star sprite shows the corresponding tooltip without requiring a separate information panel
+- [ ] Star tooltip content reuses the existing `TooltipManager` convention (`.info-icon` + `title` or `data-tooltip-title`) and introduces no new tooltip component
+- [ ] Stars filtered out by `limiting_magnitude` or lying below the horizon have no tooltip and leave no invisible interaction targets behind in the DOM or 3D scene
+- [ ] The star Sirius shows a tooltip with the name `Sirius` and its magnitude when visible in the sky map; the same star shows no tooltip in daylight when it is not rendered
+- [ ] No regression occurs in existing planet tooltips in 2D or 3D; planets, the Sun, and the Moon continue to show Swedish tooltip text as before
+- [ ] No JavaScript errors occur when `plotStars()` is called with an empty array or when the user moves the pointer over a map with no visible stars
+
+**Key files**
+- Modify `frontend/js/components/sky-map.js` — make star circles in `plotStars()` focusable and tooltip-compatible by adding name and observation data for each visible star
+- Modify `frontend/js/components/sky-map-3d.js` — extend `plotStars()` and the raycaster logic so star sprites can trigger the same tooltip flow as the planetary bodies
+- Modify `frontend/css/components/sky-map.css` — add subtle hover/focus styling for interactive stars in the 2D map without visually competing with planet markers
+- Modify `frontend/css/components/sky-map-3d.css` — add any cursor- or focus-related styling needed for interactive star tooltip targets in the 3D view
+
+---
+
+#### Phase E11: Match Maximum Constellation Intensity Between 2D and 3D
+
+**Depends on:** Phase E8
+**Parallelisable with:** None
+
+**Intended Outcome**
+
+The constellation intensity slider continues to control both sky-map renderers from one shared value, but the maximum setting now produces the same perceived line intensity in both the 2D SVG map and the 3D Three.js dome. The current mismatch, where the 3D view remains noticeably dimmer even at the slider's highest position, is removed so the user can trust that `Intensitet` means the same thing regardless of whether the active view is `2D Projektion` or `3D Vy`.
+
+**Definition of Done**
+- [ ] With the `Intensitet` slider at its maximum value (`1`), constellation lines in the 3D view are visually as strong as the corresponding lines in the 2D view for the same location and timestamp; the 3D view no longer appears dimmer at the top setting
+- [ ] `frontend/js/main.js` continues to use a single shared `constellationOpacity` value for both renderers; no second slider state or 3D-only storage key is introduced
+- [ ] `SkyMap.plotConstellations(..., opacity)` and `SkyMap3D.plotConstellations(..., opacity)` both accept the same slider-domain input, but the 3D renderer maps that input so the effective maximum intensity matches the 2D renderer's maximum appearance
+- [ ] Moving the `Intensitet` slider away from the maximum still updates both views immediately, and switching between `2D Projektion` and `3D Vy` preserves the same stored slider value from `planet_constellation_opacity`
+- [ ] Constellation labels in the 3D view remain legible when lines are at maximum intensity and do not become disproportionately faint relative to the 2D IAU labels
+- [ ] No regressions occur in constellation visibility toggling: unchecking `Stjärnbilder` still hides both lines and labels instantly in 2D and 3D without a data refetch
+- [ ] No JavaScript errors occur when the slider is dragged repeatedly between minimum and maximum while the user switches between 2D and 3D views
+
+**Key files**
+- Modify `frontend/js/main.js` — keep the intensity slider as the single shared control and pass the normalized value consistently to both sky-map renderers on load, slider input, and view switches
+- Modify `frontend/js/components/sky-map.js` — confirm and preserve the 2D constellation opacity behavior as the visual reference for the maximum slider setting
+- Modify `frontend/js/components/sky-map-3d.js` — adjust line-material and label-intensity handling in `plotConstellations()` so the maximum slider value matches the 2D view's perceived brightness
+- Modify `frontend/css/components/sky-map-3d.css` — add or tune any 3D constellation label styling needed so labels remain readable when the line intensity is raised to match 2D
+
+---
