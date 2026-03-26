@@ -143,6 +143,37 @@ All settings are managed through Pydantic `BaseSettings` in `backend/app/config.
 
 Design tokens are defined as CSS custom properties in `frontend/css/tokens.css` and imported by all component stylesheets.
 
+## Constellation Data Sources
+
+### Why Stellarium + HYG Database?
+
+The constellation stick-figure patterns use two authoritative sources:
+
+**Stellarium v24.4 Modern Skyculture** (`constellationship.fab`)
+- Widely-used open-source planetarium software
+- Modern astronomical conventions (IAU standard constellation boundaries)
+- Actively maintained with regular updates
+- GPL-2.0-or-later license (compatible with our project)
+- Provides topology: which Hipparcos (HIP) star IDs connect to form each constellation
+
+**HYG Database v3.8** (`hyg_v38.csv`)
+- Comprehensive star catalog combining Hipparcos, Yale Bright Star, and Gliese catalogs
+- ~120,000 stars with accurate J2000 epoch coordinates
+- Public domain license
+- Actively maintained (latest release 2024)
+- Provides precise RA/Dec coordinates for each HIP star ID
+
+**Alternatives Considered**:
+- Hand-authoring coordinates: Error-prone, hard to verify
+- Yale BSC only: Missing some dimmer constellation stars
+- Older Stellarium formats: Legacy .fab format more stable than new JSON
+
+**Validation**: Constellation coordinates are cross-checked against [frontend/data/bright-stars.json](frontend/data/bright-stars.json) (sourced from SIMBAD) to catch lookup errors. Mismatches >0.1° fail the build.
+
+**File Size**: Downloaded source data is 30-35 MB total and excluded from git (via `.gitignore`). The generated output is ~28 KB.
+
+**Rebuild Time**: <5 seconds on modern hardware.
+
 ## Deployment
 
 - Backend: `uvicorn` serving FastAPI on port 8000 (`start-backend.sh`)

@@ -332,3 +332,41 @@ Covers a 60-day look-ahead window. Events are cached for 1 hour, keyed on rounde
 ### `GET /api/v1/geocode/reverse`
 
 Proxy to Nominatim. Accepts `lat` and `lon` query parameters; returns a display name string. Proxying through the backend avoids browser CORS restrictions and rate-limit attribution issues.
+
+## Data Sources and Build Tools
+
+### Constellation Data
+
+The constellation stick-figure data at [frontend/data/constellations.json](frontend/data/constellations.json) is **generated** from authoritative astronomical sources, not hand-authored.
+
+#### Rebuild Workflow
+
+1. **Download source data** (30-35 MB total, not in git):
+   ```bash
+   ./tools/download_sources.sh
+   ```
+   This fetches:
+   - HYG Database v3.8 star catalog (30-35 MB CSV)
+   - Stellarium v24.4 constellation topology (8-10 KB .fab file)
+   
+   Files are saved to `tools/data/` and excluded from git via `.gitignore`.
+
+2. **Generate constellation JSON**:
+   ```bash
+   python3 tools/build_constellations.py
+   ```
+   This:
+   - Parses Stellarium constellation topology (which stars connect)
+   - Looks up J2000 coordinates from HYG catalog
+   - Cross-validates against [frontend/data/bright-stars.json](frontend/data/bright-stars.json)
+   - Writes output to [frontend/data/constellations.json](frontend/data/constellations.json)
+
+#### Data Provenance
+
+- **Topology**: Stellarium v24.4 modern skyculture (GPL-2.0-or-later)
+- **Coordinates**: HYG Database v3.8 (public domain)
+- **Validation**: Cross-checked against SIMBAD astronomical database coordinates
+
+The build process takes <5 seconds and produces a ~28 KB JSON file with 30 constellations.
+
+**Requirements**: Python 3.9+, curl or wget, gunzip

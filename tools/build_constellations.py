@@ -1,76 +1,66 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later
 """
 tools/build_constellations.py
 ==============================
-Documents how frontend/data/constellations.json was generated.
+Automated build script that generates frontend/data/constellations.json from
+authoritative astronomical data sources.
 
-This script is a REPRODUCIBILITY RECORD, not a live build step.
-The JSON file was authored manually using authoritative star catalog data;
-this script explains the provenance, coordinate system, and the mapping
-from source data to the JSON format.
+PURPOSE
+-------
+This script rebuilds constellation stick-figure data from upstream sources
+to ensure accuracy and traceability. It combines constellation topology from
+Stellarium with precise stellar coordinates from the HYG database, validates
+all coordinates against bright-stars.json, and generates a clean JSON output
+suitable for sky map rendering.
 
-LICENCE NOTICE
---------------
-The constellation stick-figure topology (which pairs of stars are connected)
-is derived from Stellarium's modern sky culture:
+Use this script when:
+- Updating to newer versions of source data
+- Adding new constellations to the rendered set
+- Verifying constellation data accuracy
 
-    https://github.com/Stellarium/stellarium/blob/master/skycultures/modern/constellationship.fab
+WORKFLOW
+--------
+1. Download source data:
+   $ cd tools && ./download_sources.sh
 
-Stellarium is released under GPL-2.0-or-later.  The JSON file
-frontend/data/constellations.json is a transformed subset of that data and
-must remain under the same licence.  See THIRD_PARTY_LICENSES.md for the full
-licence notice.
+2. Build constellation data:
+   $ python3 tools/build_constellations.py
+
+3. Validation: Script automatically cross-checks coordinates against
+   frontend/data/bright-stars.json and fails if discrepancies exceed 0.1°
 
 DATA SOURCES
 ------------
-1. Stellarium constellationship.fab
-   - Defines which Hipparcos catalogue (HIP) star IDs form the endpoints of
-     each stick-figure line segment.
-   - File URL: https://github.com/Stellarium/stellarium/blob/master/skycultures/modern/constellationship.fab
-   - Format: <IAU_abbr> <segment_count> <HIP_id_A> <HIP_id_B> [<HIP_id_C> <HIP_id_D> ...]
+This script uses two authoritative data sources:
 
-2. Hipparcos / HYG star catalogue (J2000 RA/Dec)
-   - The HYG database (David Nash) combines the Hipparcos, Yale Bright Star,
-     and Gliese catalogues into a single CSV.
-   - URL: https://github.com/astronexus/HYG-Database
-   - Relevant columns: hip (Hipparcos ID), ra (hours), dec (degrees), proper name
-   - RA in the HYG CSV is given in decimal hours; multiply by 15 to get degrees.
+1. **Stellarium v24.4 Modern Skyculture** — constellationship.fab
+   - Downloaded from: https://github.com/Stellarium/stellarium
+   - Defines constellation stick-figure topology (which HIP stars connect)
+   - Format: <IAU_abbr> <segment_count> <HIP_id_A> <HIP_id_B> ...
+   - License: GPL-2.0-or-later (see THIRD_PARTY_LICENSES.md)
 
-HOW THE JSON WAS BUILT
------------------------
-Step 1 — Identify target constellations
-    The 30 most prominent constellations visible from Sweden (latitude 55–70° N)
-    were selected: UMa, UMi, Cas, Cep, Dra, Ori, Tau, Gem, Leo, Vir, Boo, CrB,
-    Her, Lyr, Cyg, Aql, Sco, Sgr, Cap, Aqr, Psc, Ari, CMa, CMi, Aur, Per, And,
-    Peg, Oph, Ser.
+2. **HYG Database v3.8** — hyg_v38.csv
+   - Downloaded from: https://github.com/astronexus/HYG-Database
+   - Provides J2000 equatorial coordinates (RA/Dec) for Hipparcos stars
+   - Note: RA in CSV is decimal hours; converted to degrees (* 15)
 
-Step 2 — Extract HIP IDs from constellationship.fab
-    For each target IAU abbreviation, the Stellarium .fab file lists pairs of
-    Hipparcos star IDs that form stick-figure line endpoints.  Example:
-        ORI  17  27989 26727  27989 25930  27989 28716  ...
+VALIDATION
+----------
+All coordinates are validated against frontend/data/bright-stars.json:
+- Compares HYG coordinates with reference coordinates for named stars
+- Tolerance: 0.1 degrees in both RA and Dec
+- Build fails if validation fails (ensures data consistency)
 
-Step 3 — Look up J2000 coordinates for each HIP ID
-    Each Hipparcos ID was mapped to its J2000 RA and Dec using the HYG database
-    CSV (column "hip" as the key, columns "ra" and "dec" as values).
-    RA was converted from decimal hours to decimal degrees: ra_deg = ra_hours * 15.
+OUTPUT
+------
+Generated file: frontend/data/constellations.json
 
-    For named bright stars the coordinates were cross-checked against the
-    Yale Bright Star Catalogue and SIMBAD (https://simbad.u-strasbg.fr/).
-
-Step 4 — Assemble line segments
-    Each pair of HIP IDs from constellationship.fab was replaced by its
-    (ra_deg, dec_deg) pair to form a line segment:
-        [ra1_deg, dec1_deg, ra2_deg, dec2_deg]
-
-Step 5 — Write JSON
-    The resulting array of objects was written to frontend/data/constellations.json.
-    The file is 30 constellation entries, 311 line segments total, ~15 KB.
-
-JSON FORMAT
------------
+Format:
 [
   {
-    "iau": "ORI",          // IAU three-letter abbreviation (matches constellationship.fab)
-    "name": "Orion",       // English full name
+    "iau": "UMa",
+    "name": "Ursa Major",
     "lines": [
       [ra1_deg, dec1_deg, ra2_deg, dec2_deg],
       ...
@@ -79,121 +69,30 @@ JSON FORMAT
   ...
 ]
 
-All coordinates are J2000 epoch, decimal degrees.
-RA range: [0, 360)
-Dec range: [-90, 90]
+Each line segment is a straight connection between two stars in J2000 coordinates.
 
-NOTABLE STAR COORDINATES USED (cross-reference table)
-------------------------------------------------------
-The following named stars were used as reference anchors.  All coordinates
-are J2000 from the Hipparcos catalogue (epoch 1991.25 → J2000 via proper
-motion correction; values here are the standard J2000 catalogue values).
+EXPECTED OUTPUT FOR VERIFICATION
+---------------------------------
+Sample coordinates for key constellation stars:
 
-Star name       IAU abbr   HIP      RA (deg)    Dec (deg)
------------     --------   ------   ---------   ---------
-Polaris         UMi        11767     37.954      89.264
-Dubhe           UMa        54061    165.460      61.751
-Merak           UMa        53910    165.460      56.383  (approx)
-Alioth          UMa        62956    193.507      55.960
-Mizar           UMa        65378    200.981      54.925
-Alkaid          UMa        67301    206.886      49.313
-Schedar         Cas         3179      9.243      59.015
-Caph            Cas          746      2.294      59.150
-Gamma Cas       Cas         4427     14.177      60.717
-Ruchbah         Cas         6686     21.454      60.235
-Segin           Cas         8886     28.599      63.670
-Alderamin       Cep        105199   319.644      62.585
-Beta Cep        Cep        106032   332.165      58.202
-Gamma Cep       Cep        116727   354.837      77.632
-Thuban          Dra        68756    211.097      64.376  (approx)
-Eltanin         Dra        87833    269.152      51.489
-Rastaban        Dra        85670    262.608      52.301  (approx)
-Rigel           Ori        24436     78.634      -8.201
-Betelgeuse      Ori        27989     88.793       7.407
-Bellatrix       Ori        25336     81.569       6.999
-Alnilam         Ori        26311     83.858       6.350  (center belt)
-Mintaka         Ori        25930     83.001      -1.943
-Alnitak         Ori        26727     84.411      -0.299
-Saiph           Ori        27366     85.244      -2.600
-Aldebaran       Tau        21421     68.980      16.510
-Elnath          Tau        25428     81.569       6.999  (shared with Ori)
-Alcyone (Plei)  Tau        17702     56.872      24.113
-Castor          Gem        36850    113.650      31.889
-Pollux          Gem        37826    116.329      28.026
-Regulus         Leo        49669    152.093      11.967
-Denebola        Leo        57632    177.265      14.572
-Spica           Vir        65474    201.298     -11.161
-Arcturus        Boo        69673    213.915      19.182
-Alphecca        CrB        76267    233.672      26.715
-Rasalgethi      Her        84345    255.076      14.390
-Vega            Lyr        91262    279.235      38.784
-Deneb           Cyg       102098    310.358      45.280
-Altair          Aql        97649    297.695      10.613
-Antares         Sco        80763    247.352     -26.432
-Kaus Australis  Sgr        90185    276.043     -34.385  (approx)
-Nunki           Sgr        92855    283.817      -3.694  (approx sigma Sgr)
-Fomalhaut       PsA       113368    344.413     -29.622  (not in target 30)
-Sirius          CMa        32349    101.287     -16.716
-Procyon         CMi        37279    114.825       5.225
-Capella         Aur        24608     79.172      45.998
-Mirfak          Per        15863     50.350      40.010
-Algol           Per        14576     47.042      40.956
-Alpheratz       And         677       2.097      29.090
-Mirach          And         5447     17.433      35.621
-Almach          And         9640     30.975      53.504
-Markab          Peg       113963    346.190      28.083
-Scheat          Peg       113881    345.233       9.158  (approx)
-Algenib         Peg         1067      4.690       5.513  (approx; shared Psc/Peg)
-Rasalhague      Oph        86032    263.734      12.561
-Sabik           Oph        84012    258.762      14.390  (approx eta Oph)
-Unukalhai       Ser        77070    236.067       6.426  (alpha Ser)
+Polaris (UMi, HIP 11767):   RA = 37.955°,  Dec = 89.264°
+Dubhe   (UMa, HIP 54061):   RA = 165.932°, Dec = 61.751°
+Rigel   (Ori, HIP 24436):   RA = 78.634°,  Dec = -8.202°
+Vega    (Lyr, HIP 91262):   RA = 279.235°, Dec = 38.784°
+Altair  (Aql, HIP 97649):   RA = 297.696°, Dec = 8.868°
 
-VALIDATION
-----------
-After generation, the file was validated with:
-
-    python3 -c "
-    import json
-    with open('frontend/data/constellations.json') as f:
-        data = json.load(f)
-    assert len(data) >= 30
-    for c in data:
-        assert 'iau' in c and 'name' in c and 'lines' in c
-        for seg in c['lines']:
-            assert len(seg) == 4
-            ra1, dec1, ra2, dec2 = seg
-            assert 0 <= ra1 < 360 and 0 <= ra2 < 360
-            assert -90 <= dec1 <= 90 and -90 <= dec2 <= 90
-    print('OK')
-    "
-
-TO REGENERATE
--------------
-If the data needs to be regenerated from the primary sources:
-
-1. Download the HYG database CSV:
-       curl -L https://github.com/astronexus/HYG-Database/raw/master/hyg/v3/hyg_v38.csv \
-            -o /tmp/hyg_v38.csv
-
-2. Download the Stellarium constellationship.fab:
-       curl -L https://raw.githubusercontent.com/Stellarium/stellarium/master/skycultures/modern/constellationship.fab \
-            -o /tmp/constellationship.fab
-
-3. Run a build script (pseudocode):
-       - Parse constellationship.fab: for each IAU abbr, extract list of HIP ID pairs
-       - For each HIP ID, look up ra, dec from hyg_v38.csv (ra * 15 = ra_deg)
-       - For each pair (hip_a, hip_b), emit [ra_a, dec_a, ra_b, dec_b]
-       - Filter to target 30 IAU abbreviations
-       - Write JSON
-
-The manual approach used here is sufficient because the star positions are
-fixed J2000 epoch values that do not change between HYG database versions.
+These values should match the generated output within rounding precision.
 """
 
-# This script has no runtime behaviour.
-# It documents provenance only.
-# Import-safe: running it produces no side effects.
+import csv
+import json
+import sys
+from pathlib import Path
+from typing import Dict, List, Tuple
 
+# --- Configuration ---
+
+# Target 30 constellations visible from Sweden
 REQUIRED_IAU = [
     "UMa", "UMi", "Cas", "Cep", "Dra",
     "Ori", "Tau", "Gem", "Leo", "Vir",
@@ -203,60 +102,446 @@ REQUIRED_IAU = [
     "Per", "And", "Peg", "Oph", "Ser",
 ]
 
-DATA_FILE = "frontend/data/constellations.json"
-LICENSE = "GPL-2.0-or-later"
-SOURCE_URL = "https://github.com/Stellarium/stellarium/blob/master/skycultures/modern/constellationship.fab"
+# IAU code to English name mapping
+IAU_TO_NAME = {
+    "UMa": "Ursa Major",
+    "UMi": "Ursa Minor",
+    "Cas": "Cassiopeia",
+    "Cep": "Cepheus",
+    "Dra": "Draco",
+    "Ori": "Orion",
+    "Tau": "Taurus",
+    "Gem": "Gemini",
+    "Leo": "Leo",
+    "Vir": "Virgo",
+    "Boo": "Bootes",
+    "CrB": "Corona Borealis",
+    "Her": "Hercules",
+    "Lyr": "Lyra",
+    "Cyg": "Cygnus",
+    "Aql": "Aquila",
+    "Sco": "Scorpius",
+    "Sgr": "Sagittarius",
+    "Cap": "Capricornus",
+    "Aqr": "Aquarius",
+    "Psc": "Pisces",
+    "Ari": "Aries",
+    "CMa": "Canis Major",
+    "CMi": "Canis Minor",
+    "Aur": "Auriga",
+    "Per": "Perseus",
+    "And": "Andromeda",
+    "Peg": "Pegasus",
+    "Oph": "Ophiuchus",
+    "Ser": "Serpens",
+}
+
+# HIP ID to star name mapping (for bright stars in constellations)
+HIP_TO_NAME = {
+    # Ursa Major
+    54061: "Dubhe",
+    53910: "Merak",
+    62956: "Alioth",
+    65378: "Mizar",
+    67301: "Alkaid",
+    # Ursa Minor
+    11767: "Polaris",
+    # Cassiopeia
+    3179: "Schedar",
+    746: "Caph",
+    4427: "Gamma Cas",
+    6686: "Ruchbah",
+    8886: "Segin",
+    # Cepheus
+    105199: "Alderamin",
+    106032: "Beta Cep",
+    116727: "Gamma Cep",
+    # Draco
+    68756: "Thuban",
+    87833: "Eltanin",
+    85670: "Rastaban",
+    # Orion
+    24436: "Rigel",
+    27989: "Betelgeuse",
+    25336: "Bellatrix",
+    26311: "Alnilam",
+    25930: "Mintaka",
+    26727: "Alnitak",
+    27366: "Saiph",
+    22449: "Meissa",
+    # Taurus
+    21421: "Aldebaran",
+    25428: "Elnath",
+    # Gemini
+    36850: "Castor",
+    37826: "Pollux",
+    # Leo
+    49669: "Regulus",
+    57632: "Denebola",
+    # Virgo
+    65474: "Spica",
+    # Bootes
+    69673: "Arcturus",
+    # Corona Borealis
+    76267: "Alphecca",
+    # Hercules
+    84345: "Rasalgethi",
+    # Lyra
+    91262: "Vega",
+    # Cygnus
+    102098: "Deneb",
+    # Aquila
+    97649: "Altair",
+    # Scorpius
+    80763: "Antares",
+    # Sagittarius
+    90185: "Kaus Australis",
+    92855: "Nunki",
+    # Canis Major
+    32349: "Sirius",
+    # Canis Minor
+    37279: "Procyon",
+    # Auriga
+    24608: "Capella",
+    # Perseus
+    15863: "Mirfak",
+    14576: "Algol",
+    # Andromeda
+    677: "Alpheratz",
+    5447: "Mirach",
+    9640: "Almach",
+    # Pegasus
+    113963: "Markab",
+    # Ophiuchus
+    86032: "Rasalhague",
+    # Serpens
+    77070: "Unukalhai",
+}
 
 
-def validate(json_path: str) -> bool:
-    """Validate the generated JSON file against the documented format contract."""
-    import json
-    import os
+# --- Step 2: Parse Stellarium Data ---
 
-    if not os.path.exists(json_path):
-        print(f"File not found: {json_path}")
-        return False
-
-    file_size = os.path.getsize(json_path)
-    if file_size > 150 * 1024:
-        print(f"File too large: {file_size} bytes (limit 150 KB)")
-        return False
-
-    with open(json_path) as f:
-        data = json.load(f)
-
-    found = {c["iau"] for c in data}
-    missing = set(REQUIRED_IAU) - found
-    if missing:
-        print(f"Missing IAU codes: {missing}")
-        return False
-
-    errors = []
-    for c in data:
-        for i, seg in enumerate(c["lines"]):
-            if len(seg) != 4:
-                errors.append(f"{c['iau']} line {i}: need 4 values")
+def parse_constellationship(fab_path: Path) -> Dict[str, List[Tuple[int, int]]]:
+    """
+    Parse constellationship.fab and extract line segments.
+    
+    Args:
+        fab_path: Path to constellationship.fab file
+        
+    Returns:
+        Dict mapping IAU code to list of (HIP_A, HIP_B) tuples
+    """
+    constellations = {}
+    
+    with open(fab_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith('#'):
                 continue
-            ra1, dec1, ra2, dec2 = seg
-            if not (0 <= ra1 < 360 and 0 <= ra2 < 360):
-                errors.append(f"{c['iau']} line {i}: RA out of range")
-            if not (-90 <= dec1 <= 90 and -90 <= dec2 <= 90):
-                errors.append(f"{c['iau']} line {i}: Dec out of range")
+                
+            parts = line.split()
+            if len(parts) < 3:
+                print(f"WARNING: Malformed line: {line}", file=sys.stderr)
+                continue
+                
+            iau_code = parts[0]
+            
+            # Only process target constellations
+            if iau_code not in REQUIRED_IAU:
+                continue
+                
+            try:
+                segment_count = int(parts[1])
+                hip_ids = [int(x) for x in parts[2:]]
+            except ValueError as e:
+                print(f"WARNING: Invalid data in line for {iau_code}: {e}", file=sys.stderr)
+                continue
+            
+            # Extract pairs of consecutive HIP IDs as line segments
+            segments = []
+            for i in range(0, len(hip_ids), 2):
+                if i + 1 < len(hip_ids):
+                    segments.append((hip_ids[i], hip_ids[i + 1]))
+            
+            if len(segments) != segment_count:
+                print(f"WARNING: {iau_code} declares {segment_count} segments but has {len(segments)}", 
+                      file=sys.stderr)
+            
+            constellations[iau_code] = segments
+            
+    return constellations
 
+
+# --- Step 2: Load HYG Catalog ---
+
+def load_hyg_catalog(csv_path: Path) -> Dict[int, Tuple[float, float]]:
+    """
+    Load HYG catalog and build HIP ID to (RA, Dec) mapping.
+    
+    Args:
+        csv_path: Path to hyg_v38.csv file
+        
+    Returns:
+        Dict mapping HIP ID to (ra_deg, dec_deg)
+    """
+    catalog = {}
+    
+    with open(csv_path, 'r', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        
+        for row in reader:
+            hip_str = row.get('hip', '').strip()
+            if not hip_str:
+                continue
+                
+            try:
+                hip_id = int(hip_str)
+                ra_hours = float(row['ra'])
+                dec_deg = float(row['dec'])
+                
+                # Convert RA from decimal hours to degrees
+                ra_deg = ra_hours * 15.0
+                
+                # Validate ranges
+                if not (0 <= ra_deg < 360):
+                    print(f"WARNING: HIP {hip_id} has RA out of range: {ra_deg}", file=sys.stderr)
+                    continue
+                if not (-90 <= dec_deg <= 90):
+                    print(f"WARNING: HIP {hip_id} has Dec out of range: {dec_deg}", file=sys.stderr)
+                    continue
+                    
+                catalog[hip_id] = (ra_deg, dec_deg)
+                
+            except (ValueError, KeyError) as e:
+                print(f"WARNING: Error parsing row for HIP {hip_str}: {e}", file=sys.stderr)
+                continue
+    
+    return catalog
+
+
+# --- Step 3: Cross-Validation ---
+
+def load_bright_stars(json_path: Path) -> Dict[str, Tuple[float, float]]:
+    """
+    Load bright stars JSON and create name to (RA, Dec) mapping.
+    
+    Args:
+        json_path: Path to bright-stars.json
+        
+    Returns:
+        Dict mapping star name to (ra_deg, dec_deg)
+    """
+    with open(json_path, 'r', encoding='utf-8') as f:
+        stars = json.load(f)
+    
+    return {star['name']: (star['ra_deg'], star['dec_deg']) for star in stars}
+
+
+def validate_coordinates(hyg_catalog: Dict[int, Tuple[float, float]], 
+                        bright_stars: Dict[str, Tuple[float, float]]) -> bool:
+    """
+    Validate that HYG catalog coordinates match bright-stars.json within tolerance.
+    
+    Args:
+        hyg_catalog: HIP ID to (RA, Dec) mapping from HYG
+        bright_stars: Star name to (RA, Dec) mapping from bright-stars.json
+        
+    Returns:
+        True if all validation passed, False otherwise
+    """
+    tolerance = 0.1  # degrees
+    errors = []
+    
+    for hip_id, star_name in HIP_TO_NAME.items():
+        if hip_id not in hyg_catalog:
+            print(f"WARNING: HIP {hip_id} ({star_name}) not found in HYG catalog", file=sys.stderr)
+            continue
+            
+        if star_name not in bright_stars:
+            # Not all constellation stars are in the bright-stars.json
+            continue
+        
+        hyg_ra, hyg_dec = hyg_catalog[hip_id]
+        ref_ra, ref_dec = bright_stars[star_name]
+        
+        # Calculate differences
+        ra_diff = abs(hyg_ra - ref_ra)
+        # Handle RA wraparound at 0/360
+        if ra_diff > 180:
+            ra_diff = 360 - ra_diff
+            
+        dec_diff = abs(hyg_dec - ref_dec)
+        
+        if ra_diff > tolerance or dec_diff > tolerance:
+            errors.append(
+                f"HIP {hip_id} ({star_name}): "
+                f"HYG=({hyg_ra:.3f}, {hyg_dec:.3f}) "
+                f"vs bright-stars=({ref_ra:.3f}, {ref_dec:.3f}) "
+                f"diff=({ra_diff:.3f}, {dec_diff:.3f})"
+            )
+    
     if errors:
-        for e in errors:
-            print("ERROR:", e)
+        print("\nERROR: Coordinate validation failed:", file=sys.stderr)
+        for error in errors:
+            print(f"  {error}", file=sys.stderr)
         return False
-
-    print(f"OK — {len(data)} constellations, "
-          f"{sum(len(c['lines']) for c in data)} segments, "
-          f"{file_size / 1024:.1f} KB")
+    
     return True
 
 
+# --- Step 5: JSON Generation ---
+
+def build_constellations_json(constellations: Dict[str, List[Tuple[int, int]]],
+                             hyg_catalog: Dict[int, Tuple[float, float]],
+                             output_path: Path) -> bool:
+    """
+    Build constellations.json from parsed data.
+    
+    Args:
+        constellations: IAU code to list of HIP ID pairs
+        hyg_catalog: HIP ID to (RA, Dec) mapping
+        output_path: Path to write JSON file
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    result = []
+    skipped_segments = 0
+    
+    for iau_code in REQUIRED_IAU:
+        if iau_code not in constellations:
+            print(f"WARNING: Constellation {iau_code} not found in .fab file", file=sys.stderr)
+            # Include with empty lines array
+            result.append({
+                "iau": iau_code,
+                "name": IAU_TO_NAME[iau_code],
+                "lines": []
+            })
+            continue
+        
+        lines = []
+        segments = constellations[iau_code]
+        
+        for hip_a, hip_b in segments:
+            if hip_a not in hyg_catalog:
+                print(f"WARNING: {iau_code}: HIP {hip_a} not in catalog, skipping segment", 
+                      file=sys.stderr)
+                skipped_segments += 1
+                continue
+            if hip_b not in hyg_catalog:
+                print(f"WARNING: {iau_code}: HIP {hip_b} not in catalog, skipping segment", 
+                      file=sys.stderr)
+                skipped_segments += 1
+                continue
+            
+            ra1, dec1 = hyg_catalog[hip_a]
+            ra2, dec2 = hyg_catalog[hip_b]
+            
+            # Round to 3 decimal places
+            lines.append([
+                round(ra1, 3),
+                round(dec1, 3),
+                round(ra2, 3),
+                round(dec2, 3)
+            ])
+        
+        if not lines:
+            print(f"WARNING: {iau_code} has zero line segments after filtering", file=sys.stderr)
+        
+        result.append({
+            "iau": iau_code,
+            "name": IAU_TO_NAME[iau_code],
+            "lines": lines
+        })
+    
+    # Validate output schema
+    if len(result) != len(REQUIRED_IAU):
+        print(f"ERROR: Expected {len(REQUIRED_IAU)} constellations, got {len(result)}", 
+              file=sys.stderr)
+        return False
+    
+    found_iau = {c["iau"] for c in result}
+    missing_iau = set(REQUIRED_IAU) - found_iau
+    if missing_iau:
+        print(f"ERROR: Missing IAU codes in output: {missing_iau}", file=sys.stderr)
+        return False
+    
+    # Validate coordinate ranges
+    for constellation in result:
+        for line in constellation["lines"]:
+            if len(line) != 4:
+                print(f"ERROR: {constellation['iau']} has line with {len(line)} values", 
+                      file=sys.stderr)
+                return False
+            ra1, dec1, ra2, dec2 = line
+            if not (0 <= ra1 < 360 and 0 <= ra2 < 360):
+                print(f"ERROR: {constellation['iau']} has RA out of range", file=sys.stderr)
+                return False
+            if not (-90 <= dec1 <= 90 and -90 <= dec2 <= 90):
+                print(f"ERROR: {constellation['iau']} has Dec out of range", file=sys.stderr)
+                return False
+    
+    # Write JSON
+    with open(output_path, 'w', encoding='utf-8') as f:
+        json.dump(result, f, indent=2)
+    
+    total_segments = sum(len(c["lines"]) for c in result)
+    print(f"\nSUCCESS: Generated {len(result)} constellations, {total_segments} line segments")
+    if skipped_segments > 0:
+        print(f"  (skipped {skipped_segments} segments due to missing HIP IDs)")
+    
+    return True
+
+
+# --- Main ---
+
+def main() -> int:
+    """Main entry point."""
+    # Determine paths
+    script_dir = Path(__file__).parent
+    repo_root = script_dir.parent
+    
+    fab_path = script_dir / "data" / "constellationship.fab"
+    hyg_path = script_dir / "data" / "hyg_v38.csv"
+    bright_stars_path = repo_root / "frontend" / "data" / "bright-stars.json"
+    output_path = repo_root / "frontend" / "data" / "constellations.json"
+    
+    # Check input files exist
+    if not fab_path.exists():
+        print(f"ERROR: {fab_path} not found", file=sys.stderr)
+        return 1
+    if not hyg_path.exists():
+        print(f"ERROR: {hyg_path} not found", file=sys.stderr)
+        return 1
+    if not bright_stars_path.exists():
+        print(f"ERROR: {bright_stars_path} not found", file=sys.stderr)
+        return 1
+    
+    # Step 2: Parse constellation data and load catalog
+    print("Parsing constellation data...")
+    constellations = parse_constellationship(fab_path)
+    print(f"  Loaded {len(constellations)} target constellations")
+    
+    print("\nLoading HYG catalog...")
+    hyg_catalog = load_hyg_catalog(hyg_path)
+    print(f"  Loaded {len(hyg_catalog)} stars from HYG database")
+    
+    # Step 3: Cross-validation
+    print("\nValidating coordinates against bright-stars.json...")
+    bright_stars = load_bright_stars(bright_stars_path)
+    if not validate_coordinates(hyg_catalog, bright_stars):
+        print("\nERROR: Validation failed", file=sys.stderr)
+        return 1
+    print("  Validation passed")
+    
+    # Step 5: Generate JSON
+    print("\nGenerating constellations.json...")
+    if not build_constellations_json(constellations, hyg_catalog, output_path):
+        return 1
+    
+    print(f"\nOutput written to: {output_path}")
+    return 0
+
+
 if __name__ == "__main__":
-    import os
-    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    json_path = os.path.join(repo_root, DATA_FILE)
-    ok = validate(json_path)
-    raise SystemExit(0 if ok else 1)
+    sys.exit(main())

@@ -216,7 +216,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     skyMap3d.plotConstellations(constellationData, currentLocation.lat, currentLocation.lon, new Date(lastApiData.timestamp), constellationOpacity);
                 }
                 if (starCatalog !== null && lastApiData !== null) {
-                    skyMap3d.plotStars(starCatalog, lastApiData.sun.limiting_magnitude, currentLocation.lat, currentLocation.lon, new Date(lastApiData.timestamp));
+                    // Fallback to daylight threshold (-5.0) prevents spurious stars if API field missing
+                    const limitingMag = lastApiData.sun?.limiting_magnitude ?? -5.0;
+                    skyMap3d.plotStars(starCatalog, limitingMag, currentLocation.lat, currentLocation.lon, new Date(lastApiData.timestamp));
                 }
                 localStorage.setItem(VIEW_MODE_KEY, '3d');
             } catch (err) {
@@ -379,10 +381,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
+            // Fallback to daylight threshold (-5.0) prevents spurious stars if API field missing
+            const limitingMag = data.sun?.limiting_magnitude ?? -5.0;
+            if (!data.sun?.limiting_magnitude && !window._limitingMagWarned) {
+                console.warn('API response missing sun.limiting_magnitude, using fallback:', limitingMag);
+                window._limitingMagWarned = true;
+            }
+
             if (starCatalog !== null) {
-                skyMap.plotStars(starCatalog, data.sun.limiting_magnitude, location.lat, location.lon, new Date(data.timestamp));
+                skyMap.plotStars(starCatalog, limitingMag, location.lat, location.lon, new Date(data.timestamp));
                 if (skyMap3d !== null) {
-                    skyMap3d.plotStars(starCatalog, data.sun.limiting_magnitude, location.lat, location.lon, new Date(data.timestamp));
+                    skyMap3d.plotStars(starCatalog, limitingMag, location.lat, location.lon, new Date(data.timestamp));
                 }
             }
 
@@ -510,9 +519,11 @@ document.addEventListener('DOMContentLoaded', () => {
         .then((parsed) => {
             starCatalog = parsed;
             if (lastApiData !== null) {
-                skyMap.plotStars(starCatalog, lastApiData.sun.limiting_magnitude, currentLocation.lat, currentLocation.lon, new Date(lastApiData.timestamp));
+                // Fallback to daylight threshold (-5.0) prevents spurious stars if API field missing
+                const limitingMag = lastApiData.sun?.limiting_magnitude ?? -5.0;
+                skyMap.plotStars(starCatalog, limitingMag, currentLocation.lat, currentLocation.lon, new Date(lastApiData.timestamp));
                 if (skyMap3d !== null) {
-                    skyMap3d.plotStars(starCatalog, lastApiData.sun.limiting_magnitude, currentLocation.lat, currentLocation.lon, new Date(lastApiData.timestamp));
+                    skyMap3d.plotStars(starCatalog, limitingMag, currentLocation.lat, currentLocation.lon, new Date(lastApiData.timestamp));
                 }
             }
         })

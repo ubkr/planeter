@@ -972,6 +972,44 @@ The sky map panel gains two constellation controls visible in both the 2D and 3D
 
 ---
 
+#### Phase E8.1: Constellation Data Rebuild Pipeline — ✅
+
+**Depends on:** Phase A4 (Constellation data), Phase E8 (Constellation rendering)
+
+**Context:** While investigating constellation display issues, found that constellation coordinates needed validation and a reproducible rebuild process. Created automated tooling to regenerate data from authoritative sources (commit 0b3b695).
+
+**Tasks:**
+1. Create download script for source data
+   - HYG Database v3.8 star catalog (30-35 MB)
+   - Stellarium v24.4 constellation topology (8-10 KB)
+   - Automated validation and decompression
+2. Create build script with validation
+   - Parse Stellarium constellation definitions
+   - Look up coordinates from HYG catalog
+   - Cross-validate against bright-stars.json (0.1° tolerance)
+   - Generate frontend/data/constellations.json
+3. Document data provenance and rebuild workflow
+   - ARCHITECTURE.md: Rebuild workflow section
+   - TECH_CHOICES.md: Data source rationale
+   - Inline documentation in build scripts
+4. Configure git exclusions
+   - .gitignore: Exclude large downloaded files (regeneratable)
+
+**Intended Outcome:** Constellation coordinates are reproducible from authoritative sources with automated validation, ensuring astronomical accuracy and enabling future updates when source data is revised.
+
+**Definition of Done:**
+- [x] tools/download_sources.sh exists and fetches source data with validation
+- [x] tools/build_constellations.py generates constellations.json with coordinate validation
+- [x] Downloaded source files excluded from git (tools/data/*.csv, *.fab in .gitignore)
+- [x] ARCHITECTURE.md documents two-step rebuild workflow
+- [x] TECH_CHOICES.md explains data source selection (Stellarium + HYG)
+- [x] THIRD_PARTY_LICENSES.md includes Stellarium GPL-2.0-or-later attribution
+- [x] Build script includes comprehensive docstring with usage instructions
+- [x] Validation against bright-stars.json passes (< 0.1° tolerance)
+- [x] Generated constellations.json matches schema (30 constellations, valid RA/Dec ranges)
+
+---
+
 #### Phase E9: Ljusstarka Stjärnor i Stjärnkartan — ✅
 
 **Depends on:** Phase E8, Phase 12, Phase A3

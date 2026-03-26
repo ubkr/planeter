@@ -35,3 +35,9 @@ htmlcov/
 
 # Claude Code local settings (user-specific)
 .claude/settings.local.json
+
+# Constellation build tool source data (can be re-downloaded via tools/download_sources.sh)
+tools/data/*.csv
+tools/data/*.fab
+tools/data/*.gz
+tools/data/*.old
