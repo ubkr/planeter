@@ -139,25 +139,29 @@ function buildCardinalSprite(entry, options = {}) {
     } = options;
 
     // Render the label onto an off-screen canvas.
+    // Canvas is 192×128 (3:2) so two-character labels like "NO"/"SV"/"NV"
+    // have sufficient horizontal margin at bold 72px.
     const canvas = document.createElement('canvas');
-    canvas.width  = 128;
+    canvas.width  = 192;
     canvas.height = 128;
     const ctx = canvas.getContext('2d');
 
-    ctx.clearRect(0, 0, 128, 128);
+    ctx.clearRect(0, 0, 192, 128);
     ctx.fillStyle    = fillStyle;
     ctx.font         = fontSize;
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(entry.text, 64, 64);
+    ctx.fillText(entry.text, 96, 64);
 
     const texture = new THREE.CanvasTexture(canvas);
     const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false });
     const sprite = new THREE.Sprite(material);
 
-    // Scale the sprite to a readable size relative to the sphere radius.
-    const scale = SPHERE_RADIUS * scaleFactor;
-    sprite.scale.set(scale, scale, 1);
+    // Scale the sprite to match the 3:2 canvas aspect ratio so the text
+    // is not stretched.  scaleH drives the vertical size; scaleW is 1.5×.
+    const scaleH = SPHERE_RADIUS * scaleFactor;
+    const scaleW = scaleH * 1.5;
+    sprite.scale.set(scaleW, scaleH, 1);
 
     return sprite;
 }
