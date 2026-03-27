@@ -1,6 +1,6 @@
 import os
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from .config import settings
@@ -27,6 +27,15 @@ app.include_router(events.router)
 async def root():
     """Serve frontend index page."""
     return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
+
+
+@app.middleware("http")
+async def add_cache_control_headers(request: Request, call_next):
+    response = await call_next(request)
+    path = request.url.path
+    if path.endswith('.js') or path.endswith('.css'):
+        response.headers['Cache-Control'] = 'no-cache'
+    return response
 
 
 app.mount("/", StaticFiles(directory=FRONTEND_DIR), name="frontend")
