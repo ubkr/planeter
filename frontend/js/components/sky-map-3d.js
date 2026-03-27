@@ -5,7 +5,7 @@
  *   - A dark celestial sphere (inside-out, camera at origin)
  *   - A flat horizon ground plane
  *   - An alt-azimuth grid (altitude rings at 0°/30°/60°, azimuth lines every 45°)
- *   - Cardinal direction labels (N, O, S, V) rendered as canvas-texture sprites
+ *   - Cardinal direction labels (N, O, S, V) and intercardinal labels (NO, SO, SV, NV) rendered as canvas-texture sprites
  *   - OrbitControls for drag-to-look navigation (zoom and pan disabled)
  *   - Celestial body sprites (planets, Sun, Moon) with CSS2D tooltip labels
  *
@@ -61,6 +61,14 @@ const CARDINALS = [
     { text: 'V', azimuth: 270 },
 ];
 
+/** Intercardinal label definitions: text (Swedish), azimuth. */
+const INTERCARDINALS = [
+    { text: 'NO', azimuth: 45  },
+    { text: 'SO', azimuth: 135 },
+    { text: 'SV', azimuth: 225 },
+    { text: 'NV', azimuth: 315 },
+];
+
 /**
  * Colour for each celestial body used when rendering glow sprites.
  * Keys are lowercase body names.
@@ -71,8 +79,8 @@ const BODY_COLORS = {
     mars:    '#ef4444',
     jupiter: '#f59e0b',
     saturn:  '#d4a017',
-    sun:     '#fde68a',
-    moon:    '#e2e8f0',
+    sun:     '#f59e0b', // intentionally same amber as jupiter — both use #f59e0b by design
+    moon:    '#c084fc',
 };
 
 // ---------------------------------------------------------------------------
@@ -123,7 +131,13 @@ function buildAzimuthLine(azimuthDeg, material) {
  * @param {string} text - Label text (e.g. 'N').
  * @returns {THREE.Sprite}
  */
-function buildCardinalSprite(text) {
+function buildCardinalSprite(entry, options = {}) {
+    const {
+        fontSize    = 'bold 72px sans-serif',
+        fillStyle   = '#aabbcc',
+        scaleFactor = 0.07,
+    } = options;
+
     // Render the label onto an off-screen canvas.
     const canvas = document.createElement('canvas');
     canvas.width  = 128;
@@ -131,18 +145,18 @@ function buildCardinalSprite(text) {
     const ctx = canvas.getContext('2d');
 
     ctx.clearRect(0, 0, 128, 128);
-    ctx.fillStyle = '#aabbcc';
-    ctx.font = 'bold 72px sans-serif';
+    ctx.fillStyle    = fillStyle;
+    ctx.font         = fontSize;
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(text, 64, 64);
+    ctx.fillText(entry.text, 64, 64);
 
     const texture = new THREE.CanvasTexture(canvas);
     const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false });
     const sprite = new THREE.Sprite(material);
 
     // Scale the sprite to a readable size relative to the sphere radius.
-    const scale = SPHERE_RADIUS * 0.07;
+    const scale = SPHERE_RADIUS * scaleFactor;
     sprite.scale.set(scale, scale, 1);
 
     return sprite;
@@ -178,9 +192,20 @@ function buildCardinalLabels() {
     const labelAlt = 4;
     const labelRadius = SPHERE_RADIUS * 0.92;
 
-    for (const { text, azimuth } of CARDINALS) {
-        const { x, y, z } = altAzToCartesian(labelAlt, azimuth, labelRadius);
-        const sprite = buildCardinalSprite(text);
+    for (const entry of CARDINALS) {
+        const { x, y, z } = altAzToCartesian(labelAlt, entry.azimuth, labelRadius);
+        const sprite = buildCardinalSprite(entry);
+        sprite.position.set(x, y, z);
+        group.add(sprite);
+    }
+
+    for (const entry of INTERCARDINALS) {
+        const { x, y, z } = altAzToCartesian(labelAlt, entry.azimuth, labelRadius);
+        const sprite = buildCardinalSprite(entry, {
+            fontSize:    'bold 52px sans-serif',
+            fillStyle:   '#778899',
+            scaleFactor: 0.055,
+        });
         sprite.position.set(x, y, z);
         group.add(sprite);
     }

@@ -1091,3 +1091,24 @@ The constellation intensity slider continues to control both sky-map renderers f
 - Modify `frontend/css/components/sky-map-3d.css` — add or tune any 3D constellation label styling needed so labels remain readable when the line intensity is raised to match 2D
 
 ---
+
+#### Phase E12: 3D Stjärnkarta — Intermediärkompassriktningar och Färgkonsistens ✅
+
+**Depends on:** Phase E4, Phase E3
+**Parallelisable with:** None
+
+**Intended Outcome**
+The 3D sky dome gains the four intermediate compass direction labels already present in the 2D view — NO, SO, SV, NV — rendered as canvas-texture sprites at azimuths 45°, 135°, 225°, and 315°, placed at the horizon ring at a slightly smaller scale and dimmer colour than the main cardinal sprites to match the 2D visual hierarchy (where intermediate labels use `.sky-map-label--muted`). In addition, the Sun and Moon sprite colours in the 3D view are aligned with the CSS design tokens used in the 2D SVG map: the Moon changes from white-grey (`#e2e8f0`) to the purple token (`--color-moon-penalty` = `#c084fc`) and the Sun changes from pale yellow (`#fde68a`) to the amber token (`--color-sun-penalty` = `#f59e0b`). After this phase the two renderers are fully colour-consistent and share the same visual compass vocabulary.
+
+**Definition of Done**
+- [x] The 3D sky dome renders NO, SO, SV, NV labels at azimuths 45°, 135°, 225°, and 315° — confirmed by activating 3D-läge and visually inspecting the four intermediate labels around the horizon ring
+- [x] The intermediate sprites in 3D are visually subordinate to the main cardinal sprites (N, O, S, V) — smaller scale or noticeably dimmer colour — matching the muted hierarchy in the 2D view
+- [x] `BODY_COLORS.moon` in `frontend/js/components/sky-map-3d.js` equals `'#c084fc'`, causing the Moon sprite in the 3D dome to appear purple, consistent with the `.sky-map-body--moon { fill: var(--color-moon-penalty) }` rule that governs the 2D moon dot
+- [x] `BODY_COLORS.sun` in `frontend/js/components/sky-map-3d.js` equals `'#f59e0b'`, causing the Sun sprite in the 3D dome to appear amber, consistent with the `.sky-map-body--sun { fill: var(--color-sun-penalty) }` rule in the 2D view
+- [x] Existing cardinal labels N, O, S, V in the 3D view are unchanged in position, size, and colour
+- [x] No JavaScript console errors appear when switching between 2D- and 3D-läge or when the sky map re-renders after a location change
+
+**Key files**
+- Modify `frontend/js/components/sky-map-3d.js` — add an `INTERMEDIATES` constant array (NO at 45°, SO at 135°, SV at 225°, NV at 315°); extend `buildCardinalLabels()` to loop over `INTERMEDIATES` and call a muted variant of `buildCardinalSprite()` (smaller canvas font, reduced sprite scale, dimmer fill colour); change `BODY_COLORS.sun` from `'#fde68a'` to `'#f59e0b'`; change `BODY_COLORS.moon` from `'#e2e8f0'` to `'#c084fc'`
+
+---
