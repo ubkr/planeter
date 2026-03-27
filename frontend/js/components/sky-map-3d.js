@@ -202,9 +202,7 @@ function buildCardinalLabels() {
     for (const entry of INTERCARDINALS) {
         const { x, y, z } = altAzToCartesian(labelAlt, entry.azimuth, labelRadius);
         const sprite = buildCardinalSprite(entry, {
-            fontSize:    'bold 52px sans-serif',
-            fillStyle:   'rgba(170, 187, 204, 0.65)',
-            scaleFactor: 0.055,
+            fillStyle: 'rgba(170, 187, 204, 0.75)',
         });
         sprite.position.set(x, y, z);
         group.add(sprite);
