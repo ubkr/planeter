@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from httpx import AsyncClient, ASGITransport
@@ -28,6 +28,20 @@ def mock_weather(monkeypatch):
     mock = AsyncMock(return_value=weather)
     monkeypatch.setattr("app.api.routes.planets.get_weather", mock)
     return mock
+
+
+@pytest.fixture
+def mock_forecast(monkeypatch):
+    """Replace the live 180-night ephem scan with a no-op returning None.
+
+    Patches the import location in planets.py so the real
+    compute_next_good_observation is never called from integration tests.
+    Returns None (no qualifying window found) — the simplest valid value.
+    """
+    monkeypatch.setattr(
+        "app.api.routes.planets.compute_next_good_observation",
+        lambda *args, **kwargs: None,
+    )
 
 
 @pytest.fixture

@@ -33,7 +33,7 @@ LON = 13.0
 # 1. GET /visible — happy-path status
 # ---------------------------------------------------------------------------
 
-async def test_visible_returns_200(async_client, mock_weather):
+async def test_visible_returns_200(async_client, mock_weather, mock_forecast):
     response = await async_client.get(
         "/api/v1/planets/visible",
         params={"lat": LAT, "lon": LON},
@@ -45,7 +45,7 @@ async def test_visible_returns_200(async_client, mock_weather):
 # 2. GET /visible — response shape
 # ---------------------------------------------------------------------------
 
-async def test_visible_response_keys(async_client, mock_weather):
+async def test_visible_response_keys(async_client, mock_weather, mock_forecast):
     response = await async_client.get(
         "/api/v1/planets/visible",
         params={"lat": LAT, "lon": LON},
@@ -63,7 +63,7 @@ async def test_visible_response_keys(async_client, mock_weather):
 # 3. GET /visible — planets array length
 # ---------------------------------------------------------------------------
 
-async def test_visible_returns_five_planets(async_client, mock_weather):
+async def test_visible_returns_five_planets(async_client, mock_weather, mock_forecast):
     response = await async_client.get(
         "/api/v1/planets/visible",
         params={"lat": LAT, "lon": LON},
@@ -130,7 +130,7 @@ async def test_unknown_planet_returns_404(async_client, mock_weather):
 # 8. GET /visible — missing lat → 422
 # ---------------------------------------------------------------------------
 
-async def test_missing_lat_returns_422(async_client, mock_weather):
+async def test_missing_lat_returns_422(async_client, mock_weather, mock_forecast):
     # lat is declared Query(...) — required; FastAPI returns 422 when absent.
     response = await async_client.get(
         "/api/v1/planets/visible",
@@ -143,7 +143,7 @@ async def test_missing_lat_returns_422(async_client, mock_weather):
 # 9. GET /visible — lat=999 out of range → 422
 # ---------------------------------------------------------------------------
 
-async def test_invalid_lat_returns_422(async_client, mock_weather):
+async def test_invalid_lat_returns_422(async_client, mock_weather, mock_forecast):
     # lat is declared Query(..., ge=-90, le=90), so 999 fails FastAPI's built-in
     # range validation and returns 422 Unprocessable Entity.
     response = await async_client.get(
@@ -157,7 +157,7 @@ async def test_invalid_lat_returns_422(async_client, mock_weather):
 # 10. GET /visible — missing lon → 422
 # ---------------------------------------------------------------------------
 
-async def test_missing_lon_returns_422(async_client, mock_weather):
+async def test_missing_lon_returns_422(async_client, mock_weather, mock_forecast):
     # lon is declared Query(...) — required; FastAPI returns 422 when absent.
     response = await async_client.get(
         "/api/v1/planets/visible",
@@ -183,7 +183,7 @@ _DARK_WINDOW_KEYS = {"best_time", "dark_rise_time", "dark_set_time"}
 # 11. GET /visible — Phase B1 fields present on every planet
 # ---------------------------------------------------------------------------
 
-async def test_visible_includes_phase_b1_fields(async_client, mock_weather):
+async def test_visible_includes_phase_b1_fields(async_client, mock_weather, mock_forecast):
     # Every planet dict in the /visible response must contain the three new
     # dark-window fields.  Values may be null (None) — that is expected when a
     # planet stays below _MIN_ALTITUDE_DEG all night — but the keys must exist.
@@ -239,6 +239,31 @@ async def test_planet_by_name_includes_phase_b1_fields_as_null(async_client, moc
     for key in _DARK_WINDOW_KEYS:
         assert body[key] is None, (
             f"Expected '{key}' to be null from /{'{name}'} endpoint, got {body[key]!r}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# 14. Unit test — _compute_nautical_dark_window returns (None, None) during
+#     midnight sun (sun never drops below -12° at lat=70, lon=25 in June)
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# 15. GET /visible — next_good_observation key present on every planet (B9)
+# ---------------------------------------------------------------------------
+
+async def test_visible_includes_next_good_observation(async_client, mock_weather, mock_forecast):
+    # Every planet dict in the /visible response must carry the
+    # next_good_observation key introduced in Phase B9.  When the forecast
+    # mock returns None the value will be null, but the key must exist.
+    response = await async_client.get(
+        "/api/v1/planets/visible",
+        params={"lat": _STOCKHOLM_LAT, "lon": _STOCKHOLM_LON},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    for planet in body["planets"]:
+        assert "next_good_observation" in planet, (
+            f"Planet '{planet.get('name')}' is missing 'next_good_observation' key"
         )
 
 

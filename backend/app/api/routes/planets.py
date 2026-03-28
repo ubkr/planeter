@@ -10,14 +10,17 @@ from fastapi import APIRouter, HTTPException, Query
 from ...models.planet import (
     LocationInfo,
     MoonInfo,
+    NextGoodObservation,
     PlanetPosition,
     PlanetsResponse,
     SunInfo,
     WeatherInfo,
 )
 from ...services.aggregator import get_weather
+from ...services.cache_service import cache
 from ...services.planets.calculator import calculate_planet_positions
 from ...services.planets.events import detect_events
+from ...services.planets.forecast import compute_next_good_observation
 from ...services.scoring import apply_scores, score_tonight
 from ...utils.logger import setup_logger
 from ...utils.moon import calculate_moon_penalty
@@ -38,6 +41,9 @@ _MIN_ALTITUDE_DEG = 10
 
 # Sampling interval in minutes for best-viewing-time calculations.
 _BEST_TIME_SAMPLE_INTERVAL_MINUTES = 15
+
+# Cache TTL for forecast (next-good-observation) results: 6 hours.
+_FORECAST_CACHE_TTL_SECONDS = 21600
 
 
 def _utc_iso() -> str:
@@ -474,6 +480,37 @@ async def get_visible_planets(
     dark_start, dark_end = _compute_nautical_dark_window(lat, lon)
     if dark_start is not None:
         _compute_best_viewing_times(planets, lat, lon, dark_start, dark_end)
+
+    # Compute next-good-observation forecast for each planet.
+    # Results are cached for 6 hours keyed to 0.1°-rounded lat/lon.
+    # Any failure in the forecast section is caught and logged so that it
+    # never breaks the /visible endpoint response.
+    try:
+        forecast_lat = round(lat, 1)
+        forecast_lon = round(lon, 1)
+        forecast_cache_key = f"forecast:{forecast_lat}:{forecast_lon}"
+        cached_forecasts = await cache.get(forecast_cache_key)
+
+        if cached_forecasts is not None:
+            logger.info(f"Cache hit for forecasts at ({lat}, {lon})")
+            # Cache stores raw dicts (dict | None) — never Pydantic model instances
+            forecast_map = cached_forecasts
+        else:
+            forecast_map = {}
+            for planet in planets:
+                result = compute_next_good_observation(
+                    planet.name, lat, lon, start_dt=now_utc
+                )
+                forecast_map[planet.name] = result
+            await cache.set(forecast_cache_key, forecast_map, ttl_seconds=_FORECAST_CACHE_TTL_SECONDS)
+            logger.info(f"Forecasts computed and cached for ({lat}, {lon})")
+
+        for planet in planets:
+            forecast_dict = forecast_map.get(planet.name)
+            if forecast_dict is not None:
+                planet.next_good_observation = NextGoodObservation(**forecast_dict)
+    except Exception as exc:
+        logger.warning(f"Forecast computation failed for ({lat}, {lon}): {exc}")
 
     try:
         events = detect_events(lat, lon, now_utc - timedelta(days=1), now_utc + timedelta(days=2))

@@ -13,6 +13,29 @@ import PLANET_DESCRIPTIONS from '../data/planet-descriptions.js';
 // Number of skeleton cards to show while loading.
 const PLANET_COUNT = 5;
 
+// Swedish month names indexed 0–11 (January–December).
+const SWEDISH_MONTHS = [
+    'januari', 'februari', 'mars', 'april', 'maj', 'juni',
+    'juli', 'augusti', 'september', 'oktober', 'november', 'december',
+];
+
+/**
+ * Format a date string like "2026-05-14" to Swedish short form like "14 maj".
+ *
+ * Parses via string split to avoid timezone-shifting that new Date() causes
+ * when given a date-only string (which is treated as UTC midnight).
+ *
+ * @param {string} isoDateStr - A date string in "YYYY-MM-DD" format.
+ * @returns {string} e.g. "14 maj"
+ */
+function formatForecastDate(isoDateStr) {
+    // "2026-05-14" → parts = ["2026", "05", "14"]
+    const parts = isoDateStr.split('-');
+    const day = parseInt(parts[2], 10);
+    const monthIndex = parseInt(parts[1], 10) - 1;
+    return `${day} ${SWEDISH_MONTHS[monthIndex]}`;
+}
+
 /**
  * Format an ISO 8601 UTC timestamp to HH:MM in Europe/Stockholm local time.
  *
@@ -145,6 +168,31 @@ function buildCard(planet) {
     }
     card.appendChild(bestTimeEl);
 
+    // Build the "Nästa bra tillfälle" forecast row.
+    // Shown on both full and compact cards (no isCompact guard).
+    // next_good_observation may be absent on old API responses — treat undefined as null.
+    const forecastEl = document.createElement('div');
+    const ngo = planet.next_good_observation ?? null;
+    if (ngo != null) {
+        forecastEl.className = 'planet-card__forecast';
+
+        const forecastLabelEl = document.createElement('span');
+        forecastLabelEl.className = 'planet-card__forecast-label';
+        forecastLabelEl.textContent = 'N\u00e4sta bra tillf\u00e4lle:';
+
+        const forecastValueEl = document.createElement('span');
+        forecastValueEl.className = 'planet-card__forecast-value';
+        forecastValueEl.textContent =
+            `${formatForecastDate(ngo.date)} \u2022 ${formatTime(ngo.start_time)}\u2013${formatTime(ngo.end_time)}`;
+
+        forecastEl.appendChild(forecastLabelEl);
+        forecastEl.appendChild(forecastValueEl);
+    } else {
+        forecastEl.className = 'planet-card__forecast planet-card__forecast--none';
+        forecastEl.textContent = 'Inga bra tillf\u00e4llen kommande 6 m\u00e5n';
+    }
+    card.appendChild(forecastEl);
+
     // Build the visibility pill imperatively to avoid XSS via attribute injection.
     // TooltipManager watches for .info-icon and reads the `title` property.
     //
@@ -192,9 +240,9 @@ function buildCard(planet) {
     // Hidden in compact mode (non-visible planets).
     if (!isCompact) {
         const EQUIPMENT_LABELS = {
-            naked_eye:  'Blotta ögat',
-            binoculars: 'Kikare rekommenderas',
-            telescope:  'Teleskop',
+            naked_eye:  '👁 Blotta ögat',
+            binoculars: '🔭 Kikare rekommenderas',
+            telescope:  '🔭 Teleskop',
         };
         const equipment = getEquipmentRecommendation(planet);
         if (equipment !== null) {

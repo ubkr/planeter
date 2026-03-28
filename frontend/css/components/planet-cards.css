@@ -372,6 +372,33 @@
 
 /* Include best-time in the card-level skeleton reset */
 
+/* --- Next Good Observation Forecast Row --- */
+
+.planet-card__forecast {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-xs);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    line-height: 1.4;
+}
+
+.planet-card__forecast-label {
+    color: var(--color-text-muted);
+    white-space: nowrap;
+}
+
+.planet-card__forecast-value {
+    font-weight: 500;
+}
+
+/* Modifier: no upcoming good opportunity within 6 months */
+
+.planet-card__forecast--none {
+    color: var(--color-text-muted);
+    font-style: italic;
+}
+
 /* --- Description Toggle (collapsible "Vad ska man leta efter?") --- */
 
 .planet-card__description-toggle {

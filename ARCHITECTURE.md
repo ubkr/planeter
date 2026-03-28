@@ -14,7 +14,8 @@ index.html                        /api/v1/planets/visible
   +-- sky-summary.js                |     +-- MetNoClient
   +-- sky-map.js                    |     +-- OpenMeteoClient
   +-- sky-map-3d.js                 +-- VisibilityScorer
-  +-- events-timeline.js            +-- CacheService
+  +-- events-timeline.js            +-- ForecastService
+                                    +-- CacheService
   +-- api.js
 ```
 
@@ -30,12 +31,13 @@ backend/
     main.py                       -- FastAPI app, router registration, static file serving
     config.py                     -- Pydantic Settings (defaults, cache TTL, log level)
     models/
-      planet.py                   -- PlanetPosition, PlanetVisibility, PlanetsResponse, EventsResponse
+      planet.py                   -- PlanetPosition, NextGoodObservation, PlanetsResponse, EventsResponse
       weather.py                  -- WeatherData, WeatherResponse
     services/
       planets/
         calculator.py             -- Core ephem-based planet position calculations
         events.py                 -- Astronomical event detection (conjunctions, oppositions, etc.)
+        forecast.py               -- 6-month next-good-observation scanner (per-night dark-window sampling)
       weather/
         base.py                   -- WeatherSourceBase ABC
         metno_client.py           -- Met.no API client
@@ -259,7 +261,7 @@ A planet is declared **"visible"** when: altitude > 0, total score > 15, and app
 
 ### Backend
 - **Stateless**: no per-user session state
-- **In-memory cache**: weather data cached with TTL (default 30 min); events cached for 1 hour keyed by date + rounded coordinates; planet calculations are fast pure-CPU so not cached
+- **In-memory cache**: weather data cached with TTL (default 30 min); events cached for 1 hour keyed by date + rounded coordinates; next-good-observation forecast cached per rounded coordinates with a 6-hour TTL; current planet positions are fast pure-CPU so not cached
 - **Config via `.env`**: default location, cache TTL, log level, Met.no user-agent
 
 ### Frontend
@@ -291,7 +293,16 @@ A planet is declared **"visible"** when: altitude > 0, total score > 15, and app
       "rise_time": "2026-02-28T07:15:00Z",
       "set_time": "2026-02-28T20:30:00Z",
       "transit_time": "2026-02-28T13:45:00Z",
-      "next_visible_time": null
+      "next_visible_time": null,
+      "next_good_observation": {
+        "date": "2026-05-14",
+        "start_time": "2026-05-14T21:00:00Z",
+        "end_time": "2026-05-15T02:30:00Z",
+        "peak_time": "2026-05-14T23:15:00Z",
+        "peak_altitude_deg": 42.1,
+        "magnitude": -4.2,
+        "quality_score": 78
+      }
     }
   ]
 }

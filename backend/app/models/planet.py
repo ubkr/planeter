@@ -68,6 +68,18 @@ def azimuth_to_compass_sv(azimuth_deg: float) -> str:
     return _COMPASS_DIRECTIONS_SV[index]
 
 
+class NextGoodObservation(BaseModel):
+    """The next upcoming date/window when a planet will be well-placed for observation."""
+
+    date: str = Field(..., description="ISO 8601 date string (e.g. '2026-05-14')")
+    start_time: str = Field(..., description="ISO 8601 UTC datetime string for the start of the dark observing window")
+    end_time: str = Field(..., description="ISO 8601 UTC datetime string for the end of the dark observing window")
+    peak_time: str = Field(..., description="ISO 8601 UTC datetime string for the best moment to observe within the window")
+    peak_altitude_deg: float = Field(..., description="Planet altitude in degrees at peak_time")
+    magnitude: float = Field(..., description="Apparent visual magnitude at peak_time")
+    quality_score: int = Field(..., ge=0, le=100, description="Quality score 0–100 for this observation window")
+
+
 class PlanetPosition(BaseModel):
     """Position and visibility data for a single naked-eye planet."""
 
@@ -104,6 +116,10 @@ class PlanetPosition(BaseModel):
             "'goda_förhållanden' (good observing conditions)."
         ),
     )
+    # Filled by the next-good-observation finder; None until that pass has run.
+    next_good_observation: Optional[NextGoodObservation] = Field(
+        None, description="Next upcoming window when the planet is well-placed for observation, or null if not yet computed"
+    )
 
     class Config:
         json_schema_extra = {
@@ -126,6 +142,7 @@ class PlanetPosition(BaseModel):
                 "visibility_score": 85,
                 "is_visible": True,
                 "visibility_reasons": [],
+                "next_good_observation": None,
             }
         }
 

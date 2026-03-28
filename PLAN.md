@@ -561,17 +561,17 @@ Each planet card gains a collapsible "Vad ska man leta efter?" section containin
 Each visible planet card displays a small equipment badge indicating whether the planet is best observed with the naked eye, binoculars, or a small telescope under current conditions. The recommendation is computed entirely in the frontend from the planet's current magnitude and altitude — no backend changes. Mercury at faint magnitudes or any planet at very low altitude (5°–10°) gets a "Kikare rekommenderas" badge. All other visible planets get "Blotta ögat". Planets below the horizon or with score 0 do not show an equipment badge.
 
 **Definition of Done**
-- [ ] `frontend/js/utils.js` exports a `getEquipmentRecommendation(planet)` function returning `null`, `"naked_eye"`, `"binoculars"`, or `"telescope"`
-- [ ] The function returns `null` when `planet.is_above_horizon` is false or `planet.visibility_score` is 0
-- [ ] The function returns `"binoculars"` when `planet.altitude_deg` is between 5 and 10 (atmospheric extinction zone)
-- [ ] The function returns `"binoculars"` when `planet.name === "Mercury"` and `planet.magnitude > 1.5`
-- [ ] The function returns `"naked_eye"` for all other visible planets
-- [ ] Each planet card renders a badge with the Swedish label: "Blotta ögat" (naked_eye), "Kikare rekommenderas" (binoculars), or "Teleskop" (telescope)
-- [ ] The badge uses an appropriate icon or emoji (👁 for naked eye, 🔭 for binoculars/telescope) or a simple text pill
-- [ ] The badge is not rendered for planets where the function returns `null`
-- [ ] Badge styling uses `--color-text-secondary` background with `--color-text-primary` text, consistent with existing card design tokens
-- [ ] No backend changes are required
-- [ ] No JavaScript console errors on page load or data refresh
+- [x] `frontend/js/utils.js` exports a `getEquipmentRecommendation(planet)` function returning `null`, `"naked_eye"`, `"binoculars"`, or `"telescope"`
+- [x] The function returns `null` when `planet.is_above_horizon` is false or `planet.visibility_score` is 0
+- [x] The function returns `"binoculars"` when `planet.altitude_deg` is between 5 and 10 (atmospheric extinction zone)
+- [x] The function returns `"binoculars"` when `planet.name === "Mercury"` and `planet.magnitude > 1.5`
+- [x] The function returns `"naked_eye"` for all other visible planets
+- [x] Each planet card renders a badge with the Swedish label: "Blotta ögat" (naked_eye), "Kikare rekommenderas" (binoculars), or "Teleskop" (telescope)
+- [x] The badge uses an appropriate icon or emoji (👁 for naked eye, 🔭 for binoculars/telescope) or a simple text pill
+- [x] The badge is not rendered for planets where the function returns `null`
+- [x] Badge styling uses `--color-text-secondary` background with `--color-text-primary` text, consistent with existing card design tokens
+- [x] No backend changes are required
+- [x] No JavaScript console errors on page load or data refresh
 
 **Key files**
 - Modify `frontend/js/utils.js` — add `getEquipmentRecommendation(planet)` function
@@ -735,6 +735,40 @@ Planets that are currently not visible (either below the horizon or hidden by da
 - Modify `backend/app/api/routes/planets.py` — add `_compute_next_visible_time(planet_name, lat, lon, current_dt, sun_data) -> Optional[str]` helper that samples the next 24 hours at 15-minute intervals, checking both altitude > 10° and sun altitude < -12° at each sample; call this helper for every planet where `is_visible == False` before returning the response; populate the new field on each `PlanetPosition`
 - Modify `frontend/js/components/planet-cards.js` — in compact card rendering, attach a tooltip to the visibility pill; tooltip content shows "Nästa synlig: {formatTime(next_visible_time)}" when `next_visible_time` is non-null, or "Ej synlig nästa 24h" when null
 - Modify `frontend/css/components/planet-cards.css` — style the visibility pill in compact mode to indicate it is hoverable (e.g. subtle underline or help cursor) and ensure the tooltip appears correctly positioned
+
+---
+
+#### Phase B9: Nästa Bra Observationstillfälle (6-månadersprognos) — ✅
+
+**Depends on:** Phase B1
+**Parallelisable with:** Phase E series
+
+**Intended Outcome**
+
+Each planet card displays a "Nästa bra tillfälle" section showing when the next geometrically favourable observation opportunity occurs within the coming six months. The backend scans forward ~180 nights, sampling each planet's peak altitude during each night's nautical-darkness window and evaluating a lightweight geometric quality score based on altitude, apparent magnitude, and moon angular separation. Weather is deliberately excluded — it cannot be forecast months ahead, and the intent is to answer "when will the sky geometry next be good for watching this planet?", not "will the sky be clear?". The first night that exceeds a quality threshold is returned as the recommendation. If no qualifying night is found, the card shows "Inga bra tillfällen de närmaste 6 månaderna". Results are cached per location with a 6-hour TTL, since planetary geometry changes slowly and the computation spans ~900 ephem calls per request.
+
+**Definition of Done**
+- [x] `backend/app/services/planets/forecast.py` exports `compute_next_good_observation(planet_name, lat, lon, start_dt) -> Optional[NextGoodObservation]` scanning up to 180 nights ahead
+- [x] The scanner evaluates one sample per night at the planet's peak-altitude moment within nautical darkness (sun < −12°); nights where the dark window is `None` (midnight sun) are skipped
+- [x] The geometric quality score considers altitude (higher is better, minimum 15°), apparent magnitude (brighter is better), and moon angular separation (farther is better, penalty when < 20° and moon illumination > 0.4); the first night exceeding a configurable quality threshold is returned
+- [x] `PlanetPosition` model includes a new optional field `next_good_observation: Optional[NextGoodObservation]` where `NextGoodObservation` is a nested Pydantic model with fields: `date` (ISO 8601 date string, e.g. `"2026-05-14"`), `start_time` (ISO 8601 UTC), `end_time` (ISO 8601 UTC), `peak_time` (ISO 8601 UTC), `peak_altitude_deg` (float), `magnitude` (float), `quality_score` (int, 0–100)
+- [x] The `/visible` endpoint calls the forecast function for each planet and populates `next_good_observation` on each `PlanetPosition` in the response
+- [x] Forecast results are cached per `(lat_rounded, lon_rounded)` key (rounded to 1 decimal place, ~11 km granularity) with a 6-hour TTL using the existing `CacheService`; a cache hit skips all ephem computation
+- [x] A planet that is currently in an excellent observation period (e.g. opposition or high altitude during darkness) returns a `next_good_observation` with today's date, not the next future night
+- [x] Mercury and Venus (inferior planets with short visibility windows) have a lower quality threshold than Mars, Jupiter, and Saturn to avoid never recommending them
+- [x] Each planet card (both full and compact) renders a "Nästa bra tillfälle" row showing the date formatted as `"DD månad"` in Swedish (e.g. "14 maj") and the time window as `HH:MM–HH:MM` in Europe/Stockholm time
+- [x] When `next_good_observation` is `null`, the card shows "Inga bra tillfällen kommande 6 mån" in `--color-text-muted`
+- [x] The date display uses Swedish month names (januari, februari, …, december)
+- [x] No regressions in existing planet card layout on 375 px and 1200 px viewports
+- [x] No new API endpoints are introduced; the field is added to the existing `/visible` response schema
+- [x] Forecast computation completes within 500 ms for all five planets combined (profiled with live ephem calls)
+
+**Key files**
+- Create `backend/app/services/planets/forecast.py` — `compute_next_good_observation()` with per-night dark-window sampling, geometric quality scoring, and per-planet threshold tuning
+- Modify `backend/app/models/planet.py` — add `NextGoodObservation` Pydantic model and `next_good_observation: Optional[NextGoodObservation]` field on `PlanetPosition`
+- Modify `backend/app/api/routes/planets.py` — call the forecast for each planet; integrate with `CacheService` using `(lat_rounded, lon_rounded)` cache key and 6-hour TTL; populate `next_good_observation` before returning
+- Modify `frontend/js/components/planet-cards.js` — render "Nästa bra tillfälle" row on both full and compact cards; format date in Swedish and time window in Europe/Stockholm timezone
+- Modify `frontend/css/components/planet-cards.css` — style the new forecast row, consistent with the existing "Bästa tid" styling
 
 ---
 

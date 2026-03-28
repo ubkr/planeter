@@ -170,9 +170,11 @@ The constellation stick-figure patterns use two authoritative sources:
 
 **Validation**: Constellation coordinates are cross-checked against [frontend/data/bright-stars.json](frontend/data/bright-stars.json) (sourced from SIMBAD) to catch lookup errors. Mismatches >0.1° fail the build.
 
-**File Size**: Downloaded source data is 30-35 MB total and excluded from git (via `.gitignore`). The generated output is ~28 KB.
+**File Size**: Downloaded source data is 30-35 MB total and excluded from git (via `.gitignore`). The generated output is ~28 KB for the current 30-constellation subset (Planeter-relevant visible patterns).
 
 **Rebuild Time**: <5 seconds on modern hardware.
+
+**Note on Language**: Constellation names remain in Latin/English (e.g., "Ursa Major", "Orion") following international astronomical convention established by the IAU. Swedish translations are not used in professional astronomy and could cause confusion when cross-referencing with astronomical resources. This is the standard approach used by planetariums worldwide regardless of UI language.
 
 ## Deployment
 
