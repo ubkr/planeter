@@ -357,9 +357,9 @@ The visibility scorer accounts for planet brightness when evaluating twilight co
 
 ---
 
-## Phase 13: Solsystemsvy — Statisk Ögonblicksbild
+## Phase 13: Solsystemsvy — Statisk Ögonblicksbild — ✅
 
-**Status:** Pending
+**Status:** Complete
 **Depends on:** Phase 6, Phase 2
 **Parallelisable with:** Phase B series, Phase E series
 

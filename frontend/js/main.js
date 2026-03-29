@@ -15,6 +15,7 @@ import { TabNav } from './components/tab-nav.js';
 import { SkyMap } from './components/sky-map.js';
 import { EventAlerts } from './components/event-alerts.js';
 import { EventsTimeline } from './components/events-timeline.js';
+import { SolarSystemView } from './components/solar-system-view.js';
 import { fetchVisiblePlanets, fetchEvents } from './api.js';
 import { formatLocation } from './utils.js';
 
@@ -78,6 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const skyMap = new SkyMap(document.getElementById('skyMapContainer'));
     const eventAlerts = new EventAlerts(document.getElementById('eventAlerts'));
     const eventsTimeline = new EventsTimeline(document.getElementById('eventsTimelineContainer'));
+    const solarSystemView = new SolarSystemView(document.getElementById('solarSystemContainer'));
 
     // --- Constellation controls ---
     const constellationToggleEl = document.getElementById('constellationToggle');
@@ -368,6 +370,7 @@ document.addEventListener('DOMContentLoaded', () => {
             skySummary.render(data);
             planetCards.render(data.planets);
             eventAlerts.render(data.events || []);
+            solarSystemView.render(data.planets || []);
             skyMap.plotBodies(data.planets, data.sun, data.moon, data.events || []);
 
             if (skyMap3d !== null) {
@@ -410,6 +413,7 @@ document.addEventListener('DOMContentLoaded', () => {
             planetCards.clear();
             skySummary.clear();
             eventAlerts.clear();
+            solarSystemView.clear();
             showError(error.message);
         }
     }
@@ -465,6 +469,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (tabId === 'events' && !eventsLoaded) {
             loadEvents(currentLocation);
+        }
+
+        if (tabId === 'solarsystem' && lastApiData !== null) {
+            solarSystemView.render(lastApiData.planets || []);
         }
     });
 

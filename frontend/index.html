@@ -62,6 +62,15 @@
               tabindex="-1">
         Kommande
       </button>
+      <button class="tab-nav__tab"
+              role="tab"
+              id="tabSolarSystem"
+              data-tab="solarsystem"
+              aria-selected="false"
+              aria-controls="panelSolarSystem"
+              tabindex="-1">
+        Solsystemet
+      </button>
     </div>
 
     <main class="main-content">
@@ -126,6 +135,11 @@
       <!-- Kommande händelser tab panel (hidden by default) -->
       <div id="panelEvents" role="tabpanel" aria-labelledby="tabEvents" class="tab-panel--hidden" hidden>
         <div id="eventsTimelineContainer"></div>
+      </div>
+
+      <!-- Solsystemet tab panel (hidden by default) -->
+      <div id="panelSolarSystem" role="tabpanel" aria-labelledby="tabSolarSystem" class="tab-panel--hidden" hidden>
+        <div id="solarSystemContainer"></div>
       </div>
     </main>
 

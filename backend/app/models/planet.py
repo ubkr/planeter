@@ -120,6 +120,10 @@ class PlanetPosition(BaseModel):
     next_good_observation: Optional[NextGoodObservation] = Field(
         None, description="Next upcoming window when the planet is well-placed for observation, or null if not yet computed"
     )
+    # Heliocentric Cartesian coordinates in AU; filled by the solar-system view pipeline.
+    heliocentric_x_au: Optional[float] = Field(None, description="Heliocentric Cartesian X coordinate in AU")
+    heliocentric_y_au: Optional[float] = Field(None, description="Heliocentric Cartesian Y coordinate in AU")
+    heliocentric_z_au: Optional[float] = Field(None, description="Heliocentric Cartesian Z coordinate in AU")
 
     class Config:
         json_schema_extra = {
@@ -143,6 +147,9 @@ class PlanetPosition(BaseModel):
                 "is_visible": True,
                 "visibility_reasons": [],
                 "next_good_observation": None,
+                "heliocentric_x_au": 0.45,
+                "heliocentric_y_au": -0.23,
+                "heliocentric_z_au": 0.01,
             }
         }
 

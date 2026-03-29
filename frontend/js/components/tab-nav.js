@@ -6,13 +6,15 @@
  *   https://www.w3.org/WAI/ARIA/apg/patterns/tabs/
  *
  * HTML contract (IDs must exist in the DOM before instantiation):
- *   #tabNav        - <div role="tablist"> container
- *   #tabPlaneter   - tab button for the Planeter panel
- *   #tabSkyMap     - tab button for the Stjärnkarta panel
- *   #tabEvents     - tab button for the Kommande panel
- *   #panelPlaneter - <div role="tabpanel"> for Planeter content
- *   #panelSkyMap   - <div role="tabpanel"> for Stjärnkarta content
- *   #panelEvents   - <div role="tabpanel"> for Kommande content
+ *   #tabNav           - <div role="tablist"> container
+ *   #tabPlaneter      - tab button for the Planeter panel
+ *   #tabSkyMap        - tab button for the Stjärnkarta panel
+ *   #tabEvents        - tab button for the Kommande panel
+ *   #tabSolarSystem   - tab button for the Solsystemet panel
+ *   #panelPlaneter    - <div role="tabpanel"> for Planeter content
+ *   #panelSkyMap      - <div role="tabpanel"> for Stjärnkarta content
+ *   #panelEvents      - <div role="tabpanel"> for Kommande content
+ *   #panelSolarSystem - <div role="tabpanel"> for Solsystemet content
  *
  * The HTML is responsible for setting the initial aria-* attributes, the
  * tab-panel--hidden class on the inactive panels, and the roving tabindex
@@ -33,20 +35,23 @@ export class TabNav {
         this.tabPlaneter = document.getElementById('tabPlaneter');
         this.tabSkyMap = document.getElementById('tabSkyMap');
         this.tabEvents = document.getElementById('tabEvents');
+        this.tabSolarSystem = document.getElementById('tabSolarSystem');
 
         this.panelPlaneter = document.getElementById('panelPlaneter');
         this.panelSkyMap = document.getElementById('panelSkyMap');
         this.panelEvents = document.getElementById('panelEvents');
+        this.panelSolarSystem = document.getElementById('panelSolarSystem');
 
         // Ordered list used for keyboard navigation (Home / End / ArrowLeft / ArrowRight).
         // Order must match the visual left-to-right order of tabs.
-        this.tabs = [this.tabPlaneter, this.tabSkyMap, this.tabEvents];
+        this.tabs = [this.tabPlaneter, this.tabSkyMap, this.tabEvents, this.tabSolarSystem];
 
         // Map from data-tab value to its panel element.
         this._panelMap = {
-            planeter: this.panelPlaneter,
-            skymap:   this.panelSkyMap,
-            events:   this.panelEvents,
+            planeter:    this.panelPlaneter,
+            skymap:      this.panelSkyMap,
+            events:      this.panelEvents,
+            solarsystem: this.panelSolarSystem,
         };
 
         // Track the currently active tab ID to suppress duplicate events.
@@ -63,7 +68,7 @@ export class TabNav {
      * Activate a tab panel and update all related ARIA state, CSS classes,
      * and roving tabindex values.
      *
-     * @param {'planeter'|'skymap'|'events'} tabId - The tab to make active.
+     * @param {'planeter'|'skymap'|'events'|'solarsystem'} tabId - The tab to make active.
      * @param {boolean} [fromUser=true] - Whether the call originates from user interaction.
      *   Pass false during construction to suppress the 'tabChanged' event.
      */

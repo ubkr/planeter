@@ -1,0 +1,101 @@
+/* ==========================================================================
+   Solar System View Component
+   SVG top-down heliocentric diagram showing planet positions on orbit rings.
+   ========================================================================== */
+
+/* --- SVG Container --- */
+
+.solar-system-svg {
+    display: block;
+    width: 100%;
+    max-width: 560px;
+    margin: 0 auto;
+    aspect-ratio: 1 / 1;
+}
+
+/* --- Sun --- */
+
+.solar-system__sun {
+    fill: var(--color-accent-primary);
+    stroke: none;
+}
+
+/* --- Orbit Rings --- */
+
+.solar-system__orbit {
+    fill: none;
+    stroke: var(--border-color);
+    stroke-width: 1;
+    opacity: 0.5;
+}
+
+.solar-system__orbit--earth {
+    stroke-dasharray: 4 4;
+    opacity: 0.7;
+}
+
+/* --- Orbit Label (e.g. "1 AU") --- */
+
+.solar-system__orbit-label {
+    font-size: 10px;
+    fill: var(--color-text-muted);
+    font-family: inherit;
+}
+
+/* --- Planet Dots --- */
+
+.solar-system__planet {
+    cursor: pointer;
+    transition: opacity var(--transition-fast);
+}
+
+.solar-system__planet--mercury {
+    fill: var(--color-planet-mercury);
+}
+
+.solar-system__planet--venus {
+    fill: var(--color-planet-venus);
+}
+
+.solar-system__planet--mars {
+    fill: var(--color-planet-mars);
+}
+
+.solar-system__planet--jupiter {
+    fill: var(--color-planet-jupiter);
+}
+
+.solar-system__planet--saturn {
+    fill: var(--color-planet-saturn);
+}
+
+.solar-system__planet:hover {
+    opacity: 0.8;
+    outline: none;
+    filter: drop-shadow(0 0 6px currentColor);
+}
+
+.solar-system__planet:focus,
+.solar-system__planet:focus-visible {
+    opacity: 0.8;
+    outline: 2px solid var(--color-accent-primary);
+    outline-offset: 3px;
+    filter: drop-shadow(0 0 6px currentColor);
+}
+
+/* --- Planet Labels --- */
+
+.solar-system__label {
+    font-size: 11px;
+    fill: var(--color-text-secondary);
+    font-family: inherit;
+    pointer-events: none;
+}
+
+/* --- Responsive --- */
+
+@media (max-width: 400px) {
+    .solar-system-svg {
+        max-width: 100%;
+    }
+}
