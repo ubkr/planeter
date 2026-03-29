@@ -4,6 +4,10 @@ Forecast module: find the next good observation window for a naked-eye planet.
 Scans up to 180 nights from a given start date to find the first night
 where the planet clears the quality threshold for comfortable naked-eye
 viewing.
+
+Inferior planets (Mercury, Venus) are only visible during twilight (sun
+between 0° and −12°), so they use dedicated twilight-window helpers rather
+than the nautical-darkness window used by outer planets.
 """
 
 import ephem
@@ -90,6 +94,91 @@ def _compute_dark_window_for_night(
     except ephem.NeverUpError:
         # Polar night: sun never climbs above -12° — dark for a full day.
         end = start + timedelta(hours=24)
+
+    return start, end
+
+
+# ── Twilight-window helper (inferior planets only) ────────────────────────────
+
+def _compute_twilight_window_for_night(
+    lat: float,
+    lon: float,
+    night_dt: datetime,
+    is_evening: bool,
+) -> Tuple[Optional[datetime], Optional[datetime]]:
+    """
+    Compute the civil-to-nautical twilight window for Mercury and Venus.
+
+    These planets are only visible while the sun is between 0° and −12°, so we
+    need the twilight band rather than the full nautical-darkness window.
+
+    When is_evening=True — **evening twilight window**:
+        Interval from sunset (sun crosses 0° going down) to the moment the sun
+        reaches −12°.  The observer is anchored at noon UTC of night_dt so the
+        search lands reliably before the evening crossing.
+
+    When is_evening=False — **morning twilight window**:
+        Interval from the moment the sun climbs back to −12° to actual sunrise
+        (sun crosses 0° going up).  The observer is anchored at UTC midnight of
+        night_dt + 1 day so the search lands inside the pre-dawn period.
+
+    Returns (start, end) as timezone-naive UTC datetimes.
+    Returns (None, None) on any of:
+      - ephem.AlwaysUpError or ephem.NeverUpError (polar conditions)
+      - start >= end (degenerate / zero-width window)
+    """
+    observer = ephem.Observer()
+    observer.lat = str(lat)
+    observer.lon = str(lon)
+    observer.pressure = 0
+
+    try:
+        if is_evening:
+            # Anchor at noon UTC so the next setting events fall in the evening.
+            anchor = night_dt.replace(hour=12, minute=0, second=0, microsecond=0)
+            if anchor.tzinfo is not None:
+                anchor = anchor.replace(tzinfo=None)
+
+            observer.date = anchor
+
+            # Sunset: sun crosses 0° going downward.
+            observer.horizon = "0"
+            sunset_ephem = observer.next_setting(ephem.Sun(), use_center=True)
+            start = ephem.Date(sunset_ephem).datetime()
+
+            # Nautical twilight onset: sun crosses −12° going downward.
+            observer.date = sunset_ephem
+            observer.horizon = "-12"
+            nautical_ephem = observer.next_setting(ephem.Sun(), use_center=True)
+            end = ephem.Date(nautical_ephem).datetime()
+
+        else:
+            # Morning: anchor at UTC midnight of the next calendar day.
+            next_day = night_dt + timedelta(days=1)
+            anchor = next_day.replace(hour=0, minute=0, second=0, microsecond=0)
+            if anchor.tzinfo is not None:
+                anchor = anchor.replace(tzinfo=None)
+
+            observer.date = anchor
+
+            # Nautical twilight start: sun crosses −12° going upward.
+            observer.horizon = "-12"
+            nautical_ephem = observer.next_rising(ephem.Sun(), use_center=True)
+            start = ephem.Date(nautical_ephem).datetime()
+
+            # Sunrise: sun crosses 0° going upward.
+            observer.date = nautical_ephem
+            observer.horizon = "0"
+            sunrise_ephem = observer.next_rising(ephem.Sun(), use_center=True)
+            end = ephem.Date(sunrise_ephem).datetime()
+
+    except (ephem.AlwaysUpError, ephem.NeverUpError):
+        return None, None
+
+    # Reject degenerate windows (should not normally occur at Swedish latitudes
+    # outside extreme polar summer, but guard defensively).
+    if start >= end:
+        return None, None
 
     return start, end
 
@@ -245,62 +334,140 @@ def compute_next_good_observation(
     for day_offset in range(180):
         night_dt = start_naive + timedelta(days=day_offset)
 
-        dark_start, dark_end = _compute_dark_window_for_night(lat, lon, night_dt)
+        if planet_name in _INNER_PLANETS:
+            # ── Inferior-planet branch: sample both twilight windows ──────────
+            # Mercury and Venus are only visible during the civil-to-nautical
+            # twilight band (sun between 0° and −12°).  We evaluate the evening
+            # window and the morning window separately, then pick the better one.
 
-        if dark_start is None:
-            # Midnight sun — no usable dark window; skip.
-            continue
-
-        # Find the planet's peak altitude within this dark window.
-        peak = _find_peak_in_window(planet_cls, observer, dark_start, dark_end)
-        if peak is None:
-            continue
-
-        peak_dt, peak_alt_deg, peak_mag = peak
-
-        # Apply altitude gate before computing moon metrics.
-        if peak_alt_deg < _MIN_ALTITUDE_DEG:
-            continue
-
-        # Compute moon separation and illumination at the peak moment.
-        # Reset observer.date explicitly: _find_peak_in_window iterates over
-        # many sample times and leaves observer.date in an unspecified state
-        # after returning.
-        observer.date = peak_dt
-
-        moon = ephem.Moon()
-        moon.compute(observer)
-        moon_illumination = float(moon.phase) / 100.0  # ephem.Moon.phase is 0–100
-
-        planet_body = planet_cls()
-        planet_body.compute(observer)
-
-        # Angular separation between moon and planet (ephem returns radians).
-        moon_sep_deg = math.degrees(
-            ephem.separation(
-                (moon.az, moon.alt),
-                (planet_body.az, planet_body.alt),
+            eve_start, eve_end = _compute_twilight_window_for_night(
+                lat, lon, night_dt, is_evening=True
             )
-        )
+            morn_start, morn_end = _compute_twilight_window_for_night(
+                lat, lon, night_dt, is_evening=False
+            )
 
-        score = _quality_score(peak_alt_deg, peak_mag, moon_sep_deg, moon_illumination)
+            best_score = -1
+            best_window_start = None
+            best_window_end = None
+            best_peak = None
 
-        if score < threshold:
-            continue
+            # Evaluate each non-None window; prefer evening on a tie.
+            for win_start, win_end in [(eve_start, eve_end), (morn_start, morn_end)]:
+                if win_start is None:
+                    continue
 
-        # This night qualifies — build the return dict.
-        # Use the calendar date of dark_start as the "night date" (the evening
-        # side of the window, which may roll past midnight UTC).
-        night_date_str = dark_start.strftime("%Y-%m-%d")
+                peak = _find_peak_in_window(planet_cls, observer, win_start, win_end)
+                if peak is None:
+                    continue
 
-        return {
-            "date": night_date_str,
-            "start_time": dark_start.strftime(_ISO_FMT),
-            "end_time": dark_end.strftime(_ISO_FMT),
-            "peak_time": peak_dt.strftime(_ISO_FMT),
-            "peak_altitude_deg": round(peak_alt_deg, 1),
-            "magnitude": round(peak_mag, 2),
-            "quality_score": score,
-        }
+                p_dt, p_alt, p_mag = peak
+
+                if p_alt < _MIN_ALTITUDE_DEG:
+                    continue
+
+                # Moon metrics at peak moment.
+                observer.date = p_dt
+                moon = ephem.Moon()
+                moon.compute(observer)
+                moon_illumination = float(moon.phase) / 100.0
+
+                planet_body = planet_cls()
+                planet_body.compute(observer)
+
+                moon_sep_deg = math.degrees(
+                    ephem.separation(
+                        (moon.az, moon.alt),
+                        (planet_body.az, planet_body.alt),
+                    )
+                )
+
+                score = _quality_score(p_alt, p_mag, moon_sep_deg, moon_illumination)
+
+                # Strictly greater-than so evening wins on a tie (evaluated first).
+                if score > best_score:
+                    best_score = score
+                    best_window_start = win_start
+                    best_window_end = win_end
+                    best_peak = (p_dt, p_alt, p_mag)
+
+            if best_score < threshold or best_peak is None:
+                continue
+
+            peak_dt, peak_alt_deg, peak_mag = best_peak
+            # Note: best_window_start may be a morning window that falls on
+            # night_dt + 1 calendar day — the date string reflects the actual
+            # window start, not the loop's night_dt anchor.
+            night_date_str = best_window_start.strftime("%Y-%m-%d")
+
+            return {
+                "date": night_date_str,
+                "start_time": best_window_start.strftime(_ISO_FMT),
+                "end_time": best_window_end.strftime(_ISO_FMT),
+                "peak_time": peak_dt.strftime(_ISO_FMT),
+                "peak_altitude_deg": round(peak_alt_deg, 1),
+                "magnitude": round(peak_mag, 2),
+                "quality_score": best_score,
+            }
+
+        else:
+            # ── Outer-planet branch: nautical-darkness window (unchanged) ─────
+            dark_start, dark_end = _compute_dark_window_for_night(lat, lon, night_dt)
+
+            if dark_start is None:
+                # Midnight sun — no usable dark window; skip.
+                continue
+
+            # Find the planet's peak altitude within this dark window.
+            peak = _find_peak_in_window(planet_cls, observer, dark_start, dark_end)
+            if peak is None:
+                continue
+
+            peak_dt, peak_alt_deg, peak_mag = peak
+
+            # Apply altitude gate before computing moon metrics.
+            if peak_alt_deg < _MIN_ALTITUDE_DEG:
+                continue
+
+            # Compute moon separation and illumination at the peak moment.
+            # Reset observer.date explicitly: _find_peak_in_window iterates over
+            # many sample times and leaves observer.date in an unspecified state
+            # after returning.
+            observer.date = peak_dt
+
+            moon = ephem.Moon()
+            moon.compute(observer)
+            moon_illumination = float(moon.phase) / 100.0  # ephem.Moon.phase is 0–100
+
+            planet_body = planet_cls()
+            planet_body.compute(observer)
+
+            # Angular separation between moon and planet (ephem returns radians).
+            moon_sep_deg = math.degrees(
+                ephem.separation(
+                    (moon.az, moon.alt),
+                    (planet_body.az, planet_body.alt),
+                )
+            )
+
+            score = _quality_score(peak_alt_deg, peak_mag, moon_sep_deg, moon_illumination)
+
+            if score < threshold:
+                continue
+
+            # This night qualifies — build the return dict.
+            # Use the calendar date of dark_start as the "night date" (the evening
+            # side of the window, which may roll past midnight UTC).
+            night_date_str = dark_start.strftime("%Y-%m-%d")
+
+            return {
+                "date": night_date_str,
+                "start_time": dark_start.strftime(_ISO_FMT),
+                "end_time": dark_end.strftime(_ISO_FMT),
+                "peak_time": peak_dt.strftime(_ISO_FMT),
+                "peak_altitude_deg": round(peak_alt_deg, 1),
+                "magnitude": round(peak_mag, 2),
+                "quality_score": score,
+            }
 
     return None

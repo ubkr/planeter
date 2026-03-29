@@ -772,7 +772,7 @@ Each planet card displays a "Nästa bra tillfälle" section showing when the nex
 
 ---
 
-#### Phase B10: Twilight-Window Forecast för Merkurius och Venus
+#### Phase B10: Twilight-Window Forecast för Merkurius och Venus — ✅
 
 **Depends on:** Phase B9
 **Parallelisable with:** None
@@ -782,14 +782,14 @@ Each planet card displays a "Nästa bra tillfälle" section showing when the nex
 The 6-month forecast feature adapts to the observational reality of inferior planets (Mercury and Venus), which are best viewed during twilight near maximum elongation rather than during nautical darkness when they're typically too close to the sun. The forecast scanner now uses twilight windows (sun between 0° and −12°) for Mercury and Venus, sampling both evening twilight (after sunset) and morning twilight (before sunrise) and selecting whichever offers better geometry. Outer planets (Mars, Jupiter, Saturn) continue using the existing nautical-darkness logic. The frontend requires no changes — the existing "Nästa bra tillfälle" display already shows any time window regardless of whether it's twilight or darkness.
 
 **Definition of Done**
-- [ ] `backend/app/services/planets/forecast.py` exports a new helper `_compute_twilight_window_for_night(lat, lon, night_dt, is_evening: bool) -> Tuple[Optional[datetime], Optional[datetime]]` that returns the evening twilight window (sunset to sun at −12°) when `is_evening=True`, or the morning twilight window (sun at −12° to sunrise) when `is_evening=False`
-- [ ] `compute_next_good_observation()` branches on planet type: when `planet_name in {"Mercury", "Venus"}`, it calls `_compute_twilight_window_for_night()` for both evening and morning, samples each window via `_find_peak_in_window()`, and returns the window with the higher quality score; when `planet_name in {"Mars", "Jupiter", "Saturn"}`, the existing nautical-darkness logic (sun < −12°) is used unchanged
-- [ ] Mercury at 20° altitude during evening civil twilight (sun at −4°) with elongation 25° returns a forecast recommendation with `start_time` immediately after sunset and `end_time` at nautical twilight onset (sun −12°), not `None` as it would under the old nautical-darkness-only logic
-- [ ] Venus at 15° altitude during morning nautical twilight (sun at −10°) returns a forecast recommendation with a morning time window, demonstrating the dawn-side sampling
-- [ ] Mars at 30° altitude during nautical darkness (sun at −15°) continues to return the existing nautical-darkness window unchanged — outer-planet logic is unaffected
-- [ ] When both evening and morning twilight windows qualify for Mercury or Venus on the same night, the window with the higher `quality_score` is returned, breaking ties in favor of evening
-- [ ] Forecast cache keys remain unchanged (`(lat_rounded, lon_rounded)` with 6-hour TTL) — the cache logic does not distinguish between twilight and darkness windows
-- [ ] No regression in forecast performance: all five planets' forecasts still complete within 500 ms combined
+- [x] `backend/app/services/planets/forecast.py` exports a new helper `_compute_twilight_window_for_night(lat, lon, night_dt, is_evening: bool) -> Tuple[Optional[datetime], Optional[datetime]]` that returns the evening twilight window (sunset to sun at −12°) when `is_evening=True`, or the morning twilight window (sun at −12° to sunrise) when `is_evening=False`
+- [x] `compute_next_good_observation()` branches on planet type: when `planet_name in {"Mercury", "Venus"}`, it calls `_compute_twilight_window_for_night()` for both evening and morning, samples each window via `_find_peak_in_window()`, and returns the window with the higher quality score; when `planet_name in {"Mars", "Jupiter", "Saturn"}`, the existing nautical-darkness logic (sun < −12°) is used unchanged
+- [x] Mercury at 20° altitude during evening civil twilight (sun at −4°) with elongation 25° returns a forecast recommendation with `start_time` immediately after sunset and `end_time` at nautical twilight onset (sun −12°), not `None` as it would under the old nautical-darkness-only logic
+- [x] Venus at 15° altitude during morning nautical twilight (sun at −10°) returns a forecast recommendation with a morning time window, demonstrating the dawn-side sampling
+- [x] Mars at 30° altitude during nautical darkness (sun at −15°) continues to return the existing nautical-darkness window unchanged — outer-planet logic is unaffected
+- [x] When both evening and morning twilight windows qualify for Mercury or Venus on the same night, the window with the higher `quality_score` is returned, breaking ties in favor of evening
+- [x] Forecast cache keys remain unchanged (`(lat_rounded, lon_rounded)` with 6-hour TTL) — the cache logic does not distinguish between twilight and darkness windows
+- [x] No regression in forecast performance: all five planets' forecasts still complete within 500 ms combined
 
 **Key files**
 - Modify `backend/app/services/planets/forecast.py` — add `_compute_twilight_window_for_night()` helper using `observer.horizon = "0"` (sunset/sunrise) and `observer.horizon = "-12"` (nautical boundaries) via `ephem.Observer.next_setting()` and `next_rising()`; modify `compute_next_good_observation()` to branch on planet type, sample both twilight windows for inferior planets, and select the window with better quality score
