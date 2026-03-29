@@ -281,6 +281,37 @@ document.addEventListener('DOMContentLoaded', () => {
         expandBtn.addEventListener('click', toggleSkyMapExpanded);
     }
 
+    // --- Solar system expand / minimise ---
+
+    const solarSystemPanelEl = document.querySelector('.solar-system-panel');
+    const solarSystemExpandBtn = document.querySelector('.solar-system-expand-btn');
+    const solarSystemExpandBtnLabel = solarSystemExpandBtn
+        ? solarSystemExpandBtn.querySelector('.solar-system-expand-btn__label')
+        : null;
+
+    /**
+     * Toggle the solar system panel between its normal layout position and a
+     * fixed fullscreen overlay.
+     */
+    function toggleSolarSystemExpanded() {
+        if (!solarSystemPanelEl || !solarSystemExpandBtn) return;
+
+        const isExpanded = solarSystemPanelEl.classList.toggle('solar-system-panel--expanded');
+
+        // Suppress page scroll while the panel occupies the full viewport.
+        document.body.style.overflow = isExpanded ? 'hidden' : '';
+
+        if (solarSystemExpandBtnLabel) {
+            solarSystemExpandBtnLabel.textContent = isExpanded ? 'Minimera' : 'Förstora';
+        }
+        solarSystemExpandBtn.setAttribute('aria-label', isExpanded ? 'Minimera solsystemsvyn' : 'Förstora solsystemsvyn');
+        solarSystemExpandBtn.setAttribute('title', isExpanded ? 'Minimera' : 'Förstora');
+    }
+
+    if (solarSystemExpandBtn) {
+        solarSystemExpandBtn.addEventListener('click', toggleSolarSystemExpanded);
+    }
+
     // --- Sky map zoom buttons ---
     // Query all zoom buttons and route clicks to the active map instance.
     const zoomBtns = Array.from(document.querySelectorAll('.sky-map-zoom-btn'));
@@ -304,10 +335,15 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Collapse the expanded map when the user presses Escape.
+    // Collapse expanded panels when the user presses Escape.
     document.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape' && skyMapPanelEl && skyMapPanelEl.classList.contains('sky-map-panel--expanded')) {
-            toggleSkyMapExpanded();
+        if (event.key === 'Escape') {
+            if (skyMapPanelEl && skyMapPanelEl.classList.contains('sky-map-panel--expanded')) {
+                toggleSkyMapExpanded();
+            }
+            if (solarSystemPanelEl && solarSystemPanelEl.classList.contains('solar-system-panel--expanded')) {
+                toggleSolarSystemExpanded();
+            }
         }
     });
 
@@ -473,6 +509,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (tabId === 'solarsystem' && lastApiData !== null) {
             solarSystemView.render(lastApiData.planets || [], lastApiData.earth_heliocentric || null);
+        }
+
+        // If the user leaves the solar system tab while it is expanded, reset to
+        // the normal layout so it does not remain fullscreen in the background.
+        if (tabId !== 'solarsystem' && solarSystemPanelEl && solarSystemPanelEl.classList.contains('solar-system-panel--expanded')) {
+            solarSystemPanelEl.classList.remove('solar-system-panel--expanded');
+            document.body.style.overflow = '';
+            if (solarSystemExpandBtnLabel) {
+                solarSystemExpandBtnLabel.textContent = 'Förstora';
+            }
+            if (solarSystemExpandBtn) {
+                solarSystemExpandBtn.setAttribute('aria-label', 'Förstora solsystemsvyn');
+                solarSystemExpandBtn.setAttribute('title', 'Förstora');
+            }
         }
     });
 

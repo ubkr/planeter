@@ -1207,7 +1207,7 @@ The 3D sky dome gains the four intermediate compass direction labels already pre
 
 ---
 
-#### Phase E13: Helskärmsläge för Solsystemsvy
+#### Phase E13: Helskärmsläge för Solsystemsvy — ✅
 
 **Depends on:** Phase E6, Phase 13
 **Parallelisable with:** Phase B6, Phase B7, Phase E9, Phase E10, Phase E11

@@ -139,7 +139,13 @@
 
       <!-- Solsystemet tab panel (hidden by default) -->
       <div id="panelSolarSystem" role="tabpanel" aria-labelledby="tabSolarSystem" class="tab-panel--hidden" hidden>
-        <div id="solarSystemContainer"></div>
+        <div class="solar-system-panel">
+          <button class="solar-system-expand-btn" aria-label="Förstora solsystemsvyn" title="Förstora">
+            <span aria-hidden="true">&#x26F6;</span>
+            <span class="solar-system-expand-btn__label">Förstora</span>
+          </button>
+          <div id="solarSystemContainer"></div>
+        </div>
       </div>
     </main>
 
