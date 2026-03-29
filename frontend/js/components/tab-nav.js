@@ -1,6 +1,6 @@
 /**
  * tab-nav.js - Tab navigation for switching between Planeter, Stjärnkarta,
- * and Kommande panels.
+ * Solsystemet, and Kommande panels.
  *
  * Implements the WAI-ARIA tabs pattern (automatic-activation model):
  *   https://www.w3.org/WAI/ARIA/apg/patterns/tabs/

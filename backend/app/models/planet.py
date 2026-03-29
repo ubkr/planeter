@@ -244,6 +244,15 @@ class AstronomicalEvent(BaseModel):
     )
 
 
+class EarthHeliocentric(BaseModel):
+    """Heliocentric position of Earth computed via ephem.Sun()."""
+
+    heliocentric_x_au: float
+    heliocentric_y_au: float
+    heliocentric_z_au: float
+    distance_au: float
+
+
 class PlanetsResponse(BaseModel):
     """Top-level API response for planet visibility endpoints."""
 
@@ -258,6 +267,9 @@ class PlanetsResponse(BaseModel):
         default_factory=list,
         description="Upcoming and current astronomical events detected for the observation window",
     )
+    earth_heliocentric: Optional[EarthHeliocentric] = Field(
+        None, description="Earth's current heliocentric position and Sun distance"
+    )
 
     class Config:
         json_schema_extra = {
@@ -269,6 +281,12 @@ class PlanetsResponse(BaseModel):
                 "weather": {"cloud_cover": 15.0, "source": "met_no"},
                 "planets": [],
                 "events": [],
+                "earth_heliocentric": {
+                    "heliocentric_x_au": 0.98,
+                    "heliocentric_y_au": 0.15,
+                    "heliocentric_z_au": 0.0,
+                    "distance_au": 0.99,
+                },
             }
         }
 

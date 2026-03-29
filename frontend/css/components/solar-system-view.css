@@ -18,6 +18,19 @@
 .solar-system__sun {
     fill: var(--color-accent-primary);
     stroke: none;
+    cursor: pointer;
+    transition: opacity var(--transition-fast, 150ms ease);
+}
+
+.solar-system__sun:hover {
+    opacity: 0.85;
+}
+
+.solar-system__sun:focus,
+.solar-system__sun:focus-visible {
+    stroke: var(--color-accent-primary);
+    stroke-width: 2;
+    outline: none;
 }
 
 /* --- Orbit Rings --- */
@@ -46,7 +59,7 @@
 
 .solar-system__planet {
     cursor: pointer;
-    transition: opacity var(--transition-fast);
+    transition: opacity var(--transition-fast, 150ms ease);
 }
 
 .solar-system__planet--mercury {
@@ -69,6 +82,10 @@
     fill: var(--color-planet-saturn);
 }
 
+.solar-system__planet--earth {
+    fill: var(--color-accent-secondary);
+}
+
 .solar-system__planet:hover {
     opacity: 0.8;
     outline: none;
@@ -77,9 +94,10 @@
 
 .solar-system__planet:focus,
 .solar-system__planet:focus-visible {
+    stroke: var(--color-accent-primary);
+    stroke-width: 2;
+    outline: none;
     opacity: 0.8;
-    outline: 2px solid var(--color-accent-primary);
-    outline-offset: 3px;
     filter: drop-shadow(0 0 6px currentColor);
 }
 

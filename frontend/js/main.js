@@ -361,6 +361,7 @@ document.addEventListener('DOMContentLoaded', () => {
         hideError();
         planetCards.showLoading();
         skySummary.showLoading();
+        solarSystemView.clear();
 
         try {
             const data = await fetchVisiblePlanets(location.lat, location.lon);
@@ -370,7 +371,6 @@ document.addEventListener('DOMContentLoaded', () => {
             skySummary.render(data);
             planetCards.render(data.planets);
             eventAlerts.render(data.events || []);
-            solarSystemView.render(data.planets || []);
             skyMap.plotBodies(data.planets, data.sun, data.moon, data.events || []);
 
             if (skyMap3d !== null) {
@@ -472,7 +472,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (tabId === 'solarsystem' && lastApiData !== null) {
-            solarSystemView.render(lastApiData.planets || []);
+            solarSystemView.render(lastApiData.planets || [], lastApiData.earth_heliocentric || null);
         }
     });
 

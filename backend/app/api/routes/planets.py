@@ -8,6 +8,7 @@ from typing import List, Optional, Tuple
 from fastapi import APIRouter, HTTPException, Query
 
 from ...models.planet import (
+    EarthHeliocentric,
     LocationInfo,
     MoonInfo,
     NextGoodObservation,
@@ -21,7 +22,7 @@ from ...services.cache_service import cache
 from ...services.planets.calculator import calculate_planet_positions
 from ...services.planets.events import detect_events
 from ...services.planets.forecast import compute_next_good_observation
-from ...services.planets.heliocentric import compute_heliocentric_positions
+from ...services.planets.heliocentric import compute_earth_heliocentric, compute_heliocentric_positions
 from ...services.scoring import apply_scores, score_tonight
 from ...utils.logger import setup_logger
 from ...utils.moon import calculate_moon_penalty
@@ -533,6 +534,14 @@ async def get_visible_planets(
     except Exception as exc:
         logger.warning(f"compute_heliocentric_positions failed for /visible ({lat}, {lon}): {exc}")
 
+    earth_heliocentric = None
+    try:
+        earth_helio_dict = compute_earth_heliocentric(now_utc)
+        if earth_helio_dict is not None:
+            earth_heliocentric = EarthHeliocentric(**earth_helio_dict)
+    except Exception as exc:
+        logger.warning(f"compute_earth_heliocentric failed for /visible ({lat}, {lon}): {exc}")
+
     sun_info = _build_sun_info(sun_data)
     moon_info = _build_moon_info(moon_data)
 
@@ -552,6 +561,7 @@ async def get_visible_planets(
         ),
         planets=planets,
         events=events,
+        earth_heliocentric=earth_heliocentric,
     )
 
 
@@ -639,8 +649,8 @@ async def get_tonight_planets(
     events = _filter_above_horizon(events)
 
     # Populate heliocentric coordinates for the solar-system overview.
+    helio_dt = mid_dt.replace(tzinfo=timezone.utc) if mid_dt is not None else now_utc
     try:
-        helio_dt = mid_dt.replace(tzinfo=timezone.utc) if mid_dt is not None else now_utc
         helio = compute_heliocentric_positions(helio_dt)
         for planet in planets:
             coords = helio.get(planet.name)
@@ -650,6 +660,14 @@ async def get_tonight_planets(
                 planet.heliocentric_z_au = coords["heliocentric_z_au"]
     except Exception as exc:
         logger.warning(f"compute_heliocentric_positions failed for /tonight ({lat}, {lon}): {exc}")
+
+    earth_heliocentric = None
+    try:
+        earth_helio_dict = compute_earth_heliocentric(helio_dt)
+        if earth_helio_dict is not None:
+            earth_heliocentric = EarthHeliocentric(**earth_helio_dict)
+    except Exception as exc:
+        logger.warning(f"compute_earth_heliocentric failed for /tonight ({lat}, {lon}): {exc}")
 
     # Use the pre-computed sun/moon data so metadata reflects the same moment
     # used for scoring, not the wall-clock time of the HTTP request.
@@ -668,6 +686,7 @@ async def get_tonight_planets(
         planets=planets,
         tonight_score=tonight,
         events=events,
+        earth_heliocentric=earth_heliocentric,
     )
 
 

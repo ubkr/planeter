@@ -38,6 +38,7 @@ backend/
         calculator.py             -- Core ephem-based planet position calculations
         events.py                 -- Astronomical event detection (conjunctions, oppositions, etc.)
         forecast.py               -- 6-month next-good-observation scanner (per-night dark-window sampling)
+        heliocentric.py           -- Heliocentric XYZ coordinates for planets and Earth (via ephem.Sun())
       weather/
         base.py                   -- WeatherSourceBase ABC
         metno_client.py           -- Met.no API client
@@ -94,6 +95,7 @@ frontend/
       settings-modal.js           -- Location picker modal (Leaflet)
       map-selector.js             -- Leaflet map widget
       tooltip.js                  -- Tooltip utility
+      solar-system-view.js        -- Heliocentric SVG top-down solar system diagram (Solsystemet tab)
   lib/
     three.module.min.js           -- Three.js r170 (vendored, ES module)
     three/addons/
@@ -171,7 +173,8 @@ SkyMap tab (panelSkyMap)
 6. Backend `VisibilityScorer` combines positions, sun/moon state, and weather into per-planet scores
 7. Response sent to browser; `PlanetCards` and `SkySummary` components render the Planets tab
 8. When the user opens the **Stjärnkarta** tab, `SkyMap` (2D) or `SkyMap3D` (Three.js) renders planet positions
-9. When the user opens the **Kommande** tab, `APIClient` fetches `GET /api/v1/events` and `EventsTimeline` renders the next 60 days of conjunctions, oppositions, etc.
+9. When the user opens the **Solsystemet** tab, `SolarSystemView` renders a heliocentric SVG top-down diagram of the solar system with an Earth dot and a Sun tooltip showing the current Earth-Sun distance
+10. When the user opens the **Kommande** tab, `APIClient` fetches `GET /api/v1/events` and `EventsTimeline` renders the next 60 days of conjunctions, oppositions, etc.
 
 ### Calculation Pipeline (Backend)
 
@@ -188,6 +191,9 @@ ephem.Observer(lat, lon, date)
   +---> ephem.Mars()     --> alt, az, mag, rise, set, transit
   +---> ephem.Jupiter()  --> alt, az, mag, rise, set, transit
   +---> ephem.Saturn()   --> alt, az, mag, rise, set, transit
+  |
+  +---> heliocentric.py  --> per-planet heliocentric_x/y/z_au; Earth position via ephem.Sun()
+  |                          (heliocentric_x/y/z_au + distance_au added to response as earth_heliocentric)
   |
   v
 Weather API --> cloud_cover_percent
@@ -280,6 +286,12 @@ A planet is declared **"visible"** when: altitude > 0, total score > 15, and app
   "sun": { "elevation_deg": -25.3, "twilight_phase": "darkness" },
   "moon": { "illumination": 0.45, "elevation_deg": 32.1, "azimuth_deg": 180.0 },
   "weather": { "cloud_cover": 15.0, "source": "met_no" },
+  "earth_heliocentric": {
+    "heliocentric_x_au": 0.983,
+    "heliocentric_y_au": 0.021,
+    "heliocentric_z_au": 0.000,
+    "distance_au": 0.9834
+  },
   "planets": [
     {
       "name": "Venus",
@@ -294,6 +306,9 @@ A planet is declared **"visible"** when: altitude > 0, total score > 15, and app
       "set_time": "2026-02-28T20:30:00Z",
       "transit_time": "2026-02-28T13:45:00Z",
       "next_visible_time": null,
+      "heliocentric_x_au": -0.718,
+      "heliocentric_y_au": 0.021,
+      "heliocentric_z_au": 0.042,
       "next_good_observation": {
         "date": "2026-05-14",
         "start_time": "2026-05-14T21:00:00Z",

@@ -7,6 +7,7 @@ version: 2.0.0
 ## Overview
 
 This skill takes a brief feature description and produces a complete, correctly formatted PLAN.md entry through autonomous codebase research. It asks the user only for product-intent decisions that cannot be inferred from existing code and documentation. It does not modify any files.
+If you are instructed to ask questions then use the ask tool if possible. If you are not instructed to ask questions, do not ask any questions.
 
 ---
 

@@ -6,6 +6,7 @@
  *   - Orbit rings using square-root scaling so outer planets remain visible
  *   - Planet dots projected onto their orbit rings using the same sqrt scaling
  *   - Earth reference orbit ring (dashed) labelled "1 AU"
+ *   - Earth dot showing the actual Earth position from the API
  *
  * Orbit ring radii use sqrt scaling for visual readability:
  *   radius_px = MAX_RADIUS * sqrt(sma / MAX_SMA)
@@ -80,20 +81,29 @@ function orbitRadius(smaAU) {
 /**
  * Build the Sun circle at the centre of the diagram.
  *
+ * @param {number|null|undefined} distanceAU - Earth-Sun distance in AU (optional)
  * @returns {SVGCircleElement}
  */
-function buildSun() {
+function buildSun(distanceAU) {
+    const tooltipText = (distanceAU != null && !isNaN(distanceAU))
+        ? `Solen\nAvstånd från Jorden: ${distanceAU.toFixed(4)} AU`
+        : 'Solen';
+
     const circle = svgEl('circle');
     setAttrs(circle, {
         cx: CENTER,
         cy: CENTER,
         r: 10,
-        class: 'solar-system__sun',
+        class: 'solar-system__sun info-icon',
+        tabindex: '0',
+        role: 'button',
+        title: tooltipText,
     });
 
-    const title = svgEl('title');
-    title.textContent = 'Solen';
-    circle.appendChild(title);
+    const svgTitle = svgEl('title');
+    svgTitle.textContent = tooltipText;
+    svgTitle.style.pointerEvents = 'none';
+    circle.appendChild(svgTitle);
 
     return circle;
 }
@@ -191,7 +201,7 @@ function buildPlanetDot(planet) {
         r: 7,
         class: `solar-system__planet solar-system__planet--${nameLower} info-icon`,
         tabindex: '0',
-        role: 'img',
+        role: 'button',
         title: tooltipText,
     });
 
@@ -199,6 +209,7 @@ function buildPlanetDot(planet) {
     // The title attribute above is kept in parallel for TooltipManager compatibility.
     const svgTitle = svgEl('title');
     svgTitle.textContent = tooltipText;
+    svgTitle.style.pointerEvents = 'none';
     dot.appendChild(svgTitle);
 
     group.appendChild(dot);
@@ -211,6 +222,84 @@ function buildPlanetDot(planet) {
         class: 'solar-system__label',
     });
     label.textContent = planet.name_sv;
+    group.appendChild(label);
+
+    return group;
+}
+
+/**
+ * Build the Earth dot showing the actual Earth position from the API.
+ *
+ * Returns null if the heliocentric coordinates are missing or invalid.
+ *
+ * @param {Object|null|undefined} earthHeliocentric - earth_heliocentric API object
+ * @param {number|null|undefined} earthHeliocentric.heliocentric_x_au
+ * @param {number|null|undefined} earthHeliocentric.heliocentric_y_au
+ * @param {number|null|undefined} earthHeliocentric.distance_au
+ * @returns {SVGGElement|null}
+ */
+function buildEarthDot(earthHeliocentric) {
+    if (!earthHeliocentric) {
+        return null;
+    }
+
+    const x = earthHeliocentric.heliocentric_x_au;
+    const y = earthHeliocentric.heliocentric_y_au;
+
+    if (x == null || y == null || isNaN(x) || isNaN(y)) {
+        return null;
+    }
+
+    const dist = Math.sqrt(x * x + y * y);
+    if (dist === 0) {
+        return null;
+    }
+
+    // Apply sqrt scaling to radial distance; preserve the actual angle.
+    const scaledDist = MAX_RADIUS * Math.sqrt(dist / MAX_SMA);
+    const angle = Math.atan2(y, x);
+
+    const svgX = CENTER + scaledDist * Math.cos(angle);
+    const svgY = CENTER - scaledDist * Math.sin(angle); // Y flipped
+
+    // Prefer distance_au from API if available, otherwise fall back to computed dist.
+    const distanceAU = (earthHeliocentric.distance_au != null && !isNaN(earthHeliocentric.distance_au))
+        ? earthHeliocentric.distance_au
+        : dist;
+
+    const tooltipText = `Jorden\nAvstånd från Solen: ${distanceAU.toFixed(4)} AU`;
+
+    const group = svgEl('g');
+
+    // Earth dot — smaller than planet dots (r=5 vs r=7) since Earth is a
+    // reference body, not a tracked planet. Uses info-icon for TooltipManager.
+    const dot = svgEl('circle');
+    setAttrs(dot, {
+        cx: svgX,
+        cy: svgY,
+        r: 5,
+        class: 'solar-system__planet solar-system__planet--earth info-icon',
+        tabindex: '0',
+        role: 'button',
+        title: tooltipText,
+    });
+
+    // SVG accessibility: child <title> element.
+    const svgTitle = svgEl('title');
+    svgTitle.textContent = tooltipText;
+    svgTitle.style.pointerEvents = 'none';
+    dot.appendChild(svgTitle);
+
+    group.appendChild(dot);
+
+    // Text label offset slightly to the right and above the dot
+    const label = svgEl('text');
+    setAttrs(label, {
+        x: svgX + 10,
+        y: svgY - 10,
+        class: 'solar-system__label',
+    });
+    label.textContent = 'Jorden';
     group.appendChild(label);
 
     return group;
@@ -238,8 +327,9 @@ export class SolarSystemView {
      *
      * @param {Array<Object>} planets - Array of planet objects from the API.
      *   Each object should have: name, name_sv, heliocentric_x_au, heliocentric_y_au.
+     * @param {Object|null} [earthHeliocentric=null] - earth_heliocentric API object.
      */
-    render(planets) {
+    render(planets, earthHeliocentric = null) {
         if (!this.containerEl) {
             return;
         }
@@ -252,7 +342,7 @@ export class SolarSystemView {
             viewBox: `0 0 ${VIEW_SIZE} ${VIEW_SIZE}`,
             class: 'solar-system-svg',
             width: '100%',
-            role: 'img',
+            role: 'group',
             'aria-label': 'Solsystemet \u2014 vy uppifrån',
         });
 
@@ -265,7 +355,7 @@ export class SolarSystemView {
         svg.appendChild(buildEarthOrbitLabel());
 
         // --- Sun ---
-        svg.appendChild(buildSun());
+        svg.appendChild(buildSun(earthHeliocentric?.distance_au ?? null));
 
         // --- Planet dots ---
         const planetList = Array.isArray(planets) ? planets : [];
@@ -274,6 +364,12 @@ export class SolarSystemView {
             if (dotGroup !== null) {
                 svg.appendChild(dotGroup);
             }
+        }
+
+        // --- Earth dot ---
+        const earthDotGroup = buildEarthDot(earthHeliocentric);
+        if (earthDotGroup !== null) {
+            svg.appendChild(earthDotGroup);
         }
 
         this.containerEl.appendChild(svg);

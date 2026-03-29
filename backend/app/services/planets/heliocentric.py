@@ -16,7 +16,7 @@ import ephem
 import logging
 import math
 from datetime import datetime, timezone
-from typing import Dict
+from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -90,3 +90,56 @@ def compute_heliocentric_positions(dt: datetime) -> Dict[str, Dict[str, float]]:
             )
 
     return result
+
+
+def compute_earth_heliocentric(dt: datetime) -> Optional[Dict[str, float]]:
+    """
+    Return Earth's heliocentric position computed via ephem.Sun().
+
+    ephem.Sun() without an observer exposes Earth's heliocentric ecliptic
+    longitude (hlon), latitude (hlat), and Sun distance (earth_distance) in
+    the same coordinate system used for the planets.  These are converted to
+    Cartesian XYZ in AU using the same spherical-to-Cartesian formula as
+    compute_heliocentric_positions().
+
+    Args:
+        dt: UTC datetime for the calculation.  May be timezone-aware or
+            timezone-naive; timezone-aware values are converted to UTC before
+            being passed to ephem, which requires naive UTC.
+
+    Returns:
+        A dict with keys ``heliocentric_x_au``, ``heliocentric_y_au``,
+        ``heliocentric_z_au``, and ``distance_au`` (all floats), or None if
+        the calculation fails.
+    """
+    # ephem does not accept timezone-aware datetimes.
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+
+    try:
+        body = ephem.Sun()
+        # Compute without an observer — populates heliocentric attrs for Earth.
+        body.compute(dt)
+
+        hlon = float(body.hlon)             # radians, Earth heliocentric ecliptic longitude
+        hlat = float(body.hlat)             # radians, Earth heliocentric ecliptic latitude
+        dist = float(body.earth_distance)   # AU, Earth-Sun distance
+
+        cos_lat = math.cos(hlat)
+        x = dist * cos_lat * math.cos(hlon)
+        y = dist * cos_lat * math.sin(hlon)
+        z = dist * math.sin(hlat)
+
+        return {
+            "heliocentric_x_au": x,
+            "heliocentric_y_au": y,
+            "heliocentric_z_au": z,
+            "distance_au": dist,
+        }
+    except Exception as exc:
+        logger.warning(
+            "Failed to compute Earth heliocentric position at %s: %s",
+            dt.isoformat(),
+            exc,
+        )
+        return None
