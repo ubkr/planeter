@@ -1206,3 +1206,28 @@ The 3D sky dome gains the four intermediate compass direction labels already pre
 - Modify `frontend/js/components/sky-map-3d.js` — add an `INTERMEDIATES` constant array (NO at 45°, SO at 135°, SV at 225°, NV at 315°); extend `buildCardinalLabels()` to loop over `INTERMEDIATES` and call a muted variant of `buildCardinalSprite()` (smaller canvas font, reduced sprite scale, dimmer fill colour); change `BODY_COLORS.sun` from `'#fde68a'` to `'#f59e0b'`; change `BODY_COLORS.moon` from `'#e2e8f0'` to `'#c084fc'`
 
 ---
+
+#### Phase E13: Helskärmsläge för Solsystemsvy
+
+**Depends on:** Phase E6, Phase 13
+**Parallelisable with:** Phase B6, Phase B7, Phase E9, Phase E10, Phase E11
+
+**Intended Outcome**
+The solar system view gains the same fullscreen capability as the 2D and 3D sky maps. A "Förstora" button appears in the solar system panel that, when clicked, expands the view to fill the entire browser window using the same CSS-based approach established in Phase E6. The SVG diagram scales via its viewBox attribute to fill the expanded space without distortion, maintaining correct orbital proportions. Clicking "Minimera" returns the view to its normal embedded size.
+
+**Definition of Done**
+- [ ] En knapp med texten "Förstora" och "Minimera" (beroende på läge) syns i `#panelSolarSystem` container
+- [ ] Klick på knappen togglar klassen `.solar-system-panel--expanded` på solsystemspanelen och vyn täcker hela webbläsarfönstret (`100vw × 100vh`) utan scrollbars
+- [ ] Klick igen tar bort klassen och återgår vyn till ursprunglig layout
+- [ ] SVG:en för solsystemet fyller det expanderade utrymmet utan distorsion (aspect ratio bevaras via `viewBox` precis som för 2D-stjärnkartan)
+- [ ] Planettolltips fortsätter fungera korrekt i både normalt och expanderat läge
+- [ ] Ingen regression i befintlig solsystemsvy-rendering på 375 px och 1200 px viewports
+
+**Key files**
+- Modify `frontend/index.html` — lägg till expand/minimera-knapp inuti `#panelSolarSystem` container
+- Modify `frontend/css/components/solar-system-view.css` — lägg till `.solar-system-panel--expanded`-regler med `position: fixed; inset: 0; z-index` för helskärmsläge, konsistent med `.sky-map-panel--expanded` från Phase E6
+- Modify `frontend/js/main.js` — koppla knapptryckning till klasstoggle på solsystemspanelen
+
+> **Implementation note:** Use the `frontend-enhancement` skill for this phase — frontend-only change reusing an established pattern, no new backend computation.
+
+---
