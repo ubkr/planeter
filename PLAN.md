@@ -1231,3 +1231,98 @@ The solar system view gains the same fullscreen capability as the 2D and 3D sky 
 > **Implementation note:** Use the `frontend-enhancement` skill for this phase — frontend-only change reusing an established pattern, no new backend computation.
 
 ---
+
+### Phase F: Solsystemsvy — Interaktiv Planetutforskning
+
+The solar system view gains interactive planet exploration. Clicking a planet dot zooms in and presents an encyclopedic information panel, a rendering of the planet's largest moons at their current positions as seen from Earth, and (for Saturn) the ring system tilted to match the current Earth–Saturn geometry. F1 (click, zoom, and info) is the foundation; F2 (moons) and F3 (rings) build on the zoomed-in detail view and can be implemented in parallel with each other.
+
+#### Phase F1: Planetklick & Zoom med Informationsruta
+
+**Depends on:** Phase 13
+**Parallelisable with:** Phase E series
+
+**Intended Outcome**
+
+Clicking or tapping a planet dot in the solar system SVG smoothly zooms the viewBox to centre on that planet, then presents a detail overlay containing a Swedish-language encyclopedic information panel. The panel includes physical characteristics (diameter, orbital period, distance from the Sun), notable features, and number of known moons — static factual content sourced from publicly available encyclopedic knowledge and stored in a frontend data file, analogous to the existing `planet-descriptions.js`. A "Tillbaka" button reverses the zoom and returns to the full solar system overview. The interaction works for all five naked-eye planets and Earth.
+
+**Definition of Done**
+- [ ] Clicking a planet dot (Merkurius, Venus, Mars, Jupiter, Saturnus) in the solar system SVG triggers a smooth viewBox transition that centres the clicked planet within 400 ms
+- [ ] After the zoom completes, an info overlay or panel is visible containing the planet's Swedish name, diameter (km), orbital period, mean distance from the Sun (AU), number of known moons, and a 2–3 sentence description of notable features — all text in Swedish
+- [ ] `frontend/js/data/planet-info.js` exists and exports a keyed object with encyclopedic data for all five planets and Earth; each entry includes at minimum: `diameter_km`, `orbital_period_sv`, `distance_au`, `known_moons`, `description_sv`
+- [ ] Clicking the Earth dot in the solar system SVG also triggers the zoom and shows Earth's info panel
+- [ ] A "Tillbaka" button or click-outside-to-dismiss gesture reverses the zoom and hides the info overlay, restoring the full solar system viewBox
+- [ ] The zoomed-in state and info panel are usable on both 375 px and 1200 px viewports without overflow
+- [ ] The info overlay is keyboard-accessible: focusable "Tillbaka" button, Escape key dismisses the overlay
+- [ ] No JavaScript console errors when clicking planets before API data has loaded (the view gracefully ignores clicks when no planet positions are available)
+
+**Key files**
+- Create `frontend/js/data/planet-info.js` — static Swedish encyclopedic data for Mercury, Venus, Earth, Mars, Jupiter, Saturn (physical facts, orbital data, notable features, known moon count)
+- Modify `frontend/js/components/solar-system-view.js` — add click handler on planet dots and Earth dot; implement viewBox zoom animation; render detail overlay with info panel and "Tillbaka" button; manage zoomed/overview state
+- Modify `frontend/css/components/solar-system-view.css` — style `.solar-system__detail-overlay` info panel, zoom transition, "Tillbaka" button, responsive layout for zoomed state
+- Modify `frontend/js/main.js` — wire Escape key handler to dismiss zoomed state when solar system tab is active
+
+> **Implementation note:** Use the `frontend-enhancement` skill for this phase — frontend-only change using static data, no new backend computation.
+
+---
+
+#### Phase F2: Månpositioner för Jätteplaneter
+
+**Depends on:** Phase F1
+**Parallelisable with:** Phase F3
+
+**Intended Outcome**
+
+When the user zooms into Jupiter or Saturn in the solar system detail view, the planet's largest moons are rendered as small labelled dots at their current positions relative to the planet as seen from Earth. The backend computes moon positions using `ephem`'s built-in satellite calculators (`ephem.Io()`, `ephem.Europa()`, `ephem.Ganymede()`, `ephem.Callisto()` for Jupiter; `ephem.Titan()`, `ephem.Rhea()`, `ephem.Dione()`, `ephem.Tethys()`, `ephem.Enceladus()`, `ephem.Mimas()`, `ephem.Iapetus()` for Saturn), which report X/Y offsets in parent-planet radii as seen from Earth — ideal for this rendering. The frontend renders moons as dots positioned around a larger planet circle in the detail overlay, with Swedish labels. All positions are computed for the current time, matching the solar system view's timestamp.
+
+**Definition of Done**
+- [ ] `backend/app/services/planets/moons.py` exists and exports `compute_moon_positions(dt: datetime) -> dict` returning X/Y offsets (in parent-planet radii) for Jupiter's 4 Galilean moons and Saturn's 7 major moons
+- [ ] `PlanetPosition` model includes a new optional field `moons: Optional[List[MoonPosition]]` where `MoonPosition` is a Pydantic model with fields `name` (str), `name_sv` (str), `x_offset` (float, planet radii), `y_offset` (float, planet radii)
+- [ ] `GET /api/v1/planets/visible?lat=55.7&lon=13.4` returns a non-empty `moons` array for both Jupiter and Saturn; Mercury, Venus, and Mars return `moons: null` or an empty list
+- [ ] The zoomed-in detail view for Jupiter renders 4 moon dots (Io, Europa, Ganymedes, Callisto) positioned around the planet circle at offsets matching their current `x_offset`/`y_offset` values
+- [ ] The zoomed-in detail view for Saturn renders at least Titan and the other major moons as labelled dots
+- [ ] Each moon dot has a Swedish label (e.g. "Io", "Europa", "Ganymedes", "Callisto", "Titan") rendered adjacent to the dot
+- [ ] Moon dots are visually smaller than the planet circle and use a muted colour distinct from the planet's colour token
+- [ ] Hovering or tapping a moon dot shows a tooltip with the moon's Swedish name and its current offset distance from the planet
+- [ ] Planets without moons in the API response (Mercury, Venus, Mars) show no moon rendering in their detail view — no errors or empty-state clutter
+- [ ] No regression in existing solar system view rendering; the overview mode (unzoomed) is unaffected by the moon data addition
+
+**Key files**
+- Create `backend/app/services/planets/moons.py` — compute moon positions using `ephem.Io()`, `ephem.Europa()`, `ephem.Ganymede()`, `ephem.Callisto()`, `ephem.Titan()`, `ephem.Rhea()`, etc.; return X/Y offsets in planet radii as seen from Earth
+- Modify `backend/app/models/planet.py` — add `MoonPosition` Pydantic model and `moons: Optional[List[MoonPosition]]` field on `PlanetPosition`
+- Modify `backend/app/api/routes/planets.py` — call `compute_moon_positions()` in the `/visible` handler; populate `moons` field on Jupiter and Saturn `PlanetPosition` objects
+- Modify `frontend/js/components/solar-system-view.js` — in the zoomed-in detail overlay, render moon dots around the planet circle for Jupiter and Saturn using their `moons` array data; add tooltip interaction for moon dots
+- Modify `frontend/css/components/solar-system-view.css` — style `.solar-system__moon` dots, labels, and hover/focus states
+
+> **Implementation note:** Use the `full-stack-feature` skill for this phase — new backend computation (ephem moon positions) and frontend rendering.
+
+---
+
+#### Phase F3: Saturnusringar — Visuell Rendering
+
+**Depends on:** Phase F1
+**Parallelisable with:** Phase F2
+
+**Intended Outcome**
+
+When the user zooms into Saturn in the solar system detail view, the planet's ring system is rendered as a tilted ellipse matching the ring opening angle as seen from Earth at the current time. The backend computes the ring tilt using `ephem.Saturn()`'s `earth_tilt` attribute, which gives the inclination of Saturn's rings toward the Earth observer in radians. The frontend renders the rings as an SVG ellipse where the semi-major axis represents the ring's physical extent and the semi-minor axis is scaled by `sin(earth_tilt)`, producing the correct apparent foreshortening. When the rings are nearly edge-on (`earth_tilt` close to 0°), the ellipse collapses to a thin line, faithfully representing the real-world view.
+
+**Definition of Done**
+- [ ] `PlanetPosition` model includes a new optional field `ring_tilt_deg: Optional[float]` populated only for Saturn, representing the ring tilt toward Earth in degrees (positive = north pole tilted toward Earth)
+- [ ] `GET /api/v1/planets/visible?lat=55.7&lon=13.4` returns a non-null `ring_tilt_deg` value for Saturn; all other planets return `ring_tilt_deg: null`
+- [ ] The zoomed-in detail view for Saturn renders an SVG ellipse around the planet circle; the ellipse's semi-minor axis is proportional to `|sin(ring_tilt_deg)|`, correctly representing the apparent ring opening
+- [ ] At the current epoch (2025–2026, ring tilt near 0°), Saturn's rings render as a very thin ellipse nearly edge-on — matching the real-world near-edge-on passage expected in 2025
+- [ ] The ring ellipse uses Saturn's gold colour token (`--color-planet-saturn`) at reduced opacity (e.g. 0.4) so moons from Phase F2 remain visible through the ring
+- [ ] The ring rendering does not obscure the Saturn planet circle or its label
+- [ ] Planets other than Saturn show no ring rendering in their zoomed-in detail view
+- [ ] No regression in existing solar system overview rendering; ring data is only visible in the zoomed-in state
+
+**Key files**
+- Modify `backend/app/services/planets/moons.py` — add `compute_ring_tilt(dt: datetime) -> Optional[float]` that reads `ephem.Saturn().earth_tilt` and converts to degrees
+- Modify `backend/app/models/planet.py` — add `ring_tilt_deg: Optional[float]` field on `PlanetPosition`
+- Modify `backend/app/api/routes/planets.py` — call `compute_ring_tilt()` and populate `ring_tilt_deg` on Saturn's `PlanetPosition`
+- Modify `frontend/js/components/solar-system-view.js` — in the zoomed-in detail overlay for Saturn, render an SVG `<ellipse>` with semi-minor axis derived from `ring_tilt_deg`; layer the ring behind moon dots but in front of the planet background
+- Modify `frontend/css/components/solar-system-view.css` — style `.solar-system__ring` ellipse with Saturn gold colour at reduced opacity
+
+> **Implementation note:** Use the `full-stack-feature` skill for this phase — new backend computation (ring tilt) and frontend rendering.
+
+---
