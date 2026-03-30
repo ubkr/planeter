@@ -707,13 +707,13 @@ A third "Kommande" tab shows all six event types across the next 60 days as a sc
 Clicking or tapping an event row (in either the Kommande timeline or the alert cards) reveals detailed observation guidance for that event. The detail view shows the best viewing time window (start and end as `HH:MM`), the sky position at event peak (altitude in degrees, compass direction in Swedish such as "sydväst"), and a short Swedish prose tip explaining where and when to look. The exact interaction pattern — inline expand, modal, bottom sheet, or other — is left to the designer; the backend supplies all necessary data and the frontend components expose a stable hook point for whichever pattern is chosen. Events whose peak occurs during daytime or below the horizon receive a Swedish note explaining reduced visibility. All new UI strings are in Swedish.
 
 **Definition of Done**
-- [ ] `AstronomicalEvent` model includes optional observation guidance fields: `best_time_start`, `best_time_end`, `altitude_deg`, `azimuth_deg`, `compass_direction_sv`, and `observation_tip_sv`
-- [ ] The event detection pipeline computes sky position and optimal viewing window for each event type, populating the new fields on every returned event
-- [ ] Events whose peak is below the horizon or during daylight carry a Swedish explanatory note in `observation_tip_sv`
-- [ ] Clicking/tapping an event in the Kommande timeline reveals the detail content with no full-page navigation
-- [ ] Clicking/tapping an event alert card reveals the same detail content
-- [ ] Detail content is accessible via keyboard (Enter/Space to toggle) and includes appropriate ARIA attributes
-- [ ] No regressions in existing event rendering, planet cards, or sky map tabs
+- [x] `AstronomicalEvent` model includes optional observation guidance fields: `best_time_start`, `best_time_end`, `altitude_deg`, `azimuth_deg`, `compass_direction_sv`, and `observation_tip_sv`
+- [x] The event detection pipeline computes sky position and optimal viewing window for each event type, populating the new fields on every returned event
+- [x] Events whose peak is below the horizon or during daylight carry a Swedish explanatory note in `observation_tip_sv`
+- [x] Clicking/tapping an event in the Kommande timeline reveals the detail content with no full-page navigation
+- [x] Clicking/tapping an event alert card reveals the same detail content
+- [x] Detail content is accessible via keyboard (Enter/Space to toggle) and includes appropriate ARIA attributes
+- [x] No regressions in existing event rendering, planet cards, or sky map tabs
 
 **Key files**
 - Modify `backend/app/models/planet.py` — add optional fields to `AstronomicalEvent`: `best_time_start`, `best_time_end` (ISO time strings), `altitude_deg`, `azimuth_deg` (floats), `compass_direction_sv` (str), `observation_tip_sv` (str)
@@ -893,17 +893,17 @@ Planets that are currently not visible (either below the horizon or blocked by d
 The app gains a new immersive 3D viewing mode inside the "Stjärnkarta" tab. A toggle allows the user to switch between the existing "2D Projektion" and a new "3D Vy". **Three.js** is introduced as the 3D library, vendored as local ES module files under `frontend/lib/` (both `three.module.min.js` and `OrbitControls.js`) and resolved via a `<script type="importmap">` block in `index.html` — no CDN dependency, no build step required. A 3D scene is set up where the camera is placed precisely at the origin (0, 0, 0), acting as the user's viewpoint (creating an inside-out sphere view). Orbit controls allow the user to drag the screen to rotate and tilt the camera around the central pivot, simulating looking around the real sky. A visible horizon plane and an alt-azimuth grid are drawn to give the viewer perspective.
 
 **Definition of Done**
-- [ ] Three.js r0.174.0 and OrbitControls are vendored as local ES module files under `frontend/lib/`, resolved via a `<script type="importmap">` block in `index.html` — no CDN dependency, no build step required.
-- [ ] A view toggle (e.g. standard buttons or a switch) is added to the "Stjärnkarta" tab allowing switching between 2D and 3D views.
-- [ ] Selecting "3D Vy" instantiates a full-width immersive 3D canvas instead of the SVG map.
-- [ ] A camera placed at the center (0,0,0) with drag-to-look controls allows full 360-degree panning and tilting.
-- [ ] A horizon line/plane is drawn to define where the sky meets the earth.
-- [ ] A celestial grid (lines marking azimuth every 30° to 45°, and lines for altitude at 30° and 60°) is drawn natively in 3D space.
-- [ ] Changing screen size / rotating a mobile device resizes the 3D canvas while maintaining a correct aspect ratio.
-- [ ] The Three.js render loop is started when the 3D view becomes active and cleanly stopped via `renderer.setAnimationLoop(null)` when the user switches to 2D view or navigates away from the Stjärnkarta tab.
-- [ ] The user's 2D/3D view preference is stored in `localStorage` and restored on page load.
-- [ ] Mobile touch controls use single-finger drag for rotation only; pinch-zoom is disabled (fixed-radius sphere view).
-- [ ] The 2D SVG sky map remains the default view and the accessible fallback; the 3D canvas element has `aria-hidden="true"` with a visible or screen-reader-accessible hint pointing users to the 2D view.
+- [x] Three.js r0.174.0 and OrbitControls are vendored as local ES module files under `frontend/lib/`, resolved via a `<script type="importmap">` block in `index.html` — no CDN dependency, no build step required.
+- [x] A view toggle (e.g. standard buttons or a switch) is added to the "Stjärnkarta" tab allowing switching between 2D and 3D views.
+- [x] Selecting "3D Vy" instantiates a full-width immersive 3D canvas instead of the SVG map.
+- [x] A camera placed at the center (0,0,0) with drag-to-look controls allows full 360-degree panning and tilting.
+- [x] A horizon line/plane is drawn to define where the sky meets the earth.
+- [x] A celestial grid (lines marking azimuth every 30° to 45°, and lines for altitude at 30° and 60°) is drawn natively in 3D space.
+- [x] Changing screen size / rotating a mobile device resizes the 3D canvas while maintaining a correct aspect ratio.
+- [x] The Three.js render loop is started when the 3D view becomes active and cleanly stopped via `renderer.setAnimationLoop(null)` when the user switches to 2D view or navigates away from the Stjärnkarta tab.
+- [x] The user's 2D/3D view preference is stored in `localStorage` and restored on page load.
+- [x] Mobile touch controls use single-finger drag for rotation only; pinch-zoom is disabled (fixed-radius sphere view).
+- [x] The 2D SVG sky map remains the default view and the accessible fallback; the 3D canvas element has `aria-hidden="true"` with a visible or screen-reader-accessible hint pointing users to the 2D view.
 
 **Key files**
 - Modify `frontend/index.html` — add the view-toggle UI to the sky map container; Three.js is not loaded here but injected dynamically on first 3D activation.
@@ -1050,12 +1050,12 @@ The user can zoom in and out in both the 2D and 3D sky map using pinch/scroll ge
 The sky map panel gains two constellation controls visible in both the 2D and 3D views: a toggle that immediately shows or hides all constellation lines and labels without a full re-render, and an intensity slider that adjusts constellation line opacity in real time from nearly invisible to fully opaque. Both settings are persisted in `localStorage` and restored on page load. The hardcoded `opacity: 0.25` literals in `sky-map.css` and `opacity: 0.5` in `sky-map-3d.js` are replaced by the slider-driven value, making the slider the single source of truth for constellation brightness.
 
 **Definition of Done**
-- [ ] A toggle (`<input type="checkbox">`) labelled "Stjärnbilder" appears in the sky map controls area in `frontend/index.html`; unchecking it immediately hides all constellation SVG elements in the 2D view and sets `_constellationsGroup.visible = false` in the 3D view without requiring a full API re-fetch or re-render.
-- [ ] A range slider (`<input type="range" min="0" max="1" step="0.05">`) labelled "Intensitet" appears alongside the toggle; dragging it updates the `opacity` attribute on the `<g class="sky-map-constellations">` group (2D) and the `LineBasicMaterial.opacity` on children of `_constellationsGroup` (3D) in real time.
-- [ ] The enabled state and opacity value are written to `localStorage` under keys `planet_constellation_enabled` and `planet_constellation_opacity` and are read back on page load, restoring the user's last preference.
-- [ ] The hardcoded `opacity: 0.25` in `frontend/css/components/sky-map.css` on `.sky-map-constellation-line` and `.sky-map-constellation-label` is removed so the slider is the sole opacity source.
-- [ ] The hardcoded `opacity: 0.5` in the `THREE.LineBasicMaterial` constructor inside `sky-map-3d.js` `plotConstellations()` is replaced by the stored or current slider value.
-- [ ] The new controls are styled consistently with the existing `.sky-map-zoom-controls` and `.sky-map-expand-btn` in `frontend/css/components/sky-map.css`.
+- [x] A toggle (`<input type="checkbox">`) labelled "Stjärnbilder" appears in the sky map controls area in `frontend/index.html`; unchecking it immediately hides all constellation SVG elements in the 2D view and sets `_constellationsGroup.visible = false` in the 3D view without requiring a full API re-fetch or re-render.
+- [x] A range slider (`<input type="range" min="0" max="1" step="0.05">`) labelled "Intensitet" appears alongside the toggle; dragging it updates the `opacity` attribute on the `<g class="sky-map-constellations">` group (2D) and the `LineBasicMaterial.opacity` on children of `_constellationsGroup` (3D) in real time.
+- [x] The enabled state and opacity value are written to `localStorage` under keys `planet_constellation_enabled` and `planet_constellation_opacity` and are read back on page load, restoring the user's last preference.
+- [x] The hardcoded `opacity: 0.25` in `frontend/css/components/sky-map.css` on `.sky-map-constellation-line` and `.sky-map-constellation-label` is removed so the slider is the sole opacity source.
+- [x] The hardcoded `opacity: 0.5` in the `THREE.LineBasicMaterial` constructor inside `sky-map-3d.js` `plotConstellations()` is replaced by the stored or current slider value.
+- [x] The new controls are styled consistently with the existing `.sky-map-zoom-controls` and `.sky-map-expand-btn` in `frontend/css/components/sky-map.css`.
 
 **Key files**
 - Modify `frontend/index.html` — add constellation toggle checkbox and intensity slider markup inside `.sky-map-panel`
@@ -1114,15 +1114,15 @@ The sky map panel gains two constellation controls visible in both the 2D and 3D
 The sky map — both the 2D SVG view and the 3D dome — displays the brightest naked-eye stars from a static catalog whenever those stars are actually visible from the observer's sky. Visibility uses the same twilight limiting-magnitude criterion as the planetary scorer (Phase 12): a star is rendered only when its altitude is above 0° and its apparent magnitude is brighter than the sky's current limiting magnitude derived from the sun's elevation angle. Weather is deliberately excluded — a completely overcast sky still shows the theoretically visible stars, exactly as the planetary `is_visible` flag excludes weather. Stars are rendered as small white dots/sprites layered between the constellation lines and the planetary bodies, sized proportionally to brightness. Named stars are labelled with their internationally recognised name (most have no distinct Swedish equivalent, but the label uses the accepted name). The sky's `limiting_magnitude` is added to the `SunInfo` API response so the frontend can apply the same threshold the backend already uses for planets.
 
 **Definition of Done**
-- [ ] `SunInfo` in the `GET /api/v1/planets/visible` JSON response contains a `limiting_magnitude` float field; its value is approximately 6.5 when `sun.elevation_deg` is −20° and approximately −1 when `sun.elevation_deg` is −6°, matching the Phase 12 Schaefer model
-- [ ] `frontend/data/bright-stars.json` exists and contains at least 40 stars with visual magnitude ≤ 2.5, each with fields `ra_deg`, `dec_deg`, `magnitude`, and `name` (internationally recognised name string)
-- [ ] In the 2D sky map, the star Sirius (RA 101.3°, Dec −16.7°, mag −1.46) renders as an SVG dot in the `.sky-map-stars` group at the correct computed altitude/azimuth position when it is above the horizon and the sun is below −18°; no dot appears when the sun is above 0°
-- [ ] In the 3D sky map, the same visibility filter applies and the same stars visible in the 2D view are visible in the 3D view at matching positions
-- [ ] Stars with altitude ≤ 0° are not rendered in either view
-- [ ] Star dots are visually smaller than planet dots; the brightest star (Sirius, mag −1.46) has a smaller dot radius than Venus (mag −4) in the 2D view and a smaller sprite scale in the 3D view
-- [ ] Both `SkyMap.plotStars()` and `SkyMap3D.plotStars()` accept the identical parameter signature `(stars, limitingMagnitude, lat, lon, utcTimestamp)`, consistent with the `plotBodies`/`plotConstellations` pairing convention
-- [ ] No JavaScript console errors when `plotStars()` is called with an empty array (e.g. during daytime when no stars clear the limiting-magnitude threshold)
-- [ ] The star layer renders behind all planetary bodies in both views; planets, Sun, and Moon are never occluded by a star dot
+- [x] `SunInfo` in the `GET /api/v1/planets/visible` JSON response contains a `limiting_magnitude` float field; its value is approximately 6.5 when `sun.elevation_deg` is −20° and approximately −1 when `sun.elevation_deg` is −6°, matching the Phase 12 Schaefer model
+- [x] `frontend/data/bright-stars.json` exists and contains at least 40 stars with visual magnitude ≤ 2.5, each with fields `ra_deg`, `dec_deg`, `magnitude`, and `name` (internationally recognised name string)
+- [x] In the 2D sky map, the star Sirius (RA 101.3°, Dec −16.7°, mag −1.46) renders as an SVG dot in the `.sky-map-stars` group at the correct computed altitude/azimuth position when it is above the horizon and the sun is below −18°; no dot appears when the sun is above 0°
+- [x] In the 3D sky map, the same visibility filter applies and the same stars visible in the 2D view are visible in the 3D view at matching positions
+- [x] Stars with altitude ≤ 0° are not rendered in either view
+- [x] Star dots are visually smaller than planet dots; the brightest star (Sirius, mag −1.46) has a smaller dot radius than Venus (mag −4) in the 2D view and a smaller sprite scale in the 3D view
+- [x] Both `SkyMap.plotStars()` and `SkyMap3D.plotStars()` accept the identical parameter signature `(stars, limitingMagnitude, lat, lon, utcTimestamp)`, consistent with the `plotBodies`/`plotConstellations` pairing convention
+- [x] No JavaScript console errors when `plotStars()` is called with an empty array (e.g. during daytime when no stars clear the limiting-magnitude threshold)
+- [x] The star layer renders behind all planetary bodies in both views; planets, Sun, and Moon are never occluded by a star dot
 
 **Key files**
 - Modify `backend/app/models/planet.py` — add `limiting_magnitude: float` field to `SunInfo`
@@ -1144,13 +1144,13 @@ The sky map — both the 2D SVG view and the 3D dome — displays the brightest 
 The bright stars already plotted in both the 2D SVG sky map and the 3D dome become interactive in the same way as the planets. When the user hovers a visible star on desktop, or taps it in the 3D view, a tooltip appears via the existing `tooltip.js` mechanism. The tooltip identifies the star by name and shows concrete observation data in Swedish formatting, so the star layer is no longer purely decorative and becomes useful for sky orientation.
 
 **Definition of Done**
-- [ ] Visible stars in the 2D view render as interactive tooltip targets inside `.sky-map-stars` instead of purely decorative `<circle>` elements; hover or keyboard focus shows a tooltip with the star's name, altitude (`Höjd: X°`), direction (`Riktning: ...`), and magnitude
-- [ ] Visible stars in the 3D view participate in the same raycaster flow as the planets, so hovering or tapping a star sprite shows the corresponding tooltip without requiring a separate information panel
-- [ ] Star tooltip content reuses the existing `TooltipManager` convention (`.info-icon` + `title` or `data-tooltip-title`) and introduces no new tooltip component
-- [ ] Stars filtered out by `limiting_magnitude` or lying below the horizon have no tooltip and leave no invisible interaction targets behind in the DOM or 3D scene
-- [ ] The star Sirius shows a tooltip with the name `Sirius` and its magnitude when visible in the sky map; the same star shows no tooltip in daylight when it is not rendered
-- [ ] No regression occurs in existing planet tooltips in 2D or 3D; planets, the Sun, and the Moon continue to show Swedish tooltip text as before
-- [ ] No JavaScript errors occur when `plotStars()` is called with an empty array or when the user moves the pointer over a map with no visible stars
+- [x] Visible stars in the 2D view render as interactive tooltip targets inside `.sky-map-stars` instead of purely decorative `<circle>` elements; hover or keyboard focus shows a tooltip with the star's name, altitude (`Höjd: X°`), direction (`Riktning: ...`), and magnitude
+- [x] Visible stars in the 3D view participate in the same raycaster flow as the planets, so hovering or tapping a star sprite shows the corresponding tooltip without requiring a separate information panel
+- [x] Star tooltip content reuses the existing `TooltipManager` convention (`.info-icon` + `title` or `data-tooltip-title`) and introduces no new tooltip component
+- [x] Stars filtered out by `limiting_magnitude` or lying below the horizon have no tooltip and leave no invisible interaction targets behind in the DOM or 3D scene
+- [x] The star Sirius shows a tooltip with the name `Sirius` and its magnitude when visible in the sky map; the same star shows no tooltip in daylight when it is not rendered
+- [x] No regression occurs in existing planet tooltips in 2D or 3D; planets, the Sun, and the Moon continue to show Swedish tooltip text as before
+- [x] No JavaScript errors occur when `plotStars()` is called with an empty array or when the user moves the pointer over a map with no visible stars
 
 **Key files**
 - Modify `frontend/js/components/sky-map.js` — make star circles in `plotStars()` focusable and tooltip-compatible by adding name and observation data for each visible star
@@ -1170,13 +1170,13 @@ The bright stars already plotted in both the 2D SVG sky map and the 3D dome beco
 The constellation intensity slider continues to control both sky-map renderers from one shared value, but the maximum setting now produces the same perceived line intensity in both the 2D SVG map and the 3D Three.js dome. The current mismatch, where the 3D view remains noticeably dimmer even at the slider's highest position, is removed so the user can trust that `Intensitet` means the same thing regardless of whether the active view is `2D Projektion` or `3D Vy`.
 
 **Definition of Done**
-- [ ] With the `Intensitet` slider at its maximum value (`1`), constellation lines in the 3D view are visually as strong as the corresponding lines in the 2D view for the same location and timestamp; the 3D view no longer appears dimmer at the top setting
-- [ ] `frontend/js/main.js` continues to use a single shared `constellationOpacity` value for both renderers; no second slider state or 3D-only storage key is introduced
-- [ ] `SkyMap.plotConstellations(..., opacity)` and `SkyMap3D.plotConstellations(..., opacity)` both accept the same slider-domain input, but the 3D renderer maps that input so the effective maximum intensity matches the 2D renderer's maximum appearance
-- [ ] Moving the `Intensitet` slider away from the maximum still updates both views immediately, and switching between `2D Projektion` and `3D Vy` preserves the same stored slider value from `planet_constellation_opacity`
-- [ ] Constellation labels in the 3D view remain legible when lines are at maximum intensity and do not become disproportionately faint relative to the 2D IAU labels
-- [ ] No regressions occur in constellation visibility toggling: unchecking `Stjärnbilder` still hides both lines and labels instantly in 2D and 3D without a data refetch
-- [ ] No JavaScript errors occur when the slider is dragged repeatedly between minimum and maximum while the user switches between 2D and 3D views
+- [x] With the `Intensitet` slider at its maximum value (`1`), constellation lines in the 3D view are visually as strong as the corresponding lines in the 2D view for the same location and timestamp; the 3D view no longer appears dimmer at the top setting
+- [x] `frontend/js/main.js` continues to use a single shared `constellationOpacity` value for both renderers; no second slider state or 3D-only storage key is introduced
+- [x] `SkyMap.plotConstellations(..., opacity)` and `SkyMap3D.plotConstellations(..., opacity)` both accept the same slider-domain input, but the 3D renderer maps that input so the effective maximum intensity matches the 2D renderer's maximum appearance
+- [x] Moving the `Intensitet` slider away from the maximum still updates both views immediately, and switching between `2D Projektion` and `3D Vy` preserves the same stored slider value from `planet_constellation_opacity`
+- [x] Constellation labels in the 3D view remain legible when lines are at maximum intensity and do not become disproportionately faint relative to the 2D IAU labels
+- [x] No regressions occur in constellation visibility toggling: unchecking `Stjärnbilder` still hides both lines and labels instantly in 2D and 3D without a data refetch
+- [x] No JavaScript errors occur when the slider is dragged repeatedly between minimum and maximum while the user switches between 2D and 3D views
 
 **Key files**
 - Modify `frontend/js/main.js` — keep the intensity slider as the single shared control and pass the normalized value consistently to both sky-map renderers on load, slider input, and view switches
@@ -1216,12 +1216,12 @@ The 3D sky dome gains the four intermediate compass direction labels already pre
 The solar system view gains the same fullscreen capability as the 2D and 3D sky maps. A "Förstora" button appears in the solar system panel that, when clicked, expands the view to fill the entire browser window using the same CSS-based approach established in Phase E6. The SVG diagram scales via its viewBox attribute to fill the expanded space without distortion, maintaining correct orbital proportions. Clicking "Minimera" returns the view to its normal embedded size.
 
 **Definition of Done**
-- [ ] En knapp med texten "Förstora" och "Minimera" (beroende på läge) syns i `#panelSolarSystem` container
-- [ ] Klick på knappen togglar klassen `.solar-system-panel--expanded` på solsystemspanelen och vyn täcker hela webbläsarfönstret (`100vw × 100vh`) utan scrollbars
-- [ ] Klick igen tar bort klassen och återgår vyn till ursprunglig layout
-- [ ] SVG:en för solsystemet fyller det expanderade utrymmet utan distorsion (aspect ratio bevaras via `viewBox` precis som för 2D-stjärnkartan)
-- [ ] Planettolltips fortsätter fungera korrekt i både normalt och expanderat läge
-- [ ] Ingen regression i befintlig solsystemsvy-rendering på 375 px och 1200 px viewports
+- [x] En knapp med texten "Förstora" och "Minimera" (beroende på läge) syns i `#panelSolarSystem` container
+- [x] Klick på knappen togglar klassen `.solar-system-panel--expanded` på solsystemspanelen och vyn täcker hela webbläsarfönstret (`100vw × 100vh`) utan scrollbars
+- [x] Klick igen tar bort klassen och återgår vyn till ursprunglig layout
+- [x] SVG:en för solsystemet fyller det expanderade utrymmet utan distorsion (aspect ratio bevaras via `viewBox` precis som för 2D-stjärnkartan)
+- [x] Planettolltips fortsätter fungera korrekt i både normalt och expanderat läge
+- [x] Ingen regression i befintlig solsystemsvy-rendering på 375 px och 1200 px viewports
 
 **Key files**
 - Modify `frontend/index.html` — lägg till expand/minimera-knapp inuti `#panelSolarSystem` container

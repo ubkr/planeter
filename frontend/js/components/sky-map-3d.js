@@ -598,10 +598,22 @@ export default class SkyMap3D {
      */
     plotConstellations(constellationData, lat, lon, utcTimestamp, opacity = 0.25) {
         if (this._scene === null) {
+            // Store raw slider value — remapping happens at render time, not here.
             this._pendingConstellations = [constellationData, lat, lon, utcTimestamp, opacity];
             return;
         }
         if (!Array.isArray(constellationData)) return;
+
+        // Clamp input then remap to compensate for WebGL line dimness relative
+        // to antialiased SVG strokes at the same nominal opacity.
+        // ^0.5 (square root) for lines: aggressive boost because WebGL 1px lines
+        //   lack subpixel antialiasing.
+        // ^0.7 for labels: gentler boost because CSS opacity on HTML overlays
+        //   behaves more like SVG.
+        // Both mappings preserve the endpoints 0→0 and 1→1.
+        const safeOpacity = Math.max(0, Math.min(1, opacity || 0));
+        const effectiveLineOpacity  = Math.pow(safeOpacity, 0.5);
+        const effectiveLabelOpacity = Math.pow(safeOpacity, 0.7);
 
         this._clearConstellations();
 
@@ -611,8 +623,9 @@ export default class SkyMap3D {
 
         const lineMat = new THREE.LineBasicMaterial({
             color:       CONSTELLATION_LINE_COLOR,
-            transparent: true,
-            opacity:     opacity,
+            transparent: effectiveLineOpacity < 1,
+            opacity:     effectiveLineOpacity,
+            depthWrite:  false,
         });
 
         for (const constellation of constellationData) {
@@ -667,7 +680,7 @@ export default class SkyMap3D {
             const labelEl = document.createElement('div');
             labelEl.className = 'sky-map-3d-constellation-label';
             labelEl.textContent = constellation.iau;
-            labelEl.style.opacity = opacity;
+            labelEl.style.opacity = effectiveLabelOpacity;
 
             const labelObj = new CSS2DObject(labelEl);
             labelObj.position.set(cx, cy, cz);
