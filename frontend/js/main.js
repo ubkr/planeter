@@ -338,6 +338,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Collapse expanded panels when the user presses Escape.
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape') {
+            if (solarSystemView && solarSystemView.isZoomed()) {
+                solarSystemView.zoomOut();
+                return;  // consume the event — don't also collapse fullscreen on the same keypress
+            }
             if (skyMapPanelEl && skyMapPanelEl.classList.contains('sky-map-panel--expanded')) {
                 toggleSkyMapExpanded();
             }
@@ -509,6 +513,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (tabId === 'solarsystem' && lastApiData !== null) {
             solarSystemView.render(lastApiData.planets || [], lastApiData.earth_heliocentric || null);
+        }
+
+        // If the user leaves the solar system tab, reset any active planet zoom
+        // so the full overview is shown when returning.
+        if (tabId !== 'solarsystem' && solarSystemView && solarSystemView.isZoomed()) {
+            solarSystemView.zoomOut();
         }
 
         // If the user leaves the solar system tab while it is expanded, reset to

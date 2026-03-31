@@ -8,6 +8,9 @@
  *   - Earth reference orbit ring (dashed) labelled "1 AU"
  *   - Earth dot showing the actual Earth position from the API
  *
+ * Clicking a planet dot zooms the SVG viewBox to that planet and shows
+ * an encyclopedic detail overlay sourced from planet-info.js.
+ *
  * Orbit ring radii use sqrt scaling for visual readability:
  *   radius_px = MAX_RADIUS * sqrt(sma / MAX_SMA)
  *
@@ -17,6 +20,8 @@
  *   svgX = 250 + scaledDist * cos(angle)
  *   svgY = 250 - scaledDist * sin(angle)   (Y flipped for SVG coordinate system)
  */
+
+import PLANET_INFO from '../data/planet-info.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -36,6 +41,32 @@ const SEMI_MAJOR_AXES = {
     mars:    1.524,
     jupiter: 5.203,
     saturn:  9.537,
+};
+
+// Zoom animation duration in milliseconds
+const ZOOM_DURATION_MS = 400;
+
+// Half-size of the zoomed viewBox window (planet is centred in a 120×120 region)
+const ZOOM_HALF = 60;
+
+// Fallback English→Swedish name map for the detail overlay
+const SWEDISH_NAMES = {
+    mercury: 'Merkurius',
+    venus:   'Venus',
+    earth:   'Jorden',
+    mars:    'Mars',
+    jupiter: 'Jupiter',
+    saturn:  'Saturnus',
+};
+
+// Planet colour tokens — earth has no dedicated token, falls back to CSS var
+const PLANET_COLOR_TOKEN = {
+    mercury: 'var(--color-planet-mercury)',
+    venus:   'var(--color-planet-venus)',
+    earth:   'var(--color-accent-secondary)',
+    mars:    'var(--color-planet-mars)',
+    jupiter: 'var(--color-planet-jupiter)',
+    saturn:  'var(--color-planet-saturn)',
 };
 
 // ---------------------------------------------------------------------------
@@ -72,6 +103,30 @@ function setAttrs(el, attrs) {
  */
 function orbitRadius(smaAU) {
     return MAX_RADIUS * Math.sqrt(smaAU / MAX_SMA);
+}
+
+/**
+ * Clamp a number between min and max (inclusive).
+ *
+ * @param {number} v
+ * @param {number} min
+ * @param {number} max
+ * @returns {number}
+ */
+function clamp(v, min, max) {
+    return Math.max(min, Math.min(max, v));
+}
+
+/**
+ * Linear interpolation between a and b by factor t.
+ *
+ * @param {number} a
+ * @param {number} b
+ * @param {number} t  - 0..1
+ * @returns {number}
+ */
+function lerp(a, b, t) {
+    return a + (b - a) * t;
 }
 
 // ---------------------------------------------------------------------------
@@ -157,15 +212,19 @@ function buildEarthOrbitLabel() {
  * Build the planet dot and its label for one planet.
  *
  * Returns null if the heliocentric coordinates are missing or invalid.
+ * Also returns the computed SVG coordinates via the out-param object when
+ * coordinates are valid, so the caller can store them for zoom.
  *
  * @param {Object} planet
  * @param {string} planet.name      - English name (e.g. "Mercury")
  * @param {string} planet.name_sv   - Swedish name (e.g. "Merkurius")
  * @param {number|null|undefined} planet.heliocentric_x_au
  * @param {number|null|undefined} planet.heliocentric_y_au
- * @returns {SVGGElement|null}
+ * @param {{ x: number, y: number }|null} [coordsOut] - If provided, will be
+ *   mutated to contain the computed svgX/svgY on success.
+ * @returns {{ group: SVGGElement, dot: SVGCircleElement }|null}
  */
-function buildPlanetDot(planet) {
+function buildPlanetDot(planet, coordsOut) {
     const x = planet.heliocentric_x_au;
     const y = planet.heliocentric_y_au;
 
@@ -185,30 +244,32 @@ function buildPlanetDot(planet) {
     const svgX = CENTER + scaledDist * Math.cos(angle);
     const svgY = CENTER - scaledDist * Math.sin(angle); // Y flipped
 
-    const nameLower = planet.name.toLowerCase();
-    const tooltipText = `${planet.name_sv}\nAvstånd från Solen: ${dist.toFixed(2)} AU`;
+    if (coordsOut) {
+        coordsOut.x = svgX;
+        coordsOut.y = svgY;
+    }
 
+    const nameLower = planet.name.toLowerCase();
+
+    // NOTE: info-icon class intentionally omitted here — the click-to-detail
+    // overlay replaces tooltip functionality for planet dots in this view.
+    // The Sun retains info-icon since it has no detail overlay.
     const group = svgEl('g');
 
-    // Planet dot — also carries class="info-icon" so TooltipManager picks it up.
-    // TooltipManager reads getAttribute('title') to get tooltip text, then removes
-    // it and stores it in data-tooltip-title. We keep the title attribute for that
-    // purpose AND add a child SVG <title> element for SVG accessibility standards.
     const dot = svgEl('circle');
     setAttrs(dot, {
         cx: svgX,
         cy: svgY,
         r: 7,
-        class: `solar-system__planet solar-system__planet--${nameLower} info-icon`,
+        class: `solar-system__planet solar-system__planet--${nameLower}`,
         tabindex: '0',
         role: 'button',
-        title: tooltipText,
+        'aria-label': planet.name_sv,
     });
 
-    // SVG accessibility: child <title> element (the SVG-standard approach).
-    // The title attribute above is kept in parallel for TooltipManager compatibility.
+    // SVG accessibility: child <title> element.
     const svgTitle = svgEl('title');
-    svgTitle.textContent = tooltipText;
+    svgTitle.textContent = `${planet.name_sv} — klicka för information`;
     svgTitle.style.pointerEvents = 'none';
     dot.appendChild(svgTitle);
 
@@ -224,7 +285,7 @@ function buildPlanetDot(planet) {
     label.textContent = planet.name_sv;
     group.appendChild(label);
 
-    return group;
+    return { group, dot };
 }
 
 /**
@@ -236,9 +297,11 @@ function buildPlanetDot(planet) {
  * @param {number|null|undefined} earthHeliocentric.heliocentric_x_au
  * @param {number|null|undefined} earthHeliocentric.heliocentric_y_au
  * @param {number|null|undefined} earthHeliocentric.distance_au
- * @returns {SVGGElement|null}
+ * @param {{ x: number, y: number }|null} [coordsOut] - If provided, will be
+ *   mutated to contain the computed svgX/svgY on success.
+ * @returns {{ group: SVGGElement, dot: SVGCircleElement }|null}
  */
-function buildEarthDot(earthHeliocentric) {
+function buildEarthDot(earthHeliocentric, coordsOut) {
     if (!earthHeliocentric) {
         return null;
     }
@@ -262,31 +325,35 @@ function buildEarthDot(earthHeliocentric) {
     const svgX = CENTER + scaledDist * Math.cos(angle);
     const svgY = CENTER - scaledDist * Math.sin(angle); // Y flipped
 
+    if (coordsOut) {
+        coordsOut.x = svgX;
+        coordsOut.y = svgY;
+    }
+
     // Prefer distance_au from API if available, otherwise fall back to computed dist.
     const distanceAU = (earthHeliocentric.distance_au != null && !isNaN(earthHeliocentric.distance_au))
         ? earthHeliocentric.distance_au
         : dist;
 
-    const tooltipText = `Jorden\nAvstånd från Solen: ${distanceAU.toFixed(4)} AU`;
-
     const group = svgEl('g');
 
     // Earth dot — smaller than planet dots (r=5 vs r=7) since Earth is a
-    // reference body, not a tracked planet. Uses info-icon for TooltipManager.
+    // reference body, not a tracked planet.
+    // NOTE: info-icon class intentionally omitted — detail overlay handles interaction.
     const dot = svgEl('circle');
     setAttrs(dot, {
         cx: svgX,
         cy: svgY,
         r: 5,
-        class: 'solar-system__planet solar-system__planet--earth info-icon',
+        class: 'solar-system__planet solar-system__planet--earth',
         tabindex: '0',
         role: 'button',
-        title: tooltipText,
+        'aria-label': 'Jorden',
     });
 
     // SVG accessibility: child <title> element.
     const svgTitle = svgEl('title');
-    svgTitle.textContent = tooltipText;
+    svgTitle.textContent = `Jorden — klicka för information\nAvstånd från Solen: ${distanceAU.toFixed(4)} AU`;
     svgTitle.style.pointerEvents = 'none';
     dot.appendChild(svgTitle);
 
@@ -302,7 +369,7 @@ function buildEarthDot(earthHeliocentric) {
     label.textContent = 'Jorden';
     group.appendChild(label);
 
-    return group;
+    return { group, dot };
 }
 
 // ---------------------------------------------------------------------------
@@ -311,12 +378,24 @@ function buildEarthDot(earthHeliocentric) {
 
 export class SolarSystemView {
     /**
-     * @param {Element} containerEl - The DOM element to render the SVG into.
+     * @param {Element} containerEl - The DOM element to render the SVG into
+     *   (i.e. #solarSystemContainer). The detail overlay is appended to the
+     *   nearest `.solar-system-panel` ancestor.
      */
     constructor(containerEl) {
         // Guard against missing container; methods check this.containerEl before use.
         this.containerEl = containerEl || null;
         this._svg = null;
+
+        // Map of lowercase planet key → { x, y } SVG coordinates.
+        // Populated during render(); used by click handlers.
+        this._planetPositions = new Map();
+
+        // Zoom / overlay state
+        this._zoomedPlanet = null;   // lowercase planet key currently zoomed, or null
+        this._overlayEl = null;      // the detail overlay DOM element, or null
+        this._isAnimating = false;   // true while a viewBox tween is running
+        this._rafId = null;          // pending requestAnimationFrame handle, or null
     }
 
     /**
@@ -334,8 +413,14 @@ export class SolarSystemView {
             return;
         }
 
+        // Instantly reset any active zoom before re-rendering — no animation.
+        this._resetZoomInstant();
+
         // Remove any previously rendered SVG
         this._removeSvg();
+
+        // Clear position cache — will be repopulated below
+        this._planetPositions.clear();
 
         const svg = svgEl('svg');
         setAttrs(svg, {
@@ -360,16 +445,23 @@ export class SolarSystemView {
         // --- Planet dots ---
         const planetList = Array.isArray(planets) ? planets : [];
         for (const planet of planetList) {
-            const dotGroup = buildPlanetDot(planet);
-            if (dotGroup !== null) {
-                svg.appendChild(dotGroup);
+            const coords = { x: 0, y: 0 };
+            const result = buildPlanetDot(planet, coords);
+            if (result !== null) {
+                const nameLower = planet.name.toLowerCase();
+                this._planetPositions.set(nameLower, { x: coords.x, y: coords.y });
+                this._attachDotClickHandler(result.dot, nameLower);
+                svg.appendChild(result.group);
             }
         }
 
         // --- Earth dot ---
-        const earthDotGroup = buildEarthDot(earthHeliocentric);
-        if (earthDotGroup !== null) {
-            svg.appendChild(earthDotGroup);
+        const earthCoords = { x: 0, y: 0 };
+        const earthResult = buildEarthDot(earthHeliocentric, earthCoords);
+        if (earthResult !== null) {
+            this._planetPositions.set('earth', { x: earthCoords.x, y: earthCoords.y });
+            this._attachDotClickHandler(earthResult.dot, 'earth');
+            svg.appendChild(earthResult.group);
         }
 
         this.containerEl.appendChild(svg);
@@ -378,13 +470,335 @@ export class SolarSystemView {
 
     /**
      * Remove the SVG from the container and reset internal state.
+     * Instantly resets any active zoom without animation.
      */
     clear() {
+        this._resetZoomInstant();
         this._removeSvg();
     }
 
-    // --- Private ---
+    /**
+     * Returns true when a planet is currently zoomed in.
+     *
+     * @returns {boolean}
+     */
+    isZoomed() {
+        return !!this._zoomedPlanet;
+    }
 
+    /**
+     * Zoom out from the current planet, removing the detail overlay and
+     * animating the viewBox back to the default `0 0 500 500`.
+     *
+     * Safe to call even when not currently zoomed.
+     */
+    zoomOut() {
+        if (this._isAnimating) {
+            cancelAnimationFrame(this._rafId);
+            this._rafId = null;
+            this._isAnimating = false;
+        }
+
+        if (!this._zoomedPlanet && !this._overlayEl) {
+            return;
+        }
+
+        // Remove overlay immediately
+        this._removeOverlay();
+
+        if (!this._svg) {
+            this._zoomedPlanet = null;
+            this._isAnimating = false;
+            return;
+        }
+
+        this._isAnimating = true;
+
+        // Parse current viewBox as the animation start point
+        const startVB = this._parseViewBox();
+        const endVB = [0, 0, VIEW_SIZE, VIEW_SIZE];
+        const startTime = performance.now();
+
+        const animate = (now) => {
+            if (!this._svg) return;
+
+            const t = Math.min((now - startTime) / ZOOM_DURATION_MS, 1);
+            const vx = lerp(startVB[0], endVB[0], t);
+            const vy = lerp(startVB[1], endVB[1], t);
+            const vw = lerp(startVB[2], endVB[2], t);
+            const vh = lerp(startVB[3], endVB[3], t);
+            this._svg.setAttribute('viewBox', `${vx} ${vy} ${vw} ${vh}`);
+
+            if (t < 1) {
+                this._rafId = requestAnimationFrame(animate);
+            } else {
+                this._svg.setAttribute('viewBox', `0 0 ${VIEW_SIZE} ${VIEW_SIZE}`);
+                this._svg.classList.remove('solar-system-svg--zoomed');
+                this._zoomedPlanet = null;
+                this._isAnimating = false;
+                this._rafId = null;
+            }
+        };
+
+        this._rafId = requestAnimationFrame(animate);
+    }
+
+    // ---------------------------------------------------------------------------
+    // Private methods
+    // ---------------------------------------------------------------------------
+
+    /**
+     * Attach click and keyboard handlers to a planet dot element.
+     *
+     * @param {SVGCircleElement} dot
+     * @param {string} planetKey - Lowercase planet key (e.g. 'mars')
+     */
+    _attachDotClickHandler(dot, planetKey) {
+        const handleActivate = () => {
+            if (this._isAnimating) {
+                return;
+            }
+
+            if (this._zoomedPlanet === planetKey) {
+                // Already zoomed to this planet — no-op
+                return;
+            }
+
+            const pos = this._planetPositions.get(planetKey);
+            if (!pos) {
+                return;
+            }
+
+            if (this._zoomedPlanet !== null) {
+                // Instantly reset to a different planet's zoom
+                this._resetZoomInstant();
+            }
+
+            this._zoomToPlanet(planetKey, pos.x, pos.y);
+        };
+
+        dot.addEventListener('click', handleActivate);
+
+        dot.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleActivate();
+            }
+        });
+    }
+
+    /**
+     * Animate the SVG viewBox to zoom in on a planet, then show the detail overlay.
+     *
+     * @param {string} planetKey - Lowercase planet key
+     * @param {number} svgX      - Planet's SVG x coordinate
+     * @param {number} svgY      - Planet's SVG y coordinate
+     */
+    _zoomToPlanet(planetKey, svgX, svgY) {
+        if (!this._svg) {
+            return;
+        }
+
+        this._isAnimating = true;
+        this._svg.classList.add('solar-system-svg--zoomed');
+
+        // Compute target viewBox, clamped so it stays within SVG bounds 0–500
+        const targetX = clamp(svgX - ZOOM_HALF, 0, VIEW_SIZE - ZOOM_HALF * 2);
+        const targetY = clamp(svgY - ZOOM_HALF, 0, VIEW_SIZE - ZOOM_HALF * 2);
+        const targetW = ZOOM_HALF * 2;
+        const targetH = ZOOM_HALF * 2;
+
+        const startVB = this._parseViewBox();
+        const endVB = [targetX, targetY, targetW, targetH];
+        const startTime = performance.now();
+
+        const animate = (now) => {
+            if (!this._svg) return;
+
+            const t = Math.min((now - startTime) / ZOOM_DURATION_MS, 1);
+            const vx = lerp(startVB[0], endVB[0], t);
+            const vy = lerp(startVB[1], endVB[1], t);
+            const vw = lerp(startVB[2], endVB[2], t);
+            const vh = lerp(startVB[3], endVB[3], t);
+            this._svg.setAttribute('viewBox', `${vx} ${vy} ${vw} ${vh}`);
+
+            if (t < 1) {
+                this._rafId = requestAnimationFrame(animate);
+            } else {
+                this._svg.setAttribute('viewBox', `${targetX} ${targetY} ${targetW} ${targetH}`);
+                this._zoomedPlanet = planetKey;
+                this._isAnimating = false;
+                this._rafId = null;
+                this._showDetailOverlay(planetKey);
+            }
+        };
+
+        this._rafId = requestAnimationFrame(animate);
+    }
+
+    /**
+     * Show the encyclopedic detail overlay for the given planet.
+     *
+     * @param {string} planetKey - Lowercase planet key (e.g. 'jupiter')
+     */
+    _showDetailOverlay(planetKey) {
+        // Get the PLANET_INFO entry (keys are capitalised)
+        const infoKey = planetKey.charAt(0).toUpperCase() + planetKey.slice(1);
+        const info = PLANET_INFO[infoKey];
+        if (!info) {
+            return;
+        }
+
+        const swedishName = SWEDISH_NAMES[planetKey] || infoKey;
+        const colorToken = PLANET_COLOR_TOKEN[planetKey] || 'var(--color-text-primary)';
+
+        // Build overlay elements
+        const overlay = document.createElement('div');
+        overlay.className = 'solar-system__detail-overlay';
+
+        const content = document.createElement('div');
+        content.className = 'solar-system__detail-content';
+
+        // Title
+        const title = document.createElement('h2');
+        title.className = 'solar-system__detail-title';
+        title.style.setProperty('--detail-planet-color', colorToken);
+        title.textContent = swedishName;
+        content.appendChild(title);
+
+        // Facts grid
+        const grid = document.createElement('div');
+        grid.className = 'solar-system__detail-grid';
+
+        const facts = [
+            ['Diameter',             `${info.diameter_km.toLocaleString('sv-SE')} km`],
+            ['Omloppstid',           info.orbital_period_sv],
+            ['Avstånd från solen',   `${info.distance_au} AU`],
+            ['Kända månar',          String(info.known_moons)],
+        ];
+
+        for (const [label, value] of facts) {
+            const labelEl = document.createElement('span');
+            labelEl.className = 'solar-system__detail-label';
+            labelEl.textContent = label;
+
+            const valueEl = document.createElement('span');
+            valueEl.className = 'solar-system__detail-value';
+            valueEl.textContent = value;
+
+            grid.appendChild(labelEl);
+            grid.appendChild(valueEl);
+        }
+        content.appendChild(grid);
+
+        // Description
+        const desc = document.createElement('p');
+        desc.className = 'solar-system__detail-description';
+        desc.textContent = info.description_sv;
+        content.appendChild(desc);
+
+        // Back button
+        const backBtn = document.createElement('button');
+        backBtn.className = 'solar-system__detail-back-btn';
+        backBtn.textContent = 'Tillbaka';
+        backBtn.addEventListener('click', () => this.zoomOut());
+        content.appendChild(backBtn);
+
+        overlay.appendChild(content);
+
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) this.zoomOut();
+        });
+
+        // Append to .solar-system-panel (the panel wrapper that has position:relative)
+        const panelEl = this._getPanelEl();
+        const parentEl = panelEl || this.containerEl?.parentNode;
+        if (!parentEl) {
+            console.warn('SolarSystemView: could not find panel container for overlay');
+            return;
+        }
+        parentEl.appendChild(overlay);
+
+        this._overlayEl = overlay;
+
+        // Move focus to the back button after the overlay is in the DOM
+        requestAnimationFrame(() => {
+            backBtn.focus();
+        });
+    }
+
+    /**
+     * Instantly reset zoom and remove overlay without animation.
+     * Used at the start of render() and in clear().
+     */
+    _resetZoomInstant() {
+        if (this._rafId) {
+            cancelAnimationFrame(this._rafId);
+            this._rafId = null;
+        }
+
+        this._removeOverlay();
+
+        if (this._svg) {
+            this._svg.setAttribute('viewBox', `0 0 ${VIEW_SIZE} ${VIEW_SIZE}`);
+            this._svg.classList.remove('solar-system-svg--zoomed');
+        }
+
+        this._zoomedPlanet = null;
+        this._isAnimating = false;
+    }
+
+    /**
+     * Remove the detail overlay from the DOM and clear the reference.
+     */
+    _removeOverlay() {
+        if (this._overlayEl && this._overlayEl.parentNode) {
+            this._overlayEl.parentNode.removeChild(this._overlayEl);
+        }
+        this._overlayEl = null;
+    }
+
+    /**
+     * Parse the current SVG viewBox into an array [x, y, w, h].
+     * Falls back to the default full view if parsing fails.
+     *
+     * @returns {[number, number, number, number]}
+     */
+    _parseViewBox() {
+        if (!this._svg) {
+            return [0, 0, VIEW_SIZE, VIEW_SIZE];
+        }
+        const vb = this._svg.getAttribute('viewBox') || '';
+        const parts = vb.trim().split(/\s+/).map(Number);
+        if (parts.length === 4 && parts.every((n) => !isNaN(n))) {
+            return parts;
+        }
+        return [0, 0, VIEW_SIZE, VIEW_SIZE];
+    }
+
+    /**
+     * Find the `.solar-system-panel` element that wraps this component.
+     * Walks up from containerEl.
+     *
+     * @returns {Element|null}
+     */
+    _getPanelEl() {
+        if (!this.containerEl) {
+            return null;
+        }
+        let el = this.containerEl.parentNode;
+        while (el && el !== document.body) {
+            if (el.classList && el.classList.contains('solar-system-panel')) {
+                return el;
+            }
+            el = el.parentNode;
+        }
+        return null;
+    }
+
+    /**
+     * Remove the SVG from the container and reset the SVG reference.
+     */
     _removeSvg() {
         if (this._svg && this._svg.parentNode) {
             this._svg.parentNode.removeChild(this._svg);

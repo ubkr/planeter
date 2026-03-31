@@ -1236,7 +1236,7 @@ The solar system view gains the same fullscreen capability as the 2D and 3D sky 
 
 The solar system view gains interactive planet exploration. Clicking a planet dot zooms in and presents an encyclopedic information panel, a rendering of the planet's largest moons at their current positions as seen from Earth, and (for Saturn) the ring system tilted to match the current Earth–Saturn geometry. F1 (click, zoom, and info) is the foundation; F2 (moons) and F3 (rings) build on the zoomed-in detail view and can be implemented in parallel with each other.
 
-#### Phase F1: Planetklick & Zoom med Informationsruta
+#### Phase F1: Planetklick & Zoom med Informationsruta — ✅
 
 **Depends on:** Phase 13
 **Parallelisable with:** Phase E series

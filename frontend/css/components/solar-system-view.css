@@ -189,3 +189,147 @@
     height: 100%;
     aspect-ratio: auto;
 }
+
+/* ==========================================================================
+   Planet Detail Overlay
+   Interactive overlay shown when a planet is clicked for more information.
+   ========================================================================== */
+
+/* --- Fade-in animation --- */
+
+@keyframes solar-system-overlay-fadein {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* --- Overlay backdrop --- */
+
+.solar-system__detail-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: var(--z-modal);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-bg-overlay);
+    animation: solar-system-overlay-fadein var(--transition-normal) ease both;
+}
+
+/* --- Content card --- */
+
+.solar-system__detail-content {
+    width: 100%;
+    max-width: 360px;
+    max-height: 85%;
+    margin: var(--space-md);
+    padding: var(--space-lg);
+    overflow-y: auto;
+    background: var(--color-bg-surface);
+    border: var(--border-width) solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    color: var(--color-text-primary);
+}
+
+/* --- Planet name heading --- */
+
+.solar-system__detail-title {
+    margin: 0 0 var(--space-md);
+    font-family: var(--font-family-base);
+    font-size: var(--font-size-xl);
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--detail-planet-color, var(--color-text-primary));
+}
+
+/* --- Facts grid (label + value) --- */
+
+.solar-system__detail-grid {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: var(--space-2xs) var(--space-sm);
+    font-size: var(--font-size-sm);
+}
+
+/* --- Fact label (subdued) --- */
+
+.solar-system__detail-label {
+    color: var(--color-text-muted);
+    white-space: nowrap;
+}
+
+/* --- Fact value --- */
+
+.solar-system__detail-value {
+    color: var(--color-text-secondary);
+}
+
+/* --- Description prose --- */
+
+.solar-system__detail-description {
+    margin-top: var(--space-md);
+    font-size: var(--font-size-sm);
+    line-height: 1.6;
+    color: var(--color-text-secondary);
+}
+
+/* --- Back button (matches .solar-system-expand-btn style) --- */
+
+.solar-system__detail-back-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    margin-top: var(--space-lg);
+    padding: var(--space-xs) var(--space-sm);
+    border: var(--border-width) solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-deep);
+    color: var(--color-text-muted);
+    font-family: var(--font-family-base);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    line-height: 1;
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+    transition:
+        background var(--transition-fast),
+        color var(--transition-fast),
+        border-color var(--transition-fast);
+}
+
+.solar-system__detail-back-btn:hover {
+    background: var(--color-bg-surface-hover);
+    color: var(--color-text-secondary);
+    border-color: var(--border-color-hover);
+}
+
+.solar-system__detail-back-btn:focus-visible {
+    outline: 2px solid var(--color-accent-secondary);
+    outline-offset: 2px;
+}
+
+/* --- SVG zoomed state: dim orbit rings --- */
+
+.solar-system-svg--zoomed .solar-system__orbit {
+    opacity: 0.15;
+    transition: opacity var(--transition-normal);
+}
+
+/* --- Narrow screen adjustments --- */
+
+@media (max-width: 400px) {
+    .solar-system__detail-content {
+        margin: var(--space-xs);
+        padding: var(--space-md);
+        max-height: 90%;
+    }
+
+    .solar-system__detail-title {
+        font-size: var(--font-size-lg);
+    }
+}
