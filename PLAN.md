@@ -861,6 +861,38 @@ The sky summary box above the planet cards shows two compact info blocks on the 
 
 ---
 
+#### Phase B12: 24-Hour Altitude Timeline for Planets, Sun, and Moon
+
+**Depends on:** Phase A1, Phase B1
+**Parallelisable with:** None
+
+**Intended Outcome**
+
+The app gains a new top-level `Höjdkurva` view that shows a 24-hour chart from now into the future. The backend returns altitude-above-horizon time series for Mercury, Venus, Mars, Jupiter, Saturn, the Sun, and the Moon, and the frontend renders them as a responsive SVG chart using the same colours already used elsewhere in the app. The view makes it easy to see when each body is above or below the horizon, how its altitude changes over the next day, and when the Sun or Moon is likely to affect observing conditions.
+
+**Definition of Done**
+- [ ] `GET /api/v1/planets/timeline?lat=55.7&lon=13.4` returns HTTP 200 and includes the top-level fields `timestamp`, `location`, `sample_interval_minutes`, and `series`, where `series` contains exactly seven objects with `name` values `Mercury`, `Venus`, `Mars`, `Jupiter`, `Saturn`, `Sun`, and `Moon`
+- [ ] Each `series[*].samples` collection contains UTC timestamps and `altitude_deg` values covering the next 24 hours from the response `timestamp` in 15-minute intervals; the first sample is within 15 minutes of `timestamp` and the last sample is between 23 hours 45 minutes and 24 hours 15 minutes later
+- [ ] A new main-navigation tab labelled `Höjdkurva` is visible; when the user activates it, `#panelAltitudeTimeline` is shown and the other tab panels are hidden using the same ARIA tab pattern as the existing tabs
+- [ ] The chart renders a clearly marked horizon line at `0°`, a y-axis in degrees for altitude above the horizon, and an x-axis spanning from `Nu` to `+24 h`
+- [ ] The lines for `Merkurius`, `Venus`, `Mars`, `Jupiter`, `Saturnus`, `Solen`, and `Månen` use the existing colour tokens `--color-planet-mercury`, `--color-planet-venus`, `--color-planet-mars`, `--color-planet-jupiter`, `--color-planet-saturn`, `--color-sun-penalty`, and `--color-moon-penalty`
+- [ ] On a 375 px viewport the chart remains readable without horizontal page scroll; on a 1200 px viewport the axes, labels, and legend remain readable and no plotted line is clipped outside the chart area
+- [ ] `backend/tests/test_api_planets.py` includes assertions that verify the response schema, the seven series names, and that `/api/v1/planets/timeline` covers a full 24-hour interval
+
+**Key files**
+- Create `backend/app/services/planets/timeline.py` — compute 24-hour altitude-above-horizon series for Mercury, Venus, Mars, Jupiter, Saturn, the Sun, and the Moon in fixed 15-minute steps from the request time
+- Modify `backend/app/models/planet.py` — add Pydantic models for timeline sample points and the altitude-timeline endpoint response
+- Modify `backend/app/api/routes/planets.py` — add `GET /api/v1/planets/timeline`, build the response from the new timeline service, and register the route before the `/{name}` wildcard route
+- Modify `backend/tests/test_api_planets.py` — add endpoint assertions for status code, series names, and sample interval coverage
+- Modify `frontend/index.html` — add the `Höjdkurva` tab button and the `#panelAltitudeTimeline` container
+- Modify `frontend/js/components/tab-nav.js` — extend tab navigation and panel mapping so the new view follows the existing ARIA behaviour
+- Modify `frontend/js/api.js` — add `fetchPlanetTimeline(lat, lon)` with Swedish error handling
+- Modify `frontend/js/main.js` — fetch and cache altitude-timeline data when the tab is activated, refresh it on location change, and reuse cached data when the location is unchanged
+- Create `frontend/js/components/altitude-timeline.js` — render the SVG chart, axes, legend, loading state, and empty state
+- Modify `frontend/css/main.css` — add responsive layout and chart styles for the altitude-timeline panel, SVG, legend, axes, and horizon line
+
+---
+
 ### Phase C: Extended Bodies
 
 **Status: Deferred** — These phases are planned for a future iteration and are not yet scheduled for implementation. See Phase E for the current development track.
