@@ -182,6 +182,10 @@ class SunInfo(BaseModel):
     azimuth_deg: float = Field(..., ge=0, lt=360, description="Sun azimuth from North in degrees, half-open interval [0, 360)")
     twilight_phase: str = Field(..., description="Twilight phase label: daylight, civil_twilight, nautical_twilight, astronomical_twilight, or darkness")
     limiting_magnitude: float = Field(..., description="Faintest naked-eye magnitude visible at zenith for the current sun altitude (Schaefer 1993)")
+    today_rise_time: Optional[str] = Field(None, description="UTC ISO 8601 string or null")
+    today_set_time: Optional[str] = Field(None, description="UTC ISO 8601 string or null")
+    next_rise_time: Optional[str] = Field(None, description="UTC ISO 8601 string or null")
+    next_set_time: Optional[str] = Field(None, description="UTC ISO 8601 string or null")
 
 
 class MoonInfo(BaseModel):
@@ -190,6 +194,10 @@ class MoonInfo(BaseModel):
     illumination: float = Field(..., ge=0.0, le=1.0, description="Moon illumination fraction (0.0 = new moon, 1.0 = full moon)")
     elevation_deg: float = Field(..., description="Moon elevation above horizon in degrees")
     azimuth_deg: float = Field(..., ge=0, lt=360, description="Moon azimuth from North in degrees, half-open interval [0, 360)")
+    today_rise_time: Optional[str] = Field(None, description="UTC ISO 8601 string or null")
+    today_set_time: Optional[str] = Field(None, description="UTC ISO 8601 string or null")
+    next_rise_time: Optional[str] = Field(None, description="UTC ISO 8601 string or null")
+    next_set_time: Optional[str] = Field(None, description="UTC ISO 8601 string or null")
 
 
 class WeatherInfo(BaseModel):
@@ -297,8 +305,25 @@ class PlanetsResponse(BaseModel):
             "example": {
                 "timestamp": "2026-02-28T22:00:00Z",
                 "location": {"lat": 55.7, "lon": 13.4, "name": "Södra Sandby"},
-                "sun": {"elevation_deg": -25.3, "azimuth_deg": 185.0, "twilight_phase": "darkness", "limiting_magnitude": 6.5},
-                "moon": {"illumination": 0.45, "elevation_deg": 32.1, "azimuth_deg": 180.0},
+                "sun": {
+                    "elevation_deg": -25.3,
+                    "azimuth_deg": 185.0,
+                    "twilight_phase": "darkness",
+                    "limiting_magnitude": 6.5,
+                    "today_rise_time": "2026-02-28T06:45:00Z",
+                    "today_set_time": "2026-02-28T17:30:00Z",
+                    "next_rise_time": "2026-03-01T06:43:00Z",
+                    "next_set_time": "2026-03-01T17:32:00Z",
+                },
+                "moon": {
+                    "illumination": 0.45,
+                    "elevation_deg": 32.1,
+                    "azimuth_deg": 180.0,
+                    "today_rise_time": "2026-02-28T14:20:00Z",
+                    "today_set_time": "2026-02-28T03:55:00Z",
+                    "next_rise_time": "2026-03-01T15:10:00Z",
+                    "next_set_time": "2026-03-01T04:40:00Z",
+                },
                 "weather": {"cloud_cover": 15.0, "source": "met_no"},
                 "planets": [],
                 "events": [],

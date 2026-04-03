@@ -27,8 +27,8 @@ from ...services.planets.heliocentric import compute_earth_heliocentric, compute
 from ...services.planets.moons import compute_moon_positions
 from ...services.scoring import apply_scores, score_tonight
 from ...utils.logger import setup_logger
-from ...utils.moon import calculate_moon_penalty
-from ...utils.sun import calculate_sun_penalty, limiting_magnitude
+from ...utils.moon import calculate_moon_penalty, compute_moon_rise_set_times
+from ...utils.sun import calculate_sun_penalty, compute_sun_rise_set_times, limiting_magnitude
 
 logger = setup_logger(__name__)
 
@@ -55,22 +55,40 @@ def _utc_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _build_sun_info(sun_data: dict) -> SunInfo:
-    """Construct a SunInfo model from a pre-computed sun data dict."""
+def _build_sun_info(sun_data: dict, sun_times: Optional[dict] = None) -> SunInfo:
+    """Construct a SunInfo model from a pre-computed sun data dict.
+
+    sun_times, if provided, must contain: today_rise_time, today_set_time,
+    next_rise_time, next_set_time (all Optional[str]).
+    """
+    times = sun_times or {}
     return SunInfo(
         elevation_deg=sun_data["elevation_deg"],
         azimuth_deg=sun_data["azimuth_deg"],
         twilight_phase=sun_data["twilight_phase"],
         limiting_magnitude=sun_data["limiting_magnitude"],
+        today_rise_time=times.get("today_rise_time"),
+        today_set_time=times.get("today_set_time"),
+        next_rise_time=times.get("next_rise_time"),
+        next_set_time=times.get("next_set_time"),
     )
 
 
-def _build_moon_info(moon_data: dict) -> MoonInfo:
-    """Construct a MoonInfo model from a pre-computed moon data dict."""
+def _build_moon_info(moon_data: dict, moon_times: Optional[dict] = None) -> MoonInfo:
+    """Construct a MoonInfo model from a pre-computed moon data dict.
+
+    moon_times, if provided, must contain: today_rise_time, today_set_time,
+    next_rise_time, next_set_time (all Optional[str]).
+    """
+    times = moon_times or {}
     return MoonInfo(
         illumination=moon_data["illumination"],
         elevation_deg=moon_data["elevation_deg"],
         azimuth_deg=moon_data["azimuth_deg"],
+        today_rise_time=times.get("today_rise_time"),
+        today_set_time=times.get("today_set_time"),
+        next_rise_time=times.get("next_rise_time"),
+        next_set_time=times.get("next_set_time"),
     )
 
 
@@ -471,6 +489,18 @@ async def get_visible_planets(
     sun_data = calculate_sun_penalty(lat, lon)
     moon_data = calculate_moon_penalty(lat, lon)
 
+    sun_times: Optional[dict] = None
+    try:
+        sun_times = compute_sun_rise_set_times(lat, lon, dt=now_utc)
+    except Exception as exc:
+        logger.warning(f"compute_sun_rise_set_times failed for /visible ({lat}, {lon}): {exc}")
+
+    moon_times: Optional[dict] = None
+    try:
+        moon_times = compute_moon_rise_set_times(lat, lon, dt=now_utc)
+    except Exception as exc:
+        logger.warning(f"compute_moon_rise_set_times failed for /visible ({lat}, {lon}): {exc}")
+
     planets = apply_scores(planets, sun_data, moon_data, weather_data.cloud_cover)
 
     # Compute next visible time for non-visible planets.
@@ -553,8 +583,8 @@ async def get_visible_planets(
     except Exception as exc:
         logger.warning(f"compute_moon_positions failed for /visible ({lat}, {lon}): {exc}")
 
-    sun_info = _build_sun_info(sun_data)
-    moon_info = _build_moon_info(moon_data)
+    sun_info = _build_sun_info(sun_data, sun_times)
+    moon_info = _build_moon_info(moon_data, moon_times)
 
     logger.info(
         f"Visibility computed for ({lat}, {lon}): "
@@ -651,6 +681,19 @@ async def get_tonight_planets(
         )
 
     now_utc = datetime.now(timezone.utc)
+
+    sun_times_tonight: Optional[dict] = None
+    try:
+        sun_times_tonight = compute_sun_rise_set_times(lat, lon, dt=now_utc)
+    except Exception as exc:
+        logger.warning(f"compute_sun_rise_set_times failed for /tonight ({lat}, {lon}): {exc}")
+
+    moon_times_tonight: Optional[dict] = None
+    try:
+        moon_times_tonight = compute_moon_rise_set_times(lat, lon, dt=now_utc)
+    except Exception as exc:
+        logger.warning(f"compute_moon_rise_set_times failed for /tonight ({lat}, {lon}): {exc}")
+
     try:
         events = detect_events(lat, lon, now_utc - timedelta(days=1), now_utc + timedelta(days=2))
     except Exception as exc:
@@ -691,8 +734,9 @@ async def get_tonight_planets(
 
     # Use the pre-computed sun/moon data so metadata reflects the same moment
     # used for scoring, not the wall-clock time of the HTTP request.
-    sun_info = _build_sun_info(sun_data)
-    moon_info = _build_moon_info(moon_data)
+    # Rise/set times always use now_utc so they reflect today's actual events.
+    sun_info = _build_sun_info(sun_data, sun_times_tonight)
+    moon_info = _build_moon_info(moon_data, moon_times_tonight)
 
     return PlanetsResponse(
         timestamp=timestamp,

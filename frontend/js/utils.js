@@ -104,6 +104,21 @@ export function getEquipmentRecommendation(planet) {
 }
 
 /**
+ * Format an ISO 8601 UTC timestamp to HH:MM in Europe/Stockholm local time.
+ *
+ * @param {string|null|undefined} isoString - UTC ISO string, e.g. "2026-02-28T22:00:00Z".
+ * @returns {string} "HH:MM" or "--" if isoString is absent.
+ */
+export function formatTime(isoString) {
+    if (!isoString) return '--';
+    return new Intl.DateTimeFormat('sv-SE', {
+        timeZone: 'Europe/Stockholm',
+        hour: '2-digit',
+        minute: '2-digit',
+    }).format(new Date(isoString));
+}
+
+/**
  * Converts an azimuth in degrees to a Swedish 16-point compass direction string.
  *
  * 0/360 = North, 90 = East, 180 = South, 270 = West.

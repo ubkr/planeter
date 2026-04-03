@@ -7,7 +7,7 @@
  * next_visible_time (ISO 8601 UTC string or null; non-null only on non-visible planets).
  */
 
-import { scoreToLevel, formatVisibilityReasons, getEquipmentRecommendation } from '../utils.js';
+import { scoreToLevel, formatVisibilityReasons, getEquipmentRecommendation, formatTime } from '../utils.js';
 import PLANET_DESCRIPTIONS from '../data/planet-descriptions.js';
 
 // Number of skeleton cards to show while loading.
@@ -34,21 +34,6 @@ function formatForecastDate(isoDateStr) {
     const day = parseInt(parts[2], 10);
     const monthIndex = parseInt(parts[1], 10) - 1;
     return `${day} ${SWEDISH_MONTHS[monthIndex]}`;
-}
-
-/**
- * Format an ISO 8601 UTC timestamp to HH:MM in Europe/Stockholm local time.
- *
- * @param {string|null|undefined} isoString - UTC ISO string, e.g. "2026-02-28T22:00:00Z".
- * @returns {string} "HH:MM" or "--" if isoString is absent.
- */
-function formatTime(isoString) {
-    if (!isoString) return '--';
-    return new Intl.DateTimeFormat('sv-SE', {
-        timeZone: 'Europe/Stockholm',
-        hour: '2-digit',
-        minute: '2-digit',
-    }).format(new Date(isoString));
 }
 
 /**

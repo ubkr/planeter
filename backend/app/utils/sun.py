@@ -1,7 +1,7 @@
 import ephem
 import math
 from datetime import datetime, timezone
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 
 # ---------------------------------------------------------------------------
@@ -162,4 +162,88 @@ def calculate_sun_penalty(lat: float, lon: float, dt: datetime = None) -> dict:
         "twilight_phase": twilight_phase,
         "penalty_pts": penalty_pts,
         "limiting_magnitude": limiting_magnitude(elevation_deg),
+    }
+
+
+def compute_sun_rise_set_times(lat: float, lon: float, dt: datetime = None) -> dict:
+    """
+    Compute today's and next upcoming solar rise and set times for a location.
+
+    Uses refraction-corrected civil horizon (-0:34) so times match what an
+    observer at ground level would expect.
+
+    Args:
+        lat: Latitude in decimal degrees.
+        lon: Longitude in decimal degrees.
+        dt:  Reference UTC datetime (naive).  Defaults to datetime.utcnow().
+
+    Returns a dict with keys:
+        today_rise_time  – ISO-8601 UTC string or None (AlwaysUp / NeverUp)
+        today_set_time   – ISO-8601 UTC string or None
+        next_rise_time   – ISO-8601 UTC string or None
+        next_set_time    – ISO-8601 UTC string or None
+    """
+    if dt is None:
+        dt = datetime.utcnow()
+
+    # Ensure naive UTC — ephem does not accept tzinfo-aware datetimes.
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+
+    def _make_observer() -> ephem.Observer:
+        obs = ephem.Observer()
+        obs.lat = str(lat)
+        obs.lon = str(lon)
+        obs.pressure = 0
+        # Standard refraction-corrected civil horizon used to match the moment
+        # the Sun's upper limb crosses the geometric horizon.
+        obs.horizon = "-0:34"
+        return obs
+
+    def _format(ephem_date: object) -> str:
+        return ephem.Date(ephem_date).datetime().strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    # --- Today's rise and set ---
+    # Anchor to midnight UTC of the dt date so next_rising / next_setting return
+    # the first events of that calendar day.
+    midnight = dt.replace(hour=0, minute=0, second=0, microsecond=0)
+    obs_today = _make_observer()
+    obs_today.date = midnight
+
+    today_rise_time: Optional[str] = None
+    today_set_time: Optional[str] = None
+
+    try:
+        today_rise_time = _format(obs_today.next_rising(ephem.Sun()))
+    except (ephem.AlwaysUpError, ephem.NeverUpError, ephem.CircumpolarError):
+        pass
+
+    try:
+        today_set_time = _format(obs_today.next_setting(ephem.Sun()))
+    except (ephem.AlwaysUpError, ephem.NeverUpError, ephem.CircumpolarError):
+        pass
+
+    # --- Next upcoming rise and set ---
+    # Anchor to the current moment so we get the very next events from now.
+    obs_next = _make_observer()
+    obs_next.date = dt
+
+    next_rise_time: Optional[str] = None
+    next_set_time: Optional[str] = None
+
+    try:
+        next_rise_time = _format(obs_next.next_rising(ephem.Sun()))
+    except (ephem.AlwaysUpError, ephem.NeverUpError, ephem.CircumpolarError):
+        pass
+
+    try:
+        next_set_time = _format(obs_next.next_setting(ephem.Sun()))
+    except (ephem.AlwaysUpError, ephem.NeverUpError, ephem.CircumpolarError):
+        pass
+
+    return {
+        "today_rise_time": today_rise_time,
+        "today_set_time": today_set_time,
+        "next_rise_time": next_rise_time,
+        "next_set_time": next_set_time,
     }

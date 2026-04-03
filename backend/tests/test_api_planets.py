@@ -268,7 +268,74 @@ async def test_visible_includes_next_good_observation(async_client, mock_weather
 
 
 # ---------------------------------------------------------------------------
-# 14. Unit test — _compute_nautical_dark_window returns (None, None) during
+# Phase B11 — sun/moon rise/set time fields in /visible and /tonight
+# ---------------------------------------------------------------------------
+
+# Keys required on every SunInfo and MoonInfo object in the response.
+_RISE_SET_KEYS = {"today_rise_time", "today_set_time", "next_rise_time", "next_set_time"}
+
+# Stockholm coordinates are well inside the temperate zone, so rise/set
+# calculations always produce non-null values rather than midnight-sun nulls.
+_B11_LAT = 59.33
+_B11_LON = 18.07
+
+
+async def test_visible_includes_sun_rise_set_times(async_client, mock_weather, mock_forecast):
+    # The sun object in the /visible response must carry all four rise/set keys.
+    # Each value may be a string (ISO 8601) or null, but the keys must exist.
+    response = await async_client.get(
+        "/api/v1/planets/visible",
+        params={"lat": _B11_LAT, "lon": _B11_LON},
+    )
+    assert response.status_code == 200
+    sun = response.json()["sun"]
+    missing = _RISE_SET_KEYS - sun.keys()
+    assert not missing, f"sun object is missing Phase B11 keys: {missing}"
+    for key in _RISE_SET_KEYS:
+        value = sun[key]
+        assert value is None or isinstance(value, str), (
+            f"sun['{key}'] must be a string or null, got {type(value).__name__!r}: {value!r}"
+        )
+
+
+async def test_visible_includes_moon_rise_set_times(async_client, mock_weather, mock_forecast):
+    # The moon object in the /visible response must carry all four rise/set keys.
+    # Each value may be a string (ISO 8601) or null, but the keys must exist.
+    response = await async_client.get(
+        "/api/v1/planets/visible",
+        params={"lat": _B11_LAT, "lon": _B11_LON},
+    )
+    assert response.status_code == 200
+    moon = response.json()["moon"]
+    missing = _RISE_SET_KEYS - moon.keys()
+    assert not missing, f"moon object is missing Phase B11 keys: {missing}"
+    for key in _RISE_SET_KEYS:
+        value = moon[key]
+        assert value is None or isinstance(value, str), (
+            f"moon['{key}'] must be a string or null, got {type(value).__name__!r}: {value!r}"
+        )
+
+
+async def test_tonight_includes_sun_rise_set_times(async_client, mock_weather):
+    # The sun object in the /tonight response must carry all four rise/set keys.
+    # Each value may be a string (ISO 8601) or null, but the keys must exist.
+    response = await async_client.get(
+        "/api/v1/planets/tonight",
+        params={"lat": _B11_LAT, "lon": _B11_LON},
+    )
+    assert response.status_code == 200
+    sun = response.json()["sun"]
+    missing = _RISE_SET_KEYS - sun.keys()
+    assert not missing, f"sun object is missing Phase B11 keys (tonight): {missing}"
+    for key in _RISE_SET_KEYS:
+        value = sun[key]
+        assert value is None or isinstance(value, str), (
+            f"sun['{key}'] must be a string or null, got {type(value).__name__!r}: {value!r}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Unit test — _compute_nautical_dark_window returns (None, None) during
 #     midnight sun (sun never drops below -12° at lat=70, lon=25 in June)
 # ---------------------------------------------------------------------------
 

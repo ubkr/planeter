@@ -2,10 +2,10 @@
  * sky-summary.js - Renders the sky summary banner for the current observation window.
  *
  * Expects the full PlanetsResponse object from GET /api/v1/planets/visible.
- * Relevant top-level fields: planets, sun, weather, location, tonight_score.
+ * Relevant top-level fields: planets, sun, moon, weather, location, tonight_score, timestamp.
  */
 
-import { scoreToLevel, formatLocation } from '../utils.js';
+import { scoreToLevel, formatLocation, formatTime } from '../utils.js';
 
 // Swedish translations for twilight phase identifiers.
 const TWILIGHT_LABELS = {
@@ -72,6 +72,116 @@ function isMidnightSun(planets, sun) {
 }
 
 /**
+ * Build the sun rise/set time strings based on whether today's events have passed.
+ *
+ * - Sunrise: if today's rise is still in the future (or null), show today's value.
+ *   If it has passed, show next rise with "nästa" prefix.
+ * - Sunset: if today's set is still in the future (or null), show today's value.
+ *   If it has passed, show next set (no "nästa" prefix).
+ *
+ * @param {Object} sun - Sun object from API response.
+ * @param {string} timestamp - Response "now" timestamp (UTC ISO 8601).
+ * @returns {{ riseText: string, setText: string }}
+ */
+function buildSunTimeParts(sun, timestamp) {
+    const now = new Date(timestamp);
+
+    const todayRise = sun.today_rise_time ? new Date(sun.today_rise_time) : null;
+    const todaySet  = sun.today_set_time  ? new Date(sun.today_set_time)  : null;
+
+    let riseText;
+    if (todayRise === null || todayRise > now) {
+        riseText = formatTime(sun.today_rise_time);
+    } else {
+        riseText = `<span class="next-prefix">n\u00e4sta</span> ${formatTime(sun.next_rise_time)}`;
+    }
+
+    let setTextValue;
+    if (todaySet === null || todaySet > now) {
+        setTextValue = formatTime(sun.today_set_time);
+    } else {
+        setTextValue = formatTime(sun.next_set_time);
+    }
+
+    return { riseText, setText: setTextValue };
+}
+
+/**
+ * Build the moon rise/set time strings based on whether today's events have passed.
+ *
+ * - If both today's rise and set are still in the future, use today's values, no prefix.
+ * - If today's moonrise has passed, show next rise with "nästa" prefix.
+ * - If today's moonset has passed, show next set (no "nästa" prefix).
+ *
+ * @param {Object} moon - Moon object from API response.
+ * @param {string} timestamp - Response "now" timestamp (UTC ISO 8601).
+ * @returns {{ riseText: string, setText: string }}
+ */
+function buildMoonTimeParts(moon, timestamp) {
+    const now = new Date(timestamp);
+
+    const todayRise = moon.today_rise_time ? new Date(moon.today_rise_time) : null;
+    const todaySet  = moon.today_set_time  ? new Date(moon.today_set_time)  : null;
+
+    const riseInFuture = todayRise !== null && todayRise > now;
+    const setInFuture  = todaySet  !== null && todaySet  > now;
+
+    // Use today's rise if it is still in the future; otherwise point to next rise.
+    const riseText = riseInFuture
+        ? formatTime(moon.today_rise_time)
+        : `<span class="next-prefix">n\u00e4sta</span> ${formatTime(moon.next_rise_time)}`;
+
+    // Use today's set if it is still in the future; otherwise point to next set.
+    const setTextValue = setInFuture
+        ? formatTime(moon.today_set_time)
+        : formatTime(moon.next_set_time);
+
+    return { riseText, setText: setTextValue };
+}
+
+/**
+ * Build the HTML string for the sun/moon times block.
+ *
+ * Returns an empty string if neither sun nor moon data is present.
+ *
+ * @param {Object|null|undefined} sun - Sun object from API response.
+ * @param {Object|null|undefined} moon - Moon object from API response.
+ * @param {string} timestamp - Response "now" timestamp (UTC ISO 8601).
+ * @returns {string} HTML string for `.sky-summary__times`, or "".
+ */
+function buildTimesHTML(sun, moon, timestamp) {
+    if (!sun && !moon) return '';
+
+    let sunBlockHTML = '';
+    if (sun) {
+        const { riseText, setText } = buildSunTimeParts(sun, timestamp);
+        sunBlockHTML = `
+            <div class="sky-summary__sun-block">
+                <div class="sky-summary__times-heading">\u2600\ufe0f Solen</div>
+                <div class="sky-summary__time-row">Upp: ${riseText}</div>
+                <div class="sky-summary__time-row">Ned: ${setText}</div>
+            </div>`;
+    }
+
+    let moonBlockHTML = '';
+    if (moon) {
+        const { riseText, setText } = buildMoonTimeParts(moon, timestamp);
+        moonBlockHTML = `
+            <div class="sky-summary__moon-block">
+                <div class="sky-summary__times-heading">\ud83c\udf19 M\u00e5nen</div>
+                <div class="sky-summary__time-row">Upp: ${riseText}</div>
+                <div class="sky-summary__time-row">Ned: ${setText}</div>
+            </div>`;
+    }
+
+    return `
+        <div class="sky-summary__times">
+            ${sunBlockHTML}
+            ${moonBlockHTML}
+        </div>`;
+}
+
+/**
  * SkySummary renders an overview banner with the current sky conditions.
  *
  * Usage:
@@ -93,12 +203,15 @@ export class SkySummary {
      * @param {Object} data - Full API response object.
      * @param {Object[]} data.planets
      * @param {Object} data.sun
+     * @param {Object} [data.moon]
      * @param {Object} data.weather
      * @param {Object} data.location
      * @param {number} [data.tonight_score] - Optional pre-computed overall score.
+     * @param {string} [data.timestamp] - UTC ISO 8601 "now" timestamp.
      */
     render(data) {
-        const { planets, sun, weather, location } = data;
+        const { planets, sun, moon, weather, location } = data;
+        const timestamp = data.timestamp ?? new Date().toISOString();
 
         const overallScore =
             typeof data.tonight_score === 'number'
@@ -130,6 +243,8 @@ export class SkySummary {
             </div>
         `;
 
+        const timesHTML = buildTimesHTML(sun ?? null, moon ?? null, timestamp);
+
         this.container.innerHTML = `
             <div class="sky-summary" data-score-level="${level}">
                 <div class="sky-summary__score-block">
@@ -140,6 +255,7 @@ export class SkySummary {
                     <div class="sky-summary__planet-count">${visibleCount} av 5 planeter synliga</div>
                     ${infoHTML}
                 </div>
+                ${timesHTML}
             </div>
         `;
     }
@@ -159,6 +275,18 @@ export class SkySummary {
                     <div class="sky-summary__info-item">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
                     <div class="sky-summary__info-item">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
                     <div class="sky-summary__info-item">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
+                </div>
+                <div class="sky-summary__times sky-summary__times--skeleton">
+                    <div class="sky-summary__sun-block">
+                        <div class="sky-summary__times-heading">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
+                        <div class="sky-summary__time-row">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
+                        <div class="sky-summary__time-row">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
+                    </div>
+                    <div class="sky-summary__moon-block">
+                        <div class="sky-summary__times-heading">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
+                        <div class="sky-summary__time-row">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
+                        <div class="sky-summary__time-row">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
+                    </div>
                 </div>
             </div>
         `;

@@ -832,7 +832,7 @@ The 6-month forecast feature adapts to the observational reality of inferior pla
 
 ---
 
-#### Phase B11: Sun and Moon Rise/Set Times in the Sky Summary
+#### Phase B11: Sun and Moon Rise/Set Times in the Sky Summary — ✅
 
 **Depends on:** Phase 5, Phase 6
 **Parallelisable with:** None
@@ -842,13 +842,13 @@ The 6-month forecast feature adapts to the observational reality of inferior pla
 The sky summary box above the planet cards shows two compact info blocks on the right: one for the Sun and one for the Moon. Each block shows rise and set times in Europe/Stockholm time. The frontend prefers today's rise and set when those events are still ahead of the current time, but falls back to the next upcoming event when today's time has already passed. The backend therefore returns both today's and next rise/set timestamps as raw ISO 8601 values so the UI can make the display decision without duplicating astronomical calculation logic in the browser.
 
 **Definition of Done**
-- [ ] `SunInfo` in the JSON response from `GET /api/v1/planets/visible?lat=55.7&lon=13.4` includes `today_rise_time`, `today_set_time`, `next_rise_time`, and `next_set_time`, where each value is a UTC ISO 8601 string or `null`
-- [ ] `MoonInfo` in the same response includes `today_rise_time`, `today_set_time`, `next_rise_time`, and `next_set_time`, where each value is a UTC ISO 8601 string or `null`
-- [ ] When `/api/v1/planets/visible` is requested after today's sunrise but before today's sunset, the sky summary renders `Solen` with `Upp: nästa HH:MM` and `Ned: HH:MM`, formatted in Europe/Stockholm time
-- [ ] When today's moonrise and moonset are both still in the future, the sky summary renders `Månen` using only today's times and does not add the `nästa` label
-- [ ] `#skySummary` renders two clearly labelled blocks with the headings `Solen` and `Månen` to the right of the existing summary content on a 1200 px viewport without pushing the score block underneath
-- [ ] `#skySummary` stacks the sun and moon time blocks below the existing summary content on a 375 px viewport without horizontal overflow
-- [ ] `backend/tests/test_api_planets.py` verifies that the new `SunInfo` and `MoonInfo` time fields are present in the `/visible` response
+- [x] `SunInfo` in the JSON response from `GET /api/v1/planets/visible?lat=55.7&lon=13.4` includes `today_rise_time`, `today_set_time`, `next_rise_time`, and `next_set_time`, where each value is a UTC ISO 8601 string or `null`
+- [x] `MoonInfo` in the same response includes `today_rise_time`, `today_set_time`, `next_rise_time`, and `next_set_time`, where each value is a UTC ISO 8601 string or `null`
+- [x] When `/api/v1/planets/visible` is requested after today's sunrise but before today's sunset, the sky summary renders `Solen` with `Upp: nästa HH:MM` and `Ned: HH:MM`, formatted in Europe/Stockholm time
+- [x] When today's moonrise and moonset are both still in the future, the sky summary renders `Månen` using only today's times and does not add the `nästa` label
+- [x] `#skySummary` renders two clearly labelled blocks with the headings `Solen` and `Månen` to the right of the existing summary content on a 1200 px viewport without pushing the score block underneath
+- [x] `#skySummary` stacks the sun and moon time blocks below the existing summary content on a 375 px viewport without horizontal overflow
+- [x] `backend/tests/test_api_planets.py` verifies that the new `SunInfo` and `MoonInfo` time fields are present in the `/visible` response
 
 **Key files**
 - Modify `backend/app/models/planet.py` — add `today_rise_time`, `today_set_time`, `next_rise_time`, and `next_set_time` to `SunInfo` and `MoonInfo`

@@ -52,6 +52,83 @@ def calculate_moon_penalty(lat: float, lon: float, dt: datetime = None) -> dict:
     }
 
 
+def compute_moon_rise_set_times(lat: float, lon: float, dt: datetime = None) -> dict:
+    """
+    Compute today's and next upcoming moonrise/moonset times for the given location.
+
+    Uses refraction-corrected civil horizon (-0:34) so times match what an observer
+    on the ground would expect.
+
+    Args:
+        lat: Latitude in decimal degrees.
+        lon: Longitude in decimal degrees.
+        dt:  Reference UTC datetime (naive). Defaults to datetime.utcnow().
+
+    Returns a dict with keys:
+        today_rise_time  – UTC ISO 8601 string for moonrise starting from midnight of dt's date, or None
+        today_set_time   – UTC ISO 8601 string for moonset starting from midnight of dt's date, or None
+        next_rise_time   – UTC ISO 8601 string for next moonrise from dt, or None
+        next_set_time    – UTC ISO 8601 string for next moonset from dt, or None
+    """
+    if dt is None:
+        dt = datetime.utcnow()
+
+    # Ensure naive UTC — ephem does not accept tzinfo-aware datetimes.
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+
+    observer = ephem.Observer()
+    # ephem requires strings for lat/lon; floats would be interpreted as radians
+    observer.lat = str(lat)
+    observer.lon = str(lon)
+    # Refraction-corrected civil horizon — standard convention for rise/set times
+    observer.pressure = 0
+    observer.horizon = "-0:34"
+
+    def _format(ephem_date) -> str:
+        return ephem.Date(ephem_date).datetime().strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    # --- Today's rise and set: search forward from midnight UTC of dt's date ---
+    midnight = datetime(dt.year, dt.month, dt.day, 0, 0, 0)
+    observer.date = midnight
+
+    today_rise_time = None
+    today_set_time = None
+    try:
+        today_rise_time = _format(observer.next_rising(ephem.Moon()))
+    except (ephem.AlwaysUpError, ephem.NeverUpError, ephem.CircumpolarError):
+        pass
+
+    observer.date = midnight
+    try:
+        today_set_time = _format(observer.next_setting(ephem.Moon()))
+    except (ephem.AlwaysUpError, ephem.NeverUpError, ephem.CircumpolarError):
+        pass
+
+    # --- Next upcoming rise and set: search forward from dt itself ---
+    observer.date = dt
+
+    next_rise_time = None
+    next_set_time = None
+    try:
+        next_rise_time = _format(observer.next_rising(ephem.Moon()))
+    except (ephem.AlwaysUpError, ephem.NeverUpError, ephem.CircumpolarError):
+        pass
+
+    observer.date = dt
+    try:
+        next_set_time = _format(observer.next_setting(ephem.Moon()))
+    except (ephem.AlwaysUpError, ephem.NeverUpError, ephem.CircumpolarError):
+        pass
+
+    return {
+        "today_rise_time": today_rise_time,
+        "today_set_time": today_set_time,
+        "next_rise_time": next_rise_time,
+        "next_set_time": next_set_time,
+    }
+
+
 def get_moon_angular_separation(moon_az_deg, moon_alt_deg, planet_az_deg, planet_alt_deg) -> float:
     """Angular separation in degrees between moon and planet."""
     az1, alt1 = math.radians(moon_az_deg), math.radians(moon_alt_deg)
