@@ -68,6 +68,21 @@ def azimuth_to_compass_sv(azimuth_deg: float) -> str:
     return _COMPASS_DIRECTIONS_SV[index]
 
 
+class MoonPosition(BaseModel):
+    """Position of a planetary moon relative to its parent planet."""
+
+    name: str = Field(..., description="English moon name (e.g. 'Io')")
+    name_sv: str = Field(..., description="Swedish moon name (e.g. 'Io')")
+    x_offset: float = Field(
+        ...,
+        description="Horizontal offset in parent-planet radii; positive = east",
+    )
+    y_offset: float = Field(
+        ...,
+        description="Vertical offset in parent-planet radii; positive = north",
+    )
+
+
 class NextGoodObservation(BaseModel):
     """The next upcoming date/window when a planet will be well-placed for observation."""
 
@@ -124,6 +139,11 @@ class PlanetPosition(BaseModel):
     heliocentric_x_au: Optional[float] = Field(None, description="Heliocentric Cartesian X coordinate in AU")
     heliocentric_y_au: Optional[float] = Field(None, description="Heliocentric Cartesian Y coordinate in AU")
     heliocentric_z_au: Optional[float] = Field(None, description="Heliocentric Cartesian Z coordinate in AU")
+    # Filled for Jupiter and Saturn by the moon-position pipeline; None for all other planets.
+    moons: Optional[List[MoonPosition]] = Field(
+        None,
+        description="Positions of visible moons relative to the planet, or null for planets with no tracked moons",
+    )
 
     class Config:
         json_schema_extra = {
@@ -150,6 +170,7 @@ class PlanetPosition(BaseModel):
                 "heliocentric_x_au": 0.45,
                 "heliocentric_y_au": -0.23,
                 "heliocentric_z_au": 0.01,
+                "moons": None,
             }
         }
 

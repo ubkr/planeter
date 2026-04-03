@@ -39,6 +39,7 @@ backend/
         events.py                 -- Astronomical event detection (conjunctions, oppositions, etc.)
         forecast.py               -- 6-month next-good-observation scanner (per-night dark-window sampling)
         heliocentric.py           -- Heliocentric XYZ coordinates for planets and Earth (via ephem.Sun())
+        moons.py                  -- Galilean moon (Jupiter) and major moon (Saturn) X/Y offsets via ephem satellite classes
       weather/
         base.py                   -- WeatherSourceBase ABC
         metno_client.py           -- Met.no API client
@@ -309,6 +310,7 @@ A planet is declared **"visible"** when: altitude > 0, total score > 15, and app
       "heliocentric_x_au": -0.718,
       "heliocentric_y_au": 0.021,
       "heliocentric_z_au": 0.042,
+      "moons": null,
       "next_good_observation": {
         "date": "2026-05-14",
         "start_time": "2026-05-14T21:00:00Z",
@@ -322,6 +324,23 @@ A planet is declared **"visible"** when: altitude > 0, total score > 15, and app
   ]
 }
 ```
+
+Each entry in the `planets` array is a `PlanetPosition` object. The `moons` field is populated only for Jupiter and Saturn; it is `null` for Mercury, Venus, and Mars.
+
+```
+PlanetPosition.moons: Optional[List[MoonPosition]]
+```
+
+```
+MoonPosition {
+  name: str       # English name (e.g. "Ganymede")
+  name_sv: str    # Swedish name (e.g. "Ganymedes")
+  x_offset: float # East offset in parent-planet radii (positive = east as seen from Earth)
+  y_offset: float # North offset in parent-planet radii (positive = north)
+}
+```
+
+Jupiter tracks four Galilean moons: Io, Europa, Ganymede, Callisto. Saturn tracks seven major moons: Titan, Rhea, Dione, Tethys, Enceladus, Mimas, Iapetus. Offsets are computed by the `ephem` satellite classes and expressed in parent-planet equatorial radii, following the `.x` / `.y` sign convention of those classes.
 
 ### `GET /api/v1/planets/tonight`
 

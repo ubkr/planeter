@@ -1265,7 +1265,7 @@ Clicking or tapping a planet dot in the solar system SVG smoothly zooms the view
 
 ---
 
-#### Phase F2: Månpositioner för Jätteplaneter
+#### Phase F2: Månpositioner för Jätteplaneter — ✅
 
 **Depends on:** Phase F1
 **Parallelisable with:** Phase F3
@@ -1275,16 +1275,18 @@ Clicking or tapping a planet dot in the solar system SVG smoothly zooms the view
 When the user zooms into Jupiter or Saturn in the solar system detail view, the planet's largest moons are rendered as small labelled dots at their current positions relative to the planet as seen from Earth. The backend computes moon positions using `ephem`'s built-in satellite calculators (`ephem.Io()`, `ephem.Europa()`, `ephem.Ganymede()`, `ephem.Callisto()` for Jupiter; `ephem.Titan()`, `ephem.Rhea()`, `ephem.Dione()`, `ephem.Tethys()`, `ephem.Enceladus()`, `ephem.Mimas()`, `ephem.Iapetus()` for Saturn), which report X/Y offsets in parent-planet radii as seen from Earth — ideal for this rendering. The frontend renders moons as dots positioned around a larger planet circle in the detail overlay, with Swedish labels. All positions are computed for the current time, matching the solar system view's timestamp.
 
 **Definition of Done**
-- [ ] `backend/app/services/planets/moons.py` exists and exports `compute_moon_positions(dt: datetime) -> dict` returning X/Y offsets (in parent-planet radii) for Jupiter's 4 Galilean moons and Saturn's 7 major moons
-- [ ] `PlanetPosition` model includes a new optional field `moons: Optional[List[MoonPosition]]` where `MoonPosition` is a Pydantic model with fields `name` (str), `name_sv` (str), `x_offset` (float, planet radii), `y_offset` (float, planet radii)
-- [ ] `GET /api/v1/planets/visible?lat=55.7&lon=13.4` returns a non-empty `moons` array for both Jupiter and Saturn; Mercury, Venus, and Mars return `moons: null` or an empty list
-- [ ] The zoomed-in detail view for Jupiter renders 4 moon dots (Io, Europa, Ganymedes, Callisto) positioned around the planet circle at offsets matching their current `x_offset`/`y_offset` values
-- [ ] The zoomed-in detail view for Saturn renders at least Titan and the other major moons as labelled dots
-- [ ] Each moon dot has a Swedish label (e.g. "Io", "Europa", "Ganymedes", "Callisto", "Titan") rendered adjacent to the dot
-- [ ] Moon dots are visually smaller than the planet circle and use a muted colour distinct from the planet's colour token
-- [ ] Hovering or tapping a moon dot shows a tooltip with the moon's Swedish name and its current offset distance from the planet
-- [ ] Planets without moons in the API response (Mercury, Venus, Mars) show no moon rendering in their detail view — no errors or empty-state clutter
-- [ ] No regression in existing solar system view rendering; the overview mode (unzoomed) is unaffected by the moon data addition
+- [x] `backend/app/services/planets/moons.py` exists and exports `compute_moon_positions(dt: datetime) -> dict` returning X/Y offsets (in parent-planet radii) for Jupiter's 4 Galilean moons and Saturn's 7 major moons
+- [x] `PlanetPosition` model includes a new optional field `moons: Optional[List[MoonPosition]]` where `MoonPosition` is a Pydantic model with fields `name` (str), `name_sv` (str), `x_offset` (float, planet radii), `y_offset` (float, planet radii)
+- [x] `GET /api/v1/planets/visible?lat=55.7&lon=13.4` returns a non-empty `moons` array for both Jupiter and Saturn; Mercury, Venus, and Mars return `moons: null` or an empty list
+- [x] The zoomed-in detail view for Jupiter renders 4 moon dots (Io, Europa, Ganymedes, Callisto) positioned around the planet circle at offsets matching their current `x_offset`/`y_offset` values
+- [x] The zoomed-in detail view for Saturn renders at least Titan and the other major moons as labelled dots
+- [x] Each moon dot has a Swedish label (e.g. "Io", "Europa", "Ganymedes", "Callisto", "Titan") rendered adjacent to the dot
+- [x] Moon dots are visually smaller than the planet circle and use a muted colour distinct from the planet's colour token
+- [x] Hovering or tapping a moon dot shows a tooltip with the moon's Swedish name and its current offset distance from the planet
+- [x] Planets without moons in the API response (Mercury, Venus, Mars) show no moon rendering in their detail view — no errors or empty-state clutter
+- [x] No regression in existing solar system view rendering; the overview mode (unzoomed) is unaffected by the moon data addition
+
+> Note: Minor label-anchor asymmetry for right-side moon labels is cosmetic (not a DoD failure). Can be addressed in a future polish pass.
 
 **Key files**
 - Create `backend/app/services/planets/moons.py` — compute moon positions using `ephem.Io()`, `ephem.Europa()`, `ephem.Ganymede()`, `ephem.Callisto()`, `ephem.Titan()`, `ephem.Rhea()`, etc.; return X/Y offsets in planet radii as seen from Earth

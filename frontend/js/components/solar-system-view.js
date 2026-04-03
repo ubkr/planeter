@@ -391,6 +391,10 @@ export class SolarSystemView {
         // Populated during render(); used by click handlers.
         this._planetPositions = new Map();
 
+        // Map of lowercase planet key → full planet API data object (including moons).
+        // Populated during render() alongside _planetPositions.
+        this._planetData = new Map();
+
         // Zoom / overlay state
         this._zoomedPlanet = null;   // lowercase planet key currently zoomed, or null
         this._overlayEl = null;      // the detail overlay DOM element, or null
@@ -419,8 +423,9 @@ export class SolarSystemView {
         // Remove any previously rendered SVG
         this._removeSvg();
 
-        // Clear position cache — will be repopulated below
+        // Clear position and data caches — will be repopulated below
         this._planetPositions.clear();
+        this._planetData.clear();
 
         const svg = svgEl('svg');
         setAttrs(svg, {
@@ -450,6 +455,7 @@ export class SolarSystemView {
             if (result !== null) {
                 const nameLower = planet.name.toLowerCase();
                 this._planetPositions.set(nameLower, { x: coords.x, y: coords.y });
+                this._planetData.set(nameLower, planet);
                 this._attachDotClickHandler(result.dot, nameLower);
                 svg.appendChild(result.group);
             }
@@ -659,10 +665,13 @@ export class SolarSystemView {
         const content = document.createElement('div');
         content.className = 'solar-system__detail-content';
 
+        // Set the planet colour token on the content card so all children
+        // (title, moon diagram planet circle, etc.) can inherit it via CSS var().
+        content.style.setProperty('--detail-planet-color', colorToken);
+
         // Title
         const title = document.createElement('h2');
         title.className = 'solar-system__detail-title';
-        title.style.setProperty('--detail-planet-color', colorToken);
         title.textContent = swedishName;
         content.appendChild(title);
 
@@ -696,6 +705,108 @@ export class SolarSystemView {
         desc.className = 'solar-system__detail-description';
         desc.textContent = info.description_sv;
         content.appendChild(desc);
+
+        // Moon diagram — only rendered for planets that have moon data (Jupiter, Saturn)
+        const planetData = this._planetData?.get(planetKey);
+        if (planetData?.moons && planetData.moons.length > 0) {
+            const moons = planetData.moons;
+
+            const moonHeading = document.createElement('h4');
+            moonHeading.className = 'solar-system__moon-heading';
+            moonHeading.textContent = 'Månar';
+            content.appendChild(moonHeading);
+
+            const diagram = document.createElement('div');
+            diagram.className = 'solar-system__moon-diagram';
+
+            // Diagram dimensions — must match the CSS class dimensions
+            const diagramWidth = 280;
+            const diagramHeight = 200;
+            const centerX = diagramWidth / 2;   // 140
+            const centerY = diagramHeight / 2;  // 100
+            const dotRadius = 3;
+            const padding = 12;
+            const maxScale = 8; // px per planet radius for near moons
+
+            // Central planet circle
+            const planetCircle = document.createElement('div');
+            planetCircle.className = 'solar-system__moon-planet-circle';
+            diagram.appendChild(planetCircle);
+
+            // Outer moon threshold: moons beyond this offset in planet radii are
+            // considered "outer" and excluded from the scale calculation (Fix 1).
+            const OUTER_MOON_THRESHOLD = 30;
+
+            // Fix 1: Two-tier scaling — compute scale based on inner moons only
+            // (offset <= 30 radii) so that Iapetus (~60 radii) does not compress
+            // the Galilean/inner-Saturn moons to overlap the planet circle.
+            const allOffsets = moons.map((m) => Math.max(Math.abs(m.x_offset), Math.abs(m.y_offset)));
+            const innerOffsets = allOffsets.filter((o) => o <= OUTER_MOON_THRESHOLD);
+            const innerMaxOffset = innerOffsets.length > 0
+                ? Math.max(...innerOffsets)
+                : Math.max(...allOffsets);
+
+            // Guard: avoid division by zero if all offsets are 0
+            const scale = innerMaxOffset > 0
+                ? Math.min((Math.min(centerX, centerY) - padding) / innerMaxOffset, maxScale)
+                : maxScale;
+
+            for (const moon of moons) {
+                const moonOffset = Math.max(Math.abs(moon.x_offset), Math.abs(moon.y_offset));
+                const isOuterMoon = moonOffset > OUTER_MOON_THRESHOLD;
+
+                // Pixel position from centre; negate y because screen Y is inverted
+                const rawLeft = centerX + moon.x_offset * scale - dotRadius;
+                const rawTop  = centerY - moon.y_offset * scale - dotRadius;
+
+                // Clamp so the dot stays within the diagram bounds
+                const clampedLeft = Math.max(0, Math.min(diagramWidth  - dotRadius * 2, rawLeft));
+                const clampedTop  = Math.max(0, Math.min(diagramHeight - dotRadius * 2, rawTop));
+
+                // Fix 1 + 2: outer moons whose raw position differs from clamped
+                // get the --clamped modifier class to indicate they are farther than shown.
+                const wasClamped = isOuterMoon && (rawLeft !== clampedLeft || rawTop !== clampedTop);
+
+                // Distance in planet radii for the tooltip (Pythagoras)
+                const distRadii = Math.sqrt(moon.x_offset * moon.x_offset + moon.y_offset * moon.y_offset);
+
+                const dot = document.createElement('div');
+                // Fix 2: add --clamped class for visually distinct appearance
+                dot.className = wasClamped
+                    ? 'solar-system__moon-dot solar-system__moon-dot--clamped info-icon'
+                    : 'solar-system__moon-dot info-icon';
+                dot.setAttribute('title', `${moon.name_sv} — avstånd: ${distRadii.toFixed(1)} planetradier`);
+                dot.style.left = `${Math.round(clampedLeft)}px`;
+                dot.style.top  = `${Math.round(clampedTop)}px`;
+                diagram.appendChild(dot);
+
+                // Fix 3: Flip label to the LEFT when dot is in the right half,
+                // and flip label UP when dot is near the bottom of the diagram.
+                const label = document.createElement('span');
+                label.className = 'solar-system__moon-label';
+                label.textContent = moon.name_sv;
+
+                if (clampedLeft > diagramWidth / 2) {
+                    // Right half: anchor label to the right of the dot position
+                    // and shift it left by its own width using translateX.
+                    label.style.left = `${Math.round(clampedLeft - 2)}px`;
+                    label.style.transform = 'translateX(-100%)';
+                } else {
+                    label.style.left = `${Math.round(clampedLeft + dotRadius * 2 + 2)}px`;
+                }
+
+                if (clampedTop > diagramHeight * 0.75) {
+                    // Near the bottom: place label above the dot
+                    label.style.top = `${Math.round(clampedTop - 12)}px`;
+                } else {
+                    label.style.top = `${Math.round(clampedTop - 2)}px`;
+                }
+
+                diagram.appendChild(label);
+            }
+
+            content.appendChild(diagram);
+        }
 
         // Back button
         const backBtn = document.createElement('button');

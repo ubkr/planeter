@@ -320,6 +320,90 @@
     transition: opacity var(--transition-normal);
 }
 
+/* ==========================================================================
+   Moon Diagram
+   Shown inside the detail overlay for Jupiter and Saturn.
+   ========================================================================== */
+
+/* --- Section heading --- */
+
+.solar-system__moon-heading {
+    margin: var(--space-lg) 0 var(--space-xs);
+    font-family: var(--font-family-base);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* --- Diagram container --- */
+
+.solar-system__moon-diagram {
+    position: relative;
+    width: 280px;
+    height: 200px;
+    background: var(--color-bg-deep);
+    border: var(--border-width) solid var(--border-color);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+
+/* --- Central planet circle --- */
+
+.solar-system__moon-planet-circle {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    /* Center within the 280×200 diagram (left: 140-7=133, top: 100-7=93) */
+    left: 133px;
+    top: 93px;
+    border-radius: var(--radius-full);
+    background: var(--detail-planet-color, var(--color-text-secondary));
+    opacity: 0.9;
+}
+
+/* --- Moon dots --- */
+
+.solar-system__moon-dot {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    border-radius: var(--radius-full);
+    background: var(--color-star);
+    cursor: help;
+    transition: opacity var(--transition-fast);
+}
+
+.solar-system__moon-dot:hover {
+    opacity: 0.75;
+}
+
+/* Fix 2: Clamped moon dots are placed at the diagram edge because the moon's
+   true orbit is farther than the diagram scale can show. Reduced opacity and a
+   dashed outline signal that the position is approximate. */
+.solar-system__moon-dot--clamped {
+    opacity: 0.5;
+    outline: 1px dashed var(--color-text-muted);
+    outline-offset: 1px;
+}
+
+.solar-system__moon-dot--clamped:hover {
+    opacity: 0.65;
+}
+
+/* --- Moon labels --- */
+
+.solar-system__moon-label {
+    position: absolute;
+    font-size: 9px;
+    font-family: var(--font-family-base);
+    color: var(--color-text-muted);
+    white-space: nowrap;
+    pointer-events: none;
+    line-height: 1;
+}
+
 /* --- Narrow screen adjustments --- */
 
 @media (max-width: 400px) {
@@ -327,9 +411,26 @@
         margin: var(--space-xs);
         padding: var(--space-md);
         max-height: 90%;
+        /* Fix 4: allow the 280px moon diagram to scroll horizontally on very
+           narrow screens rather than clipping it. */
+        overflow-x: auto;
     }
 
     .solar-system__detail-title {
         font-size: var(--font-size-lg);
+    }
+
+    /* Fix 4: keep diagram at its fixed 280px width on narrow viewports;
+       max-width: 100% prevents overflow of the content card but does not
+       shrink the diagram — the card's overflow-x: auto handles scrolling.
+       The JS constants (diagramWidth=280, centerX=140) stay valid. */
+    .solar-system__moon-diagram {
+        max-width: 100%;
+        height: 180px;
+    }
+
+    .solar-system__moon-planet-circle {
+        /* Fixed pixel position is correct for the 280px diagram width. */
+        left: 133px;
     }
 }

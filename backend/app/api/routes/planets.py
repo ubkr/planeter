@@ -11,6 +11,7 @@ from ...models.planet import (
     EarthHeliocentric,
     LocationInfo,
     MoonInfo,
+    MoonPosition,
     NextGoodObservation,
     PlanetPosition,
     PlanetsResponse,
@@ -23,6 +24,7 @@ from ...services.planets.calculator import calculate_planet_positions
 from ...services.planets.events import detect_events
 from ...services.planets.forecast import compute_next_good_observation
 from ...services.planets.heliocentric import compute_earth_heliocentric, compute_heliocentric_positions
+from ...services.planets.moons import compute_moon_positions
 from ...services.scoring import apply_scores, score_tonight
 from ...utils.logger import setup_logger
 from ...utils.moon import calculate_moon_penalty
@@ -542,6 +544,15 @@ async def get_visible_planets(
     except Exception as exc:
         logger.warning(f"compute_earth_heliocentric failed for /visible ({lat}, {lon}): {exc}")
 
+    # Populate moon positions for Jupiter and Saturn.
+    try:
+        moon_positions = compute_moon_positions(now_utc)
+        for planet in planets:
+            if planet.name in moon_positions:
+                planet.moons = [MoonPosition(**m) for m in moon_positions[planet.name]]
+    except Exception as exc:
+        logger.warning(f"compute_moon_positions failed for /visible ({lat}, {lon}): {exc}")
+
     sun_info = _build_sun_info(sun_data)
     moon_info = _build_moon_info(moon_data)
 
@@ -669,6 +680,15 @@ async def get_tonight_planets(
     except Exception as exc:
         logger.warning(f"compute_earth_heliocentric failed for /tonight ({lat}, {lon}): {exc}")
 
+    # Populate moon positions for Jupiter and Saturn.
+    try:
+        moon_positions = compute_moon_positions(helio_dt)
+        for planet in planets:
+            if planet.name in moon_positions:
+                planet.moons = [MoonPosition(**m) for m in moon_positions[planet.name]]
+    except Exception as exc:
+        logger.warning(f"compute_moon_positions failed for /tonight ({lat}, {lon}): {exc}")
+
     # Use the pre-computed sun/moon data so metadata reflects the same moment
     # used for scoring, not the wall-clock time of the HTTP request.
     sun_info = _build_sun_info(sun_data)
@@ -722,6 +742,16 @@ async def get_planet(
     moon_data = calculate_moon_penalty(lat, lon)
 
     planets = apply_scores(planets, sun_data, moon_data, weather_data.cloud_cover)
+
+    # Populate moon positions for Jupiter and Saturn.
+    now_utc = datetime.now(timezone.utc)
+    try:
+        moon_positions = compute_moon_positions(now_utc)
+        for planet in planets:
+            if planet.name in moon_positions:
+                planet.moons = [MoonPosition(**m) for m in moon_positions[planet.name]]
+    except Exception as exc:
+        logger.warning(f"compute_moon_positions failed for /{name} ({lat}, {lon}): {exc}")
 
     # Planet names from the calculator are title-cased English names.
     for planet in planets:
