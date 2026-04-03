@@ -341,8 +341,8 @@
 
 .solar-system__moon-diagram {
     position: relative;
-    width: 280px;
-    height: 200px;
+    width: 344px;
+    height: 246px;
     background: var(--color-bg-deep);
     border: var(--border-width) solid var(--border-color);
     border-radius: var(--radius-sm);
@@ -353,11 +353,11 @@
 
 .solar-system__moon-planet-circle {
     position: absolute;
-    width: 14px;
-    height: 14px;
-    /* Center within the 280×200 diagram (left: 140-7=133, top: 100-7=93) */
-    left: 133px;
-    top: 93px;
+    width: 18px;
+    height: 18px;
+    /* Center within the 344×246 diagram (left: 172-9=163, top: 123-9=114) */
+    left: 163px;
+    top: 114px;
     border-radius: var(--radius-full);
     background: var(--detail-planet-color, var(--color-text-secondary));
     opacity: 0.9;
@@ -367,8 +367,8 @@
 
 .solar-system__moon-dot {
     position: absolute;
-    width: 6px;
-    height: 6px;
+    width: 8px;
+    height: 8px;
     border-radius: var(--radius-full);
     background: var(--color-star);
     cursor: help;
@@ -411,7 +411,7 @@
         margin: var(--space-xs);
         padding: var(--space-md);
         max-height: 90%;
-        /* Fix 4: allow the 280px moon diagram to scroll horizontally on very
+        /* Fix 4: allow the 344px moon diagram to scroll horizontally on very
            narrow screens rather than clipping it. */
         overflow-x: auto;
     }
@@ -420,17 +420,23 @@
         font-size: var(--font-size-lg);
     }
 
-    /* Fix 4: keep diagram at its fixed 280px width on narrow viewports;
+    /* Fix 4: keep diagram at its fixed 344px width on narrow viewports;
        max-width: 100% prevents overflow of the content card but does not
        shrink the diagram — the card's overflow-x: auto handles scrolling.
-       The JS constants (diagramWidth=280, centerX=140) stay valid. */
+       The JS constants (diagramWidth=344, centerX=172) stay valid. */
     .solar-system__moon-diagram {
         max-width: 100%;
-        height: 180px;
+        /* Keep in sync with the JS constant diagramHeight = 246 in
+           solar-system-view.js. The JS clamping logic positions moon dots up
+           to (diagramHeight - dotRadius * 2) = 238px, so the CSS height must
+           be at least 246px or dots near the bottom will be clipped. The
+           detail overlay uses overflow-y: auto so vertical scrolling handles
+           any extra height on narrow screens. If you change one, change both. */
+        height: 246px;
     }
 
     .solar-system__moon-planet-circle {
-        /* Fixed pixel position is correct for the 280px diagram width. */
-        left: 133px;
+        /* Fixed pixel position is correct for the 344px diagram width. */
+        left: 163px;
     }
 }

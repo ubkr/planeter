@@ -720,13 +720,13 @@ export class SolarSystemView {
             diagram.className = 'solar-system__moon-diagram';
 
             // Diagram dimensions — must match the CSS class dimensions
-            const diagramWidth = 280;
-            const diagramHeight = 200;
-            const centerX = diagramWidth / 2;   // 140
-            const centerY = diagramHeight / 2;  // 100
-            const dotRadius = 3;
-            const padding = 12;
-            const maxScale = 8; // px per planet radius for near moons
+            const diagramWidth = 344;
+            const diagramHeight = 246;
+            const centerX = diagramWidth / 2;   // 172
+            const centerY = diagramHeight / 2;  // 123
+            const dotRadius = 4;
+            const padding = 15;
+            const maxScale = 10; // px per planet radius for near moons
 
             // Central planet circle
             const planetCircle = document.createElement('div');
