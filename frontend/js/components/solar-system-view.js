@@ -731,13 +731,13 @@ export class SolarSystemView {
         if (planetData?.moons && planetData.moons.length > 0) {
             const moons = planetData.moons;
 
+            const diagram = document.createElement('div');
+            diagram.className = 'solar-system__moon-diagram';
+
             const moonHeading = document.createElement('h4');
             moonHeading.className = 'solar-system__moon-heading';
             moonHeading.textContent = 'Månar';
-            svgArea.appendChild(moonHeading);
-
-            const diagram = document.createElement('div');
-            diagram.className = 'solar-system__moon-diagram';
+            diagram.appendChild(moonHeading);
 
             // Diagram dimensions — must match the CSS class dimensions
             const diagramWidth = 344;
@@ -826,6 +826,23 @@ export class SolarSystemView {
             }
 
             svgArea.appendChild(diagram);
+
+            // Hide the zoomed SVG — the moon diagram is the primary planet visualization
+            this._svg.classList.add('solar-system-svg--detail-hidden');
+
+            // Scale the moon diagram to fill the svgarea
+            requestAnimationFrame(() => {
+                const areaW = svgArea.clientWidth;
+                const areaH = svgArea.clientHeight;
+                const DIAGRAM_W = 344; // must match diagramWidth constant
+                const DIAGRAM_H = 246; // must match diagramHeight constant
+                const PADDING = 32;
+                const diagramScale = Math.max(0.8, Math.min(
+                    (areaW - PADDING) / DIAGRAM_W,
+                    (areaH - PADDING) / DIAGRAM_H
+                ));
+                diagram.style.setProperty('--moon-diagram-scale', diagramScale);
+            });
         }
 
         // Saturn ring diagram — rendered only when ring tilt data is available
@@ -856,6 +873,18 @@ export class SolarSystemView {
                 ringContainer = document.createElement('div');
                 ringContainer.className = 'solar-system__moon-diagram';
                 svgArea.appendChild(ringContainer);
+                requestAnimationFrame(() => {
+                    const areaW = svgArea.clientWidth;
+                    const areaH = svgArea.clientHeight;
+                    const DIAGRAM_W = 344;
+                    const DIAGRAM_H = 246;
+                    const PADDING = 32;
+                    const diagramScale = Math.max(0.8, Math.min(
+                        (areaW - PADDING) / DIAGRAM_W,
+                        (areaH - PADDING) / DIAGRAM_H
+                    ));
+                    ringContainer.style.setProperty('--moon-diagram-scale', diagramScale);
+                });
             }
 
             // Build the SVG overlay — use document.createElementNS for correct
@@ -882,6 +911,12 @@ export class SolarSystemView {
             // Insert the SVG as the FIRST child of the container so it renders
             // behind the planet circle div and all moon dot elements.
             ringContainer.insertBefore(ringSvg, ringContainer.firstChild);
+
+            // Hide the zoomed SVG — the ring/moon diagram is the primary visualization.
+            // Guard against double-add: the moon diagram path above may have already set it.
+            if (this._svg) {
+                this._svg.classList.add('solar-system-svg--detail-hidden');
+            }
         }
 
         // Assemble layout: info panel on the left, SVG area on the right
@@ -920,6 +955,7 @@ export class SolarSystemView {
         if (this._svg) {
             this._svg.setAttribute('viewBox', `0 0 ${VIEW_SIZE} ${VIEW_SIZE}`);
             this._svg.classList.remove('solar-system-svg--zoomed');
+            this._svg.classList.remove('solar-system-svg--detail-hidden');
         }
 
         this._zoomedPlanet = null;
@@ -930,6 +966,9 @@ export class SolarSystemView {
      * Remove the detail overlay from the DOM and clear the reference.
      */
     _removeOverlay() {
+        if (this._svg) {
+            this._svg.classList.remove('solar-system-svg--detail-hidden');
+        }
         if (this._overlayEl && this._overlayEl.parentNode) {
             this._overlayEl.parentNode.removeChild(this._overlayEl);
         }

@@ -238,6 +238,10 @@
 .solar-system__detail-svgarea {
     position: relative;
     pointer-events: auto;
+    overflow: visible; /* allow scaled diagram to exceed box bounds */
+    display: flex;
+    align-items: center;
+    justify-content: center;
     /* No background — zoomed SVG shows through */
 }
 
@@ -331,24 +335,34 @@
     position: absolute;
     top: 50%;
     left: 50%;
-    transform: translate(-50%, -50%);
+    transform: translate(-50%, -50%) scale(var(--moon-diagram-scale, 1));
+    transform-origin: center center;
 }
 
-/* --- Moon heading positioned above centred diagram --- */
+/* --- Moon heading positioned above centred diagram (inside .moon-diagram) --- */
 
-.solar-system__detail-svgarea .solar-system__moon-heading {
+.solar-system__moon-diagram .solar-system__moon-heading {
     position: absolute;
-    top: calc(50% - 146px); /* 123px = half of diagramHeight (246px from JS); +23px gap above diagram. Keep in sync with JS constant diagramHeight = 246 */
+    top: -24px; /* sits just above the diagram top edge */
     left: 50%;
     transform: translateX(-50%);
     z-index: 1;
     margin: 0;
+    white-space: nowrap;
 }
 
 /* --- SVG zoomed state: dim orbit rings --- */
 
 .solar-system-svg--zoomed .solar-system__orbit {
     opacity: 0.15;
+    transition: opacity var(--transition-normal);
+}
+
+/* --- SVG hidden when moon diagram is displayed (Jupiter / Saturn detail) --- */
+
+.solar-system-svg--detail-hidden {
+    opacity: 0;
+    pointer-events: none;
     transition: opacity var(--transition-normal);
 }
 
@@ -468,7 +482,7 @@
 
     .solar-system__detail-svgarea {
         flex: 1;
-        min-height: 260px; /* enough for the 246px moon diagram + heading */
+        min-height: 280px; /* enough for the 246px scaled moon diagram + heading */
     }
 }
 
