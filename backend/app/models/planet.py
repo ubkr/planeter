@@ -337,6 +337,29 @@ class PlanetsResponse(BaseModel):
         }
 
 
+class TimelineSample(BaseModel):
+    """A single altitude reading at a given time offset from the query timestamp."""
+
+    time_offset_minutes: int
+    altitude_deg: Optional[float]  # None when ephem returns NaN
+
+
+class TimelineSeries(BaseModel):
+    """Altitude samples for one body (a planet, the Sun, or the Moon) over a time span."""
+
+    name: str
+    samples: List[TimelineSample]
+
+
+class TimelineResponse(BaseModel):
+    """Top-level API response for the altitude timeline endpoint."""
+
+    timestamp: str
+    location: LocationInfo
+    sample_interval_minutes: int = 15
+    series: List[TimelineSeries]
+
+
 class EventsResponse(BaseModel):
     """Dedicated API response for the events endpoint."""
 

@@ -33,6 +33,10 @@
     --color-moon-penalty: #c084fc;
     --color-sun-penalty: #f59e0b;
 
+    /* Chart / timeline colors */
+    --color-chart-grid: rgba(255, 255, 255, 0.08);
+    --color-chart-horizon: rgba(255, 255, 255, 0.25);
+
     /* Planet accent colors */
     --color-planet-mercury: #9ca3af;
     --color-planet-venus: #fbbf24;

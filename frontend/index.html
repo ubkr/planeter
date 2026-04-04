@@ -71,6 +71,15 @@
               tabindex="-1">
         Solsystemet
       </button>
+      <button class="tab-nav__tab"
+              role="tab"
+              id="tabAltitudeTimeline"
+              data-tab="altitudetimeline"
+              aria-selected="false"
+              aria-controls="panelAltitudeTimeline"
+              tabindex="-1">
+        Höjdkurva
+      </button>
     </div>
 
     <main class="main-content">
@@ -146,6 +155,15 @@
           </button>
           <div id="solarSystemContainer"></div>
         </div>
+      </div>
+
+      <!-- Höjdkurva tab panel (hidden by default) -->
+      <div id="panelAltitudeTimeline"
+           role="tabpanel"
+           aria-labelledby="tabAltitudeTimeline"
+           class="tab-panel--hidden"
+           hidden>
+        <div id="altitudeTimelineContainer"></div>
       </div>
     </main>
 

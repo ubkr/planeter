@@ -16,7 +16,8 @@ import { SkyMap } from './components/sky-map.js';
 import { EventAlerts } from './components/event-alerts.js';
 import { EventsTimeline } from './components/events-timeline.js';
 import { SolarSystemView } from './components/solar-system-view.js';
-import { fetchVisiblePlanets, fetchEvents } from './api.js';
+import { AltitudeTimeline } from './components/altitude-timeline.js';
+import { fetchVisiblePlanets, fetchEvents, fetchPlanetTimeline } from './api.js';
 import { formatLocation } from './utils.js';
 
 /** Auto-refresh interval in milliseconds. */
@@ -80,6 +81,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const eventAlerts = new EventAlerts(document.getElementById('eventAlerts'));
     const eventsTimeline = new EventsTimeline(document.getElementById('eventsTimelineContainer'));
     const solarSystemView = new SolarSystemView(document.getElementById('solarSystemContainer'));
+    const altitudeTimeline = new AltitudeTimeline(document.getElementById('altitudeTimelineContainer'));
 
     // --- Constellation controls ---
     const constellationToggleEl = document.getElementById('constellationToggle');
@@ -367,6 +369,15 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     let eventsLoaded = false;
 
+    /**
+     * Whether the altitude timeline has been loaded for the current location.
+     * Resets to false whenever the location changes so that switching back to
+     * the "Höjdkurva" tab after a location change triggers a fresh fetch.
+     *
+     * @type {boolean}
+     */
+    let timelineLoaded = false;
+
     // --- Helper: hide error banner ---
     function hideError() {
         errorBannerEl.classList.add('hidden');
@@ -459,6 +470,26 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /**
+     * Fetch the altitude timeline for a location and render the chart.
+     *
+     * Only called when the "Höjdkurva" tab is activated and the timeline has
+     * not yet been loaded for the current location.
+     *
+     * @param {Object} location - Location object with lat and lon.
+     */
+    async function loadTimeline(location) {
+        altitudeTimeline.showLoading();
+        try {
+            const data = await fetchPlanetTimeline(location.lat, location.lon);
+            altitudeTimeline.render(data);
+            timelineLoaded = true;
+        } catch (err) {
+            console.warn('loadTimeline error:', err);
+            altitudeTimeline.showEmpty();
+        }
+    }
+
+    /**
      * Fetch events for a location and render the timeline.
      *
      * Only called when the "Kommande" tab is activated and events have not
@@ -511,6 +542,10 @@ document.addEventListener('DOMContentLoaded', () => {
             loadEvents(currentLocation);
         }
 
+        if (tabId === 'altitudetimeline' && !timelineLoaded) {
+            loadTimeline(currentLocation);
+        }
+
         if (tabId === 'solarsystem' && lastApiData !== null) {
             solarSystemView.render(lastApiData.planets || [], lastApiData.earth_heliocentric || null);
         }
@@ -549,8 +584,9 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('locationChanged', (event) => {
         currentLocation = event.detail;
         locationDisplayEl.textContent = formatLocation(currentLocation);
-        // Reset events loaded flag so the timeline refreshes for the new location.
+        // Reset lazy-load flags so each tab refreshes for the new location.
         eventsLoaded = false;
+        timelineLoaded = false;
         loadData(currentLocation);
     });
 

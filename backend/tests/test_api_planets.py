@@ -1,10 +1,14 @@
 """
 Integration tests for the /api/v1/planets endpoints.
 
-All tests use:
+Most tests use:
   - async_client  — httpx AsyncClient wired to the FastAPI ASGI app.
   - mock_weather  — monkeypatches app.api.routes.planets.get_weather so no
                     live HTTP calls are made to Met.no or Open-Meteo.
+
+Exception: the three timeline tests (test_timeline_*) do not use mock_weather
+or mock_forecast because the /timeline endpoint only performs astronomical
+calculations and never calls the weather service.
 
 asyncio_mode = auto is set in pytest.ini so no @pytest.mark.asyncio is needed.
 
@@ -360,3 +364,47 @@ def test_compute_nautical_dark_window_midnight_sun():
     assert dark_end is None, (
         f"Expected dark_end=None for midnight sun, got {dark_end!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Phase B12 — GET /timeline altitude timeline endpoint
+# ---------------------------------------------------------------------------
+
+async def test_timeline_returns_200(async_client):
+    response = await async_client.get(
+        "/api/v1/planets/timeline",
+        params={"lat": LAT, "lon": LON},
+    )
+    assert response.status_code == 200
+
+
+async def test_timeline_response_schema(async_client):
+    response = await async_client.get(
+        "/api/v1/planets/timeline",
+        params={"lat": LAT, "lon": LON},
+    )
+    data = response.json()
+    assert "timestamp" in data
+    assert "location" in data
+    assert "sample_interval_minutes" in data
+    assert "series" in data
+    assert data["sample_interval_minutes"] == 15
+    assert len(data["series"]) == 7
+
+
+async def test_timeline_series_names_and_coverage(async_client):
+    response = await async_client.get(
+        "/api/v1/planets/timeline",
+        params={"lat": LAT, "lon": LON},
+    )
+    data = response.json()
+    expected_names = {"Mercury", "Venus", "Mars", "Jupiter", "Saturn", "Sun", "Moon"}
+    actual_names = {s["name"] for s in data["series"]}
+    assert actual_names == expected_names
+    for series in data["series"]:
+        assert len(series["samples"]) == 96
+        assert series["samples"][0]["time_offset_minutes"] == 0
+        assert series["samples"][-1]["time_offset_minutes"] == 1425
+        for sample in series["samples"]:
+            if sample["altitude_deg"] is not None:
+                assert -90 <= sample["altitude_deg"] <= 90

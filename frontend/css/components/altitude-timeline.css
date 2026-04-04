@@ -1,0 +1,85 @@
+/* ==========================================================================
+   Altitude Timeline Component
+   24-hour SVG altitude chart for planets, Sun, and Moon.
+   ========================================================================== */
+
+/* --- Container --- */
+
+#altitudeTimelineContainer {
+    width: 100%;
+    padding: var(--space-md, 1rem);
+    box-sizing: border-box;
+}
+
+@media (max-width: 640px) {
+    #altitudeTimelineContainer {
+        padding: var(--space-sm, 0.5rem);
+    }
+}
+
+/* --- Chart Wrapper --- */
+
+.altitude-timeline {
+    width: 100%;
+}
+
+.altitude-timeline svg {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+/* --- Skeleton Loading --- */
+
+.altitude-timeline__skeleton {
+    width: 100%;
+}
+
+.altitude-timeline__skeleton-chart {
+    width: 100%;
+    height: 200px;
+    border-radius: var(--radius-md);
+    background: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0.04) 0%,
+        rgba(255, 255, 255, 0.08) 50%,
+        rgba(255, 255, 255, 0.04) 100%
+    );
+    background-size: 200% 100%;
+    /* @keyframes shimmer defined in frontend/css/base.css */
+    animation: shimmer 1.8s ease-in-out infinite;
+}
+
+/* --- Empty State --- */
+
+.altitude-timeline__empty-msg {
+    color: var(--color-text-secondary);
+    text-align: center;
+    padding: var(--space-xl, 2rem) var(--space-md, 1rem);
+    font-size: var(--font-size-sm, 0.875rem);
+}
+
+/* --- Legend --- */
+
+.altitude-timeline__legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm, 0.5rem);
+    justify-content: center;
+    padding: var(--space-sm, 0.5rem) 0;
+}
+
+.altitude-timeline__legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: var(--font-size-xs, 0.75rem);
+    color: var(--color-text-secondary);
+}
+
+.altitude-timeline__legend-swatch {
+    width: 16px;
+    height: 3px;
+    border-radius: 1px;
+    flex-shrink: 0;
+}

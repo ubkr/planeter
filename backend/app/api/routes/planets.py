@@ -16,10 +16,14 @@ from ...models.planet import (
     PlanetPosition,
     PlanetsResponse,
     SunInfo,
+    TimelineResponse,
+    TimelineSample,
+    TimelineSeries,
     WeatherInfo,
 )
 from ...services.aggregator import get_weather
 from ...services.cache_service import cache
+from ...services.planets import compute_altitude_timeline
 from ...services.planets.calculator import calculate_planet_positions
 from ...services.planets.events import detect_events
 from ...services.planets.forecast import compute_next_good_observation
@@ -751,6 +755,27 @@ async def get_tonight_planets(
         tonight_score=tonight,
         events=events,
         earth_heliocentric=earth_heliocentric,
+    )
+
+
+@router.get("/timeline", response_model=TimelineResponse)
+async def get_altitude_timeline(
+    lat: float = Query(..., ge=-90, le=90, description="Latitud"),
+    lon: float = Query(..., ge=-180, le=180, description="Longitud"),
+):
+    """Returnerar 24-timmarsaltityd för alla planeter, solen och månen."""
+    series_data = compute_altitude_timeline(lat, lon)
+    series = [
+        TimelineSeries(
+            name=s["name"],
+            samples=[TimelineSample(**sample) for sample in s["samples"]]
+        )
+        for s in series_data
+    ]
+    return TimelineResponse(
+        timestamp=_utc_iso(),
+        location=LocationInfo(lat=lat, lon=lon),
+        series=series,
     )
 
 

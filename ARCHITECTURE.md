@@ -40,6 +40,7 @@ backend/
         forecast.py               -- 6-month next-good-observation scanner (per-night dark-window sampling)
         heliocentric.py           -- Heliocentric XYZ coordinates for planets and Earth (via ephem.Sun())
         moons.py                  -- Galilean moon (Jupiter) and major moon (Saturn) X/Y offsets via ephem satellite classes
+        timeline.py               -- 24-hour altitude-above-horizon series for all bodies in 15-minute steps
       weather/
         base.py                   -- WeatherSourceBase ABC
         metno_client.py           -- Met.no API client
@@ -77,6 +78,7 @@ frontend/
       tab-nav.css                 -- Tab navigation bar
       events-timeline.css         -- Upcoming events timeline
       event-alerts.css            -- Event alert banners
+      altitude-timeline.css       -- Altitude-timeline panel, SVG chart, axes, legend, and horizon line
   js/
     main.js                       -- App entry point, tab orchestration
     api.js                        -- API client (planets, events, geocode)
@@ -97,6 +99,7 @@ frontend/
       map-selector.js             -- Leaflet map widget
       tooltip.js                  -- Tooltip utility
       solar-system-view.js        -- Heliocentric SVG top-down solar system diagram (Solsystemet tab)
+      altitude-timeline.js        -- 24-hour SVG altitude chart for planets, Sun, and Moon (Höjdkurva tab)
   lib/
     three.module.min.js           -- Three.js r170 (vendored, ES module)
     three/addons/
@@ -176,6 +179,7 @@ SkyMap tab (panelSkyMap)
 8. When the user opens the **Stjärnkarta** tab, `SkyMap` (2D) or `SkyMap3D` (Three.js) renders planet positions
 9. When the user opens the **Solsystemet** tab, `SolarSystemView` renders a heliocentric SVG top-down diagram of the solar system with an Earth dot and a Sun tooltip showing the current Earth-Sun distance
 10. When the user opens the **Kommande** tab, `APIClient` fetches `GET /api/v1/events` and `EventsTimeline` renders the next 60 days of conjunctions, oppositions, etc.
+11. When the user opens the **Höjdkurva** tab, `APIClient` fetches `GET /api/v1/planets/timeline` and `AltitudeTimeline` renders a 24-hour SVG altitude chart for all bodies
 
 ### Calculation Pipeline (Backend)
 
@@ -373,6 +377,27 @@ Same structure as above but includes visibility windows: when each planet rises,
 ```
 
 Covers a 60-day look-ahead window. Events are cached for 1 hour, keyed on rounded coordinates and today's date.
+
+### `GET /api/v1/planets/timeline`
+
+```json
+{
+  "timestamp": "2026-04-04T20:00:00Z",
+  "location": { "lat": 55.7, "lon": 13.4 },
+  "sample_interval_minutes": 15,
+  "series": [
+    {
+      "name": "Mercury",
+      "samples": [
+        { "time_offset_minutes": 0,   "altitude_deg": -12.3 },
+        { "time_offset_minutes": 15,  "altitude_deg": -11.8 }
+      ]
+    }
+  ]
+}
+```
+
+Seven series are always present, in this order: `Mercury`, `Venus`, `Mars`, `Jupiter`, `Saturn`, `Sun`, `Moon`. Each series contains 96 samples at 15-minute intervals covering the next 24 hours from `timestamp`. `time_offset_minutes` is a non-negative integer offset from `timestamp`; `altitude_deg` is the body's altitude above the horizon in degrees (negative values mean below the horizon). The endpoint is registered before the `/{name}` wildcard route in `planets.py` to avoid routing conflicts.
 
 ### `GET /api/v1/geocode/reverse`
 

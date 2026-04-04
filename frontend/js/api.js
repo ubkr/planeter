@@ -115,6 +115,25 @@ export async function fetchEvents(lat, lon) {
 }
 
 /**
+ * Fetch the altitude timeline for all planets over the coming night.
+ *
+ * @param {number} lat - Latitude in decimal degrees.
+ * @param {number} lon - Longitude in decimal degrees.
+ * @returns {Promise<Object>} Timeline response object.
+ * @throws {Error} Swedish-language error on network, HTTP, or parse failure.
+ */
+export async function fetchPlanetTimeline(lat, lon) {
+    const url = `${BASE_URL}/api/v1/planets/timeline?lat=${lat}&lon=${lon}`;
+    const response = await fetchWithTimeout(url);
+
+    if (!response.ok) {
+        throw new Error(`Serverfel (${response.status}): Kunde inte hämta höjdkurva.`);
+    }
+
+    return parseJson(response);
+}
+
+/**
  * Fetch data for a single planet by its lowercase English name.
  *
  * @param {string} name - Planet name: mercury, venus, mars, jupiter, or saturn.
