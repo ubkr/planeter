@@ -346,6 +346,12 @@ MoonPosition {
 
 Jupiter tracks four Galilean moons: Io, Europa, Ganymede, Callisto. Saturn tracks seven major moons: Titan, Rhea, Dione, Tethys, Enceladus, Mimas, Iapetus. Offsets are computed by the `ephem` satellite classes and expressed in parent-planet equatorial radii, following the `.x` / `.y` sign convention of those classes.
 
+The `ring_tilt_deg` field is populated only for Saturn; it is `null` for all other planets. Value is the ring tilt toward Earth in degrees; positive = southern face visible (pyephem convention), negative = northern face visible. `null` for all non-Saturn planets.
+
+```
+PlanetPosition.ring_tilt_deg: Optional[float]
+```
+
 ### `GET /api/v1/planets/tonight`
 
 Same structure as above but includes visibility windows: when each planet rises, when it enters darkness, when it sets or dawn breaks.

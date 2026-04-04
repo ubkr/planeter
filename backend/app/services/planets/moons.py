@@ -9,8 +9,9 @@ moon objects (.x east-positive, .y north-positive as seen from Earth).
 
 import ephem
 import logging
+import math
 from datetime import datetime, timezone
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -101,3 +102,42 @@ def compute_moon_positions(dt: datetime) -> Dict[str, List[Dict]]:
         "Jupiter": _compute_moons(dt, _JUPITER_MOONS, "Jupiter"),
         "Saturn":  _compute_moons(dt, _SATURN_MOONS,  "Saturn"),
     }
+
+
+def compute_ring_tilt(dt: datetime) -> Optional[float]:
+    """
+    Return Saturn's ring tilt as seen from Earth, in degrees.
+
+    The tilt is the angle between Earth and Saturn's ring plane —
+    positive values mean the southern face of the rings is visible
+    (south pole tilted toward Earth); negative values mean the northern
+    face is visible.  A value near zero indicates the rings are seen
+    edge-on.
+
+    This function is Saturn-specific; it reads the ``earth_tilt``
+    attribute from an ``ephem.Saturn`` object, which ephem exposes as
+    an ``ephem.Angle`` in radians.
+
+    Args:
+        dt: UTC datetime for the calculation.  May be timezone-aware or
+            timezone-naive; timezone-aware values are converted to UTC
+            before being passed to ephem, which requires naive UTC.
+
+    Returns:
+        Ring tilt in degrees as a float, or ``None`` if computation fails.
+    """
+    # ephem does not accept timezone-aware datetimes.
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+
+    try:
+        saturn = ephem.Saturn()
+        saturn.compute(ephem.Date(dt))
+        return math.degrees(saturn.earth_tilt)
+    except Exception as exc:
+        logger.warning(
+            "Failed to compute Saturn ring tilt at %s: %s",
+            dt.isoformat(),
+            exc,
+        )
+        return None

@@ -1360,7 +1360,7 @@ When the user zooms into Jupiter or Saturn in the solar system detail view, the 
 
 ---
 
-#### Phase F3: Saturnusringar — Visuell Rendering
+#### Phase F3: Saturnusringar — Visuell Rendering — ✅
 
 **Depends on:** Phase F1
 **Parallelisable with:** Phase F2
@@ -1370,7 +1370,7 @@ When the user zooms into Jupiter or Saturn in the solar system detail view, the 
 When the user zooms into Saturn in the solar system detail view, the planet's ring system is rendered as a tilted ellipse matching the ring opening angle as seen from Earth at the current time. The backend computes the ring tilt using `ephem.Saturn()`'s `earth_tilt` attribute, which gives the inclination of Saturn's rings toward the Earth observer in radians. The frontend renders the rings as an SVG ellipse where the semi-major axis represents the ring's physical extent and the semi-minor axis is scaled by `sin(earth_tilt)`, producing the correct apparent foreshortening. When the rings are nearly edge-on (`earth_tilt` close to 0°), the ellipse collapses to a thin line, faithfully representing the real-world view.
 
 **Definition of Done**
-- [ ] `PlanetPosition` model includes a new optional field `ring_tilt_deg: Optional[float]` populated only for Saturn, representing the ring tilt toward Earth in degrees (positive = north pole tilted toward Earth)
+- [ ] `PlanetPosition` model includes a new optional field `ring_tilt_deg: Optional[float]` populated only for Saturn, representing the ring tilt toward Earth in degrees (positive = southern face visible (pyephem convention), negative = northern face visible)
 - [ ] `GET /api/v1/planets/visible?lat=55.7&lon=13.4` returns a non-null `ring_tilt_deg` value for Saturn; all other planets return `ring_tilt_deg: null`
 - [ ] The zoomed-in detail view for Saturn renders an SVG ellipse around the planet circle; the ellipse's semi-minor axis is proportional to `|sin(ring_tilt_deg)|`, correctly representing the apparent ring opening
 - [ ] At the current epoch (2025–2026, ring tilt near 0°), Saturn's rings render as a very thin ellipse nearly edge-on — matching the real-world near-edge-on passage expected in 2025

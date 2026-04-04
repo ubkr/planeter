@@ -808,6 +808,64 @@ export class SolarSystemView {
             content.appendChild(diagram);
         }
 
+        // Saturn ring diagram — rendered only when ring tilt data is available
+        if (planetKey === 'saturn' && planetData?.ring_tilt_deg != null) {
+            const ringTiltDeg = planetData.ring_tilt_deg;
+
+            // Planet circle radius in the moon diagram (matches CSS: width/height 18px → r=9)
+            const planetCircleRadius = 9;
+
+            // Ring semi-major axis extends ~2.3 planetary radii
+            const ringRx = planetCircleRadius * 2.3;
+
+            // Semi-minor axis determined by the tilt angle; minimum 1px so the
+            // ring remains visible during near-edge-on epochs (e.g. 2025-2026).
+            const ringRy = Math.max(1, ringRx * Math.abs(Math.sin(ringTiltDeg * Math.PI / 180)));
+
+            // Diagram dimensions and planet centre — kept in sync with the moon
+            // diagram constants so the ring is centred on the planet circle.
+            const ringDiagramWidth  = 344;
+            const ringDiagramHeight = 246;
+            const ringCenterX = ringDiagramWidth  / 2;  // 172
+            const ringCenterY = ringDiagramHeight / 2;  // 123
+
+            // Determine the container: reuse an existing moon diagram if present,
+            // otherwise create a standalone container with the same dimensions.
+            let ringContainer = content.querySelector('.solar-system__moon-diagram');
+            if (!ringContainer) {
+                ringContainer = document.createElement('div');
+                ringContainer.className = 'solar-system__moon-diagram';
+                // Insert before the back button (which is not yet appended — safe
+                // to just append to content here since we haven't added backBtn yet).
+                content.appendChild(ringContainer);
+            }
+
+            // Build the SVG overlay — use document.createElementNS for correct
+            // SVG namespace; must match SVG_NS used throughout this file.
+            const ringSvg = document.createElementNS(SVG_NS, 'svg');
+            ringSvg.setAttribute('xmlns', SVG_NS);
+            ringSvg.setAttribute('width',  String(ringDiagramWidth));
+            ringSvg.setAttribute('height', String(ringDiagramHeight));
+            ringSvg.setAttribute('viewBox', `0 0 ${ringDiagramWidth} ${ringDiagramHeight}`);
+            ringSvg.style.position        = 'absolute';
+            ringSvg.style.top             = '0';
+            ringSvg.style.left            = '0';
+            ringSvg.style.pointerEvents   = 'none';
+
+            const ringEllipse = document.createElementNS(SVG_NS, 'ellipse');
+            ringEllipse.setAttribute('cx', String(ringCenterX));
+            ringEllipse.setAttribute('cy', String(ringCenterY));
+            ringEllipse.setAttribute('rx', String(ringRx));
+            ringEllipse.setAttribute('ry', String(ringRy));
+            ringEllipse.setAttribute('class', 'solar-system__ring');
+
+            ringSvg.appendChild(ringEllipse);
+
+            // Insert the SVG as the FIRST child of the container so it renders
+            // behind the planet circle div and all moon dot elements.
+            ringContainer.insertBefore(ringSvg, ringContainer.firstChild);
+        }
+
         // Back button
         const backBtn = document.createElement('button');
         backBtn.className = 'solar-system__detail-back-btn';

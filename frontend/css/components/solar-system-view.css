@@ -392,6 +392,20 @@
     opacity: 0.65;
 }
 
+/* --- Saturn ring ellipse --- */
+
+/* Rendered as an inline SVG <ellipse> absolutely positioned inside the moon
+   diagram container. The ring sits behind planet circle and moon dots because
+   the SVG is inserted as the first child of the container. */
+.solar-system__ring {
+    fill: var(--color-planet-saturn, #d4a017);
+    fill-opacity: 0.12;
+    stroke: var(--color-planet-saturn, #d4a017);
+    stroke-opacity: 0.75;
+    stroke-width: 2;
+    pointer-events: none;
+}
+
 /* --- Moon labels --- */
 
 .solar-system__moon-label {

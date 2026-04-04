@@ -144,6 +144,7 @@ class PlanetPosition(BaseModel):
         None,
         description="Positions of visible moons relative to the planet, or null for planets with no tracked moons",
     )
+    ring_tilt_deg: Optional[float] = Field(None, description="Ring tilt toward Earth in degrees (Saturn only); positive = south pole tilted toward Earth")
 
     class Config:
         json_schema_extra = {
@@ -171,6 +172,7 @@ class PlanetPosition(BaseModel):
                 "heliocentric_y_au": -0.23,
                 "heliocentric_z_au": 0.01,
                 "moons": None,
+                "ring_tilt_deg": None,
             }
         }
 

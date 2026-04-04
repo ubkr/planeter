@@ -28,7 +28,7 @@ from ...services.planets.calculator import calculate_planet_positions
 from ...services.planets.events import detect_events
 from ...services.planets.forecast import compute_next_good_observation
 from ...services.planets.heliocentric import compute_earth_heliocentric, compute_heliocentric_positions
-from ...services.planets.moons import compute_moon_positions
+from ...services.planets.moons import compute_moon_positions, compute_ring_tilt
 from ...services.scoring import apply_scores, score_tonight
 from ...utils.logger import setup_logger
 from ...utils.moon import calculate_moon_penalty, compute_moon_rise_set_times
@@ -587,6 +587,14 @@ async def get_visible_planets(
     except Exception as exc:
         logger.warning(f"compute_moon_positions failed for /visible ({lat}, {lon}): {exc}")
 
+    # Populate Saturn ring tilt.
+    try:
+        for planet in planets:
+            if planet.name == "Saturn":
+                planet.ring_tilt_deg = compute_ring_tilt(now_utc)
+    except Exception as exc:
+        logger.warning(f"compute_ring_tilt failed for /visible ({lat}, {lon}): {exc}")
+
     sun_info = _build_sun_info(sun_data, sun_times)
     moon_info = _build_moon_info(moon_data, moon_times)
 
@@ -736,6 +744,14 @@ async def get_tonight_planets(
     except Exception as exc:
         logger.warning(f"compute_moon_positions failed for /tonight ({lat}, {lon}): {exc}")
 
+    # Populate Saturn ring tilt.
+    try:
+        for planet in planets:
+            if planet.name == "Saturn":
+                planet.ring_tilt_deg = compute_ring_tilt(helio_dt)
+    except Exception as exc:
+        logger.warning(f"compute_ring_tilt failed for /tonight ({lat}, {lon}): {exc}")
+
     # Use the pre-computed sun/moon data so metadata reflects the same moment
     # used for scoring, not the wall-clock time of the HTTP request.
     # Rise/set times always use now_utc so they reflect today's actual events.
@@ -821,6 +837,14 @@ async def get_planet(
                 planet.moons = [MoonPosition(**m) for m in moon_positions[planet.name]]
     except Exception as exc:
         logger.warning(f"compute_moon_positions failed for /{name} ({lat}, {lon}): {exc}")
+
+    # Populate Saturn ring tilt.
+    try:
+        for planet in planets:
+            if planet.name == "Saturn":
+                planet.ring_tilt_deg = compute_ring_tilt(now_utc)
+    except Exception as exc:
+        logger.warning(f"compute_ring_tilt failed for /{name} ({lat}, {lon}): {exc}")
 
     # Planet names from the calculator are title-cased English names.
     for planet in planets:
