@@ -643,7 +643,15 @@ export class SolarSystemView {
     }
 
     /**
-     * Show the encyclopedic detail overlay for the given planet.
+     * Show the encyclopedic detail panel for the given planet.
+     *
+     * Replaces the old dark-backdrop overlay with a transparent two-column
+     * layout so the zoomed SVG remains fully visible in the right column.
+     *
+     * DOM structure appended to .solar-system-panel:
+     *   .solar-system__detail-layout
+     *     ├── .solar-system__detail-info    (left column: title, facts, description, back btn)
+     *     └── .solar-system__detail-svgarea (right column: moon/ring diagram sits here)
      *
      * @param {string} planetKey - Lowercase planet key (e.g. 'jupiter')
      */
@@ -658,22 +666,23 @@ export class SolarSystemView {
         const swedishName = SWEDISH_NAMES[planetKey] || infoKey;
         const colorToken = PLANET_COLOR_TOKEN[planetKey] || 'var(--color-text-primary)';
 
-        // Build overlay elements
-        const overlay = document.createElement('div');
-        overlay.className = 'solar-system__detail-overlay';
+        // --- Outer layout wrapper (transparent — no backdrop) ---
+        const layout = document.createElement('div');
+        layout.className = 'solar-system__detail-layout';
 
-        const content = document.createElement('div');
-        content.className = 'solar-system__detail-content';
+        // --- Left column: info panel ---
+        const infoPanel = document.createElement('div');
+        infoPanel.className = 'solar-system__detail-info';
 
-        // Set the planet colour token on the content card so all children
-        // (title, moon diagram planet circle, etc.) can inherit it via CSS var().
-        content.style.setProperty('--detail-planet-color', colorToken);
+        // Set the planet colour token so title and moon diagram planet circle
+        // can reference it via CSS var(--detail-planet-color).
+        layout.style.setProperty('--detail-planet-color', colorToken);
 
         // Title
         const title = document.createElement('h2');
         title.className = 'solar-system__detail-title';
         title.textContent = swedishName;
-        content.appendChild(title);
+        infoPanel.appendChild(title);
 
         // Facts grid
         const grid = document.createElement('div');
@@ -698,13 +707,24 @@ export class SolarSystemView {
             grid.appendChild(labelEl);
             grid.appendChild(valueEl);
         }
-        content.appendChild(grid);
+        infoPanel.appendChild(grid);
 
         // Description
         const desc = document.createElement('p');
         desc.className = 'solar-system__detail-description';
         desc.textContent = info.description_sv;
-        content.appendChild(desc);
+        infoPanel.appendChild(desc);
+
+        // Back button
+        const backBtn = document.createElement('button');
+        backBtn.className = 'solar-system__detail-back-btn';
+        backBtn.textContent = 'Tillbaka';
+        backBtn.addEventListener('click', () => this.zoomOut());
+        infoPanel.appendChild(backBtn);
+
+        // --- Right column: SVG area (transparent overlay over the zoomed SVG) ---
+        const svgArea = document.createElement('div');
+        svgArea.className = 'solar-system__detail-svgarea';
 
         // Moon diagram — only rendered for planets that have moon data (Jupiter, Saturn)
         const planetData = this._planetData?.get(planetKey);
@@ -714,7 +734,7 @@ export class SolarSystemView {
             const moonHeading = document.createElement('h4');
             moonHeading.className = 'solar-system__moon-heading';
             moonHeading.textContent = 'Månar';
-            content.appendChild(moonHeading);
+            svgArea.appendChild(moonHeading);
 
             const diagram = document.createElement('div');
             diagram.className = 'solar-system__moon-diagram';
@@ -805,7 +825,7 @@ export class SolarSystemView {
                 diagram.appendChild(label);
             }
 
-            content.appendChild(diagram);
+            svgArea.appendChild(diagram);
         }
 
         // Saturn ring diagram — rendered only when ring tilt data is available
@@ -829,15 +849,13 @@ export class SolarSystemView {
             const ringCenterX = ringDiagramWidth  / 2;  // 172
             const ringCenterY = ringDiagramHeight / 2;  // 123
 
-            // Determine the container: reuse an existing moon diagram if present,
-            // otherwise create a standalone container with the same dimensions.
-            let ringContainer = content.querySelector('.solar-system__moon-diagram');
+            // Determine the container: reuse an existing moon diagram if present
+            // (inside svgArea), otherwise create a standalone container.
+            let ringContainer = svgArea.querySelector('.solar-system__moon-diagram');
             if (!ringContainer) {
                 ringContainer = document.createElement('div');
                 ringContainer.className = 'solar-system__moon-diagram';
-                // Insert before the back button (which is not yet appended — safe
-                // to just append to content here since we haven't added backBtn yet).
-                content.appendChild(ringContainer);
+                svgArea.appendChild(ringContainer);
             }
 
             // Build the SVG overlay — use document.createElementNS for correct
@@ -866,31 +884,22 @@ export class SolarSystemView {
             ringContainer.insertBefore(ringSvg, ringContainer.firstChild);
         }
 
-        // Back button
-        const backBtn = document.createElement('button');
-        backBtn.className = 'solar-system__detail-back-btn';
-        backBtn.textContent = 'Tillbaka';
-        backBtn.addEventListener('click', () => this.zoomOut());
-        content.appendChild(backBtn);
-
-        overlay.appendChild(content);
-
-        overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) this.zoomOut();
-        });
+        // Assemble layout: info panel on the left, SVG area on the right
+        layout.appendChild(infoPanel);
+        layout.appendChild(svgArea);
 
         // Append to .solar-system-panel (the panel wrapper that has position:relative)
         const panelEl = this._getPanelEl();
         const parentEl = panelEl || this.containerEl?.parentNode;
         if (!parentEl) {
-            console.warn('SolarSystemView: could not find panel container for overlay');
+            console.warn('SolarSystemView: could not find panel container for detail layout');
             return;
         }
-        parentEl.appendChild(overlay);
+        parentEl.appendChild(layout);
 
-        this._overlayEl = overlay;
+        this._overlayEl = layout;
 
-        // Move focus to the back button after the overlay is in the DOM
+        // Move focus to the back button after the layout is in the DOM
         requestAnimationFrame(() => {
             backBtn.focus();
         });

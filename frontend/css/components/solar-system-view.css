@@ -191,13 +191,14 @@
 }
 
 /* ==========================================================================
-   Planet Detail Overlay
-   Interactive overlay shown when a planet is clicked for more information.
+   Planet Detail — Integrated Zoom Layout
+   Side-by-side info panel + transparent SVG area shown when a planet is
+   clicked. Replaces the old centred modal overlay.
    ========================================================================== */
 
 /* --- Fade-in animation --- */
 
-@keyframes solar-system-overlay-fadein {
+@keyframes solar-system-detail-fadein {
     from {
         opacity: 0;
     }
@@ -206,33 +207,38 @@
     }
 }
 
-/* --- Overlay backdrop --- */
+/* --- Layout wrapper (transparent — no backdrop) --- */
 
-.solar-system__detail-overlay {
+.solar-system__detail-layout {
     position: absolute;
     inset: 0;
     z-index: var(--z-modal);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--color-bg-overlay);
-    animation: solar-system-overlay-fadein var(--transition-normal) ease both;
+    display: grid;
+    grid-template-columns: minmax(240px, 320px) 1fr;
+    pointer-events: none; /* let clicks pass through to SVG except on children */
+    animation: solar-system-detail-fadein var(--transition-normal) ease both;
 }
 
-/* --- Content card --- */
+/* --- Left column: info panel --- */
 
-.solar-system__detail-content {
-    width: 100%;
-    max-width: 360px;
-    max-height: 85%;
-    margin: var(--space-md);
-    padding: var(--space-lg);
+.solar-system__detail-info {
+    pointer-events: auto;
+    height: 100%;
     overflow-y: auto;
-    background: var(--color-bg-surface);
-    border: var(--border-width) solid var(--border-color);
-    border-radius: var(--radius-md);
+    padding: var(--space-lg);
+    background: rgba(10, 12, 28, 0.92);
+    border-right: var(--border-width) solid var(--border-color);
     box-shadow: var(--shadow-lg);
     color: var(--color-text-primary);
+    animation: solar-system-detail-fadein var(--transition-normal) ease both;
+}
+
+/* --- Right column: transparent SVG area --- */
+
+.solar-system__detail-svgarea {
+    position: relative;
+    pointer-events: auto;
+    /* No background — zoomed SVG shows through */
 }
 
 /* --- Planet name heading --- */
@@ -313,6 +319,32 @@
     outline-offset: 2px;
 }
 
+/* --- Fullscreen expanded: cap info panel width --- */
+
+.solar-system-panel--expanded .solar-system__detail-layout {
+    grid-template-columns: minmax(240px, 340px) 1fr;
+}
+
+/* --- Moon diagram centred in the SVG area --- */
+
+.solar-system__detail-svgarea .solar-system__moon-diagram {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+/* --- Moon heading positioned above centred diagram --- */
+
+.solar-system__detail-svgarea .solar-system__moon-heading {
+    position: absolute;
+    top: calc(50% - 146px); /* 123px = half of diagramHeight (246px from JS); +23px gap above diagram. Keep in sync with JS constant diagramHeight = 246 */
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1;
+    margin: 0;
+}
+
 /* --- SVG zoomed state: dim orbit rings --- */
 
 .solar-system-svg--zoomed .solar-system__orbit {
@@ -346,7 +378,7 @@
     background: var(--color-bg-deep);
     border: var(--border-width) solid var(--border-color);
     border-radius: var(--radius-sm);
-    overflow: hidden;
+    overflow: hidden; /* JS pre-clamps all dot positions to diagram bounds; this clips only ring SVG corners. Do not remove the JS clamping. */
 }
 
 /* --- Central planet circle --- */
@@ -418,14 +450,34 @@
     line-height: 1;
 }
 
-/* --- Narrow screen adjustments --- */
+/* --- Narrow viewports: stacked layout --- */
 
-@media (max-width: 400px) {
-    .solar-system__detail-content {
-        margin: var(--space-xs);
+@media (max-width: 599px) {
+    .solar-system__detail-layout {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .solar-system__detail-info {
+        max-height: 50%;
+        height: auto;
+        border-right: none;
+        border-bottom: var(--border-width) solid var(--border-color);
+        border-radius: 0;
+    }
+
+    .solar-system__detail-svgarea {
+        flex: 1;
+        min-height: 260px; /* enough for the 246px moon diagram + heading */
+    }
+}
+
+/* --- Very narrow screens (375px and below) --- */
+
+@media (max-width: 374px) {
+    .solar-system__detail-info {
         padding: var(--space-md);
-        max-height: 90%;
-        /* Fix 4: allow the 344px moon diagram to scroll horizontally on very
+        /* Allow the 344px moon diagram to scroll horizontally on very
            narrow screens rather than clipping it. */
         overflow-x: auto;
     }
@@ -434,18 +486,14 @@
         font-size: var(--font-size-lg);
     }
 
-    /* Fix 4: keep diagram at its fixed 344px width on narrow viewports;
-       max-width: 100% prevents overflow of the content card but does not
-       shrink the diagram — the card's overflow-x: auto handles scrolling.
+    /* Keep diagram at its fixed 344px width on narrow viewports;
+       max-width: 100% prevents overflow but does not shrink the diagram —
+       overflow-x: auto handles scrolling.
        The JS constants (diagramWidth=344, centerX=172) stay valid. */
     .solar-system__moon-diagram {
         max-width: 100%;
         /* Keep in sync with the JS constant diagramHeight = 246 in
-           solar-system-view.js. The JS clamping logic positions moon dots up
-           to (diagramHeight - dotRadius * 2) = 238px, so the CSS height must
-           be at least 246px or dots near the bottom will be clipped. The
-           detail overlay uses overflow-y: auto so vertical scrolling handles
-           any extra height on narrow screens. If you change one, change both. */
+           solar-system-view.js. */
         height: 246px;
     }
 
