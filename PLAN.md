@@ -1414,3 +1414,73 @@ When the user zooms into a planet in the solar system view, the enlarged planet 
 - Modify `frontend/css/components/solar-system-view.css` — build the split layout for the zoomed state with a left-aligned information panel on wider viewports, responsive stacking on small screens, and rules that prevent the planet, ring, or moon rendering from being clipped
 
 ---
+
+### Phase G: Artificial Objects in the Sky Map
+
+This group introduces human-made sky objects as a separate data track in the app, independent from the planets API. G1 establishes a dedicated endpoint, models, and rendering flow for ISS as the first tracked object. G2 extends the same endpoint and sky-map pipeline with Artemis II using a separate mission ephemeris source. This keeps the planets domain clean while allowing future sub-phases to add more satellites, spacecraft, pass forecasts, filtering, and source-specific handling.
+
+#### Phase G1: ISS via Separate Artificial Objects Endpoint
+
+**Depends on:** Phase 5, Phase A3, Phase E3
+**Parallelisable with:** None
+
+**Intended Outcome**
+
+The app gains a separate endpoint for artificial sky objects that returns a current sky position for the selected location and time without mixing these objects into the planets API. The first version supports ISS only. The frontend fetches ISS data separately from the planets response and plots it in both the 2D sky map and the 3D dome using the existing refresh and tooltip patterns. The solution keeps models, routes, and tracking logic for artificial objects isolated from the planet stack.
+
+**Definition of Done**
+- [ ] `GET /api/v1/artificial-objects?lat=55.7&lon=13.4` returns HTTP 200 with top-level fields `timestamp`, `location`, and `objects`
+- [ ] In mocked backend tests, the `objects` array contains an entry with `name` = `ISS`
+- [ ] Each object in `objects` contains at minimum `name`, `category`, `altitude_deg`, `azimuth_deg`, `direction`, `is_above_horizon`, and `data_source`, and the schema does not reuse `PlanetPosition`
+- [ ] `frontend/js/main.js` fetches `/api/v1/artificial-objects` separately from `/api/v1/planets/visible`, and the sky map updates without changing planet cards or sky summary behavior
+- [ ] `frontend/js/components/sky-map.js` renders ISS in the 2D view at the correct `altitude_deg` and `azimuth_deg`; if `altitude_deg < 0`, the marker is shown with reduced opacity outside the horizon ring
+- [ ] `frontend/js/components/sky-map-3d.js` renders ISS in the 3D view as a separate sprite/label when `is_above_horizon == true`; if it is below the horizon, it is not rendered in 3D
+- [ ] Hovering or tapping ISS in the 2D or 3D view shows a tooltip with Swedish UI text such as `Höjd`, `Riktning`, and `Datakälla`
+- [ ] `backend/tests/test_api_artificial_objects.py` verifies HTTP 200, schema validation, and mocked ISS-source handling
+
+**Key files**
+- Create `backend/app/models/artificial_object.py` — Pydantic models for artificial-object response payloads
+- Create `backend/app/services/artificial_objects/tracker.py` — fetch and normalize ISS orbital data into local alt/az for the observer
+- Create `backend/app/api/routes/artificial_objects.py` — `GET /api/v1/artificial-objects` with validation, error handling, and response schema
+- Modify `backend/app/main.py` — register the new artificial-objects router
+- Create `backend/tests/test_api_artificial_objects.py` — mock the ISS source and verify response shape and fallback behavior
+- Modify `frontend/js/api.js` — add `fetchArtificialObjects(lat, lon)` with Swedish-language error handling
+- Modify `frontend/js/main.js` — fetch the artificial-objects endpoint in parallel with planet data, cache the result, and pass it to both sky-map renderers
+- Modify `frontend/js/components/sky-map.js` — add `plotArtificialObjects(objects)` for 2D markers, labels, and tooltip targets
+- Modify `frontend/js/components/sky-map-3d.js` — add `plotArtificialObjects(objects)` for 3D sprites, labels, and raycaster support
+- Modify `frontend/css/components/sky-map.css` — add 2D styles for artificial-object markers and labels
+- Modify `frontend/css/components/sky-map-3d.css` — add 3D label and interaction styles for artificial objects
+
+---
+
+#### Phase G2: Artemis II via Mission Ephemeris Source
+
+**Depends on:** Phase G1
+**Parallelisable with:** None
+
+> **Note:** Artemis II requires a separate mission ephemeris source that is not currently documented in TECH_CHOICES.md. That documentation update should be handled separately.
+
+**Intended Outcome**
+
+The artificial-objects endpoint is extended with Artemis II using a mission-specific ephemeris source that is separate from ISS tracking data. The frontend continues to use the same endpoint and rendering flow introduced in G1, but now plots both ISS and Artemis II in the 2D sky map and 3D dome. The solution supports partial-source failure so that one source can fail without breaking the rest of the artificial-objects response or the sky-map UI.
+
+**Definition of Done**
+- [ ] `GET /api/v1/artificial-objects?lat=55.7&lon=13.4` still returns HTTP 200 after Artemis II support is added, and in mocked backend tests the `objects` array contains entries for both `ISS` and `Artemis II`
+- [ ] The Artemis II object includes at minimum `name`, `category`, `altitude_deg`, `azimuth_deg`, `direction`, `is_above_horizon`, and `data_source`, using the same response schema introduced in G1
+- [ ] `frontend/js/components/sky-map.js` renders Artemis II in the 2D view at positions matching its `altitude_deg` and `azimuth_deg`; if it is below the horizon, the marker is shown with reduced opacity outside the horizon ring
+- [ ] `frontend/js/components/sky-map-3d.js` renders Artemis II in the 3D view as a separate sprite/label when `is_above_horizon == true`; if it is below the horizon, it is not rendered in 3D
+- [ ] Hovering or tapping Artemis II in the 2D or 3D view shows a tooltip with Swedish UI text such as `Höjd`, `Riktning`, and `Datakälla`
+- [ ] If the Artemis II source is unavailable, `/api/v1/artificial-objects` still returns HTTP 200 with any remaining valid objects, and the frontend sky map continues to function without JavaScript errors
+- [ ] `backend/tests/test_api_artificial_objects.py` verifies mocked Artemis II-source ingestion and partial-failure fallback behavior without regressing ISS support
+
+**Key files**
+- Modify `backend/app/services/artificial_objects/tracker.py` — add Artemis II mission ephemeris ingestion and normalization into the shared artificial-object model
+- Modify `backend/app/api/routes/artificial_objects.py` — extend the endpoint to merge multiple source results and tolerate partial-source failures
+- Modify `backend/tests/test_api_artificial_objects.py` — add mocked Artemis II coverage and partial-failure assertions
+- Modify `frontend/js/main.js` — continue passing the unified artificial-object list to both sky-map renderers after each refresh
+- Modify `frontend/js/components/sky-map.js` — ensure Artemis II renders distinctly alongside ISS in 2D
+- Modify `frontend/js/components/sky-map-3d.js` — ensure Artemis II renders distinctly alongside ISS in 3D
+- Modify `frontend/css/components/sky-map.css` — add any visual differentiation needed between ISS and Artemis II in the 2D sky map
+- Modify `frontend/css/components/sky-map-3d.css` — add any visual differentiation needed between ISS and Artemis II in the 3D sky map
+
+---
