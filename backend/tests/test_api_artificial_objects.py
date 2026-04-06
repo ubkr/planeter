@@ -242,3 +242,76 @@ async def test_iss_fails_horizons_still_returned(async_client):
         f"Expected 1 object (Artemis II), got {len(body['objects'])}"
     )
     assert body["objects"][0]["name"] == "Artemis II"
+
+
+# ---------------------------------------------------------------------------
+# 14–15. earth_detail_position field serialisation
+# ---------------------------------------------------------------------------
+
+# An ArtificialObject with a fully-populated EarthDetailPosition — the four
+# sub-fields that the VECTORS call produces for Artemis II.
+from app.models.artificial_object import EarthDetailPosition  # noqa: E402
+
+_ARTEMIS_WITH_EARTH_DETAIL = ArtificialObject(
+    name="Artemis II",
+    category="spacecraft",
+    altitude_deg=18.7,
+    azimuth_deg=213.5,
+    direction=azimuth_to_compass(213.5),
+    is_above_horizon=True,
+    data_source="jpl_horizons",
+    colour="#00bfff",
+    label_sv="Artemis II",
+    earth_detail_position=EarthDetailPosition(
+        x_offset_earth_radii=12.345,
+        y_offset_earth_radii=-6.789,
+        distance_km=423_456.0,
+        label_sv="Artemis II",
+    ),
+)
+
+
+async def test_earth_detail_position_present_in_response(async_client):
+    """Test 14: ArtificialObject with EarthDetailPosition → field serialised correctly."""
+    with patch(_MOCK_TARGET, new=AsyncMock(return_value=[_ARTEMIS_WITH_EARTH_DETAIL])):
+        response = await async_client.get(
+            "/api/v1/artificial-objects",
+            params={"lat": LAT, "lon": LON},
+        )
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["objects"]) == 1
+    edp = body["objects"][0].get("earth_detail_position")
+    assert edp is not None, "earth_detail_position must not be null for this object"
+    assert edp["x_offset_earth_radii"] == 12.345, (
+        f"Unexpected x_offset_earth_radii: {edp['x_offset_earth_radii']!r}"
+    )
+    assert edp["y_offset_earth_radii"] == -6.789, (
+        f"Unexpected y_offset_earth_radii: {edp['y_offset_earth_radii']!r}"
+    )
+    assert edp["distance_km"] == 423_456.0, (
+        f"Unexpected distance_km: {edp['distance_km']!r}"
+    )
+    assert edp["label_sv"] == "Artemis II", (
+        f"Unexpected label_sv: {edp['label_sv']!r}"
+    )
+
+
+async def test_earth_detail_position_null_for_iss(async_client):
+    """Test 15: ArtificialObject with earth_detail_position=None → field is null in JSON."""
+    # _ISS_OBJECT does not set earth_detail_position; it defaults to None.
+    with patch(_MOCK_TARGET, new=AsyncMock(return_value=[_ISS_OBJECT])):
+        response = await async_client.get(
+            "/api/v1/artificial-objects",
+            params={"lat": LAT, "lon": LON},
+        )
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["objects"]) == 1
+    obj = body["objects"][0]
+    assert "earth_detail_position" in obj, (
+        "earth_detail_position key must be present in the serialised object"
+    )
+    assert obj["earth_detail_position"] is None, (
+        f"Expected null earth_detail_position for ISS, got {obj['earth_detail_position']!r}"
+    )

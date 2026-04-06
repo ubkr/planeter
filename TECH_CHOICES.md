@@ -92,6 +92,25 @@ Add a single dict to `HORIZONS_OBJECTS` in `backend/app/services/artificial_obje
 
 When a mission is inactive or the spacecraft has re-entered, the Horizons API returns an empty data block (no rows between `$$SOE` / `$$EOE`). The provider detects this, logs a warning, and omits the object from the response. The endpoint continues to return HTTP 200 with any remaining valid objects.
 
+### Earth-Detail Positioning via a Second VECTORS Call
+
+For objects flagged with `earth_detail: True` in the `HORIZONS_OBJECTS` registry, the Horizons provider makes a second Horizons request alongside the primary OBSERVER call:
+
+| Parameter | Value |
+|---|---|
+| `EPHEM_TYPE` | `VECTORS` |
+| `CENTER` | `500@399` (geocentre of Earth) |
+| Frame | J2000 (equatorial, Earth-centred) |
+| Output | Geocentric XYZ position in AU, converted to Earth radii for diagram scaling |
+
+**Why a separate call rather than extending the OBSERVER call:**
+
+- **Isolation** — the OBSERVER call uses a topocentric centre tied to the observer's lat/lon; mixing two incompatible centre references in a single call is not supported by the Horizons API. A separate request keeps the sky-map OBSERVER call unchanged.
+- **Correctness** — the Earth-detail diagram is a 2D geocentric projection (X and Y axes of the J2000 equatorial frame). Geocentric Cartesian XYZ coordinates from the VECTORS call map directly to the diagram plane without any further coordinate transformation beyond unit conversion.
+- **Simplicity** — parsing a `VECTORS` response (one XYZ row between `$$SOE` / `$$EOE`) uses the same sentinel-based parser already in place for the OBSERVER call, requiring only a different set of extracted columns.
+
+The `EarthDetailPosition` fields (`x_offset_earth_radii`, `y_offset_earth_radii`, `distance_km`) are populated from this second call and appended to the `ArtificialObject` returned by the endpoint.
+
 ## Geolocation and Location Picker
 
 | Aspect | Choice | Rationale |

@@ -483,6 +483,16 @@ ArtificialObject {
   data_source: str           # Source identifier (e.g. "celestrak_tle", "jpl_horizons")
   colour: Optional[str]      # CSS hex colour string for the dot/sprite (e.g. "#ffffff"). Set per-object in the source registry. Frontend uses this for data-driven rendering colour.
   label_sv: Optional[str]    # Swedish display label (e.g. "ISS"). Frontend uses this for tooltips and labels; falls back to name if absent.
+  earth_detail_position: Optional[EarthDetailPosition]  # Position relative to Earth for the Earth/Moon detail diagram. Null for objects without Earth-proximity data (e.g. ISS).
+}
+```
+
+```
+EarthDetailPosition {
+  x_offset_earth_radii: float  # J2000 equatorial X offset from Earth centre in Earth radii (toward vernal equinox)
+  y_offset_earth_radii: float  # J2000 equatorial Y offset from Earth centre in Earth radii (90° east in equatorial plane)
+  distance_km: float           # Distance from Earth centre in km
+  label_sv: str                # Swedish label for the diagram (e.g. "Artemis II")
 }
 ```
 

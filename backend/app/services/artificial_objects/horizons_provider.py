@@ -6,17 +6,24 @@ No new classes or functions are needed.
 
 Each registry entry is fetched concurrently (up to 3 simultaneous requests),
 parsed from the Horizons CSV ephemeris format, and returned as an ArtificialObject.
+
+If a registry entry has ``earth_detail: True``, a second Horizons VECTORS call
+(geocentric, CENTER='500@399') is made to populate the ``earth_detail_position``
+field.  Failure of the VECTORS call never prevents the sky-map position from
+being returned.
 """
 
 import asyncio
 import csv
 import io
+import math
+import re
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Tuple
 
 import httpx
 
-from ...models.artificial_object import ArtificialObject
+from ...models.artificial_object import ArtificialObject, EarthDetailPosition
 from ...models.planet import azimuth_to_compass
 from ...services.cache_service import cache
 from ...utils.logger import setup_logger
@@ -35,6 +42,9 @@ HORIZONS_OBJECTS = [
         "label_sv": "Artemis II",
         "colour": "#00bfff",
         "data_source": "jpl_horizons",
+        # earth_detail: True triggers a geocentric VECTORS call so the object
+        # can be rendered on the Earth/Moon detail diagram.
+        "earth_detail": True,
     },
 ]
 
@@ -48,6 +58,10 @@ _HORIZONS_CACHE_TTL_SECONDS = 300  # 5 minutes
 
 # Maximum simultaneous requests to the JPL Horizons API.
 _HORIZONS_SEMAPHORE = asyncio.Semaphore(3)
+
+# Unit-conversion constants for VECTORS → Earth-detail position.
+_AU_TO_KM = 149_597_870.7  # kilometres per astronomical unit
+_EARTH_RADIUS_KM = 6_371.0  # km
 
 
 # ---------------------------------------------------------------------------
@@ -128,9 +142,179 @@ async def _fetch_horizons_observer(
     return text
 
 
+async def _fetch_horizons_vectors(command_id: str) -> Optional[str]:
+    """
+    Fetch a geocentric VECTORS ephemeris for *command_id* from JPL Horizons.
+
+    Uses CENTER='500@399' (Earth body-centre) and REF_PLANE='FRAME' /
+    REF_SYSTEM='J2000' so that the returned X/Y axes align with the
+    coordinate convention used in earth_system.py:
+        X — toward vernal equinox
+        Y — 90 ° east in the equatorial plane
+
+    Caches the raw response text for _HORIZONS_CACHE_TTL_SECONDS seconds.
+    The cache key is keyed only on command_id because the geocentric position
+    does not depend on the ground observer location.
+
+    Returns:
+        Raw response text, or None on any network/HTTP failure.
+    """
+    cache_key = f"horizons_vectors_{command_id}"
+    cached = await cache.get(cache_key)
+    if cached is not None:
+        logger.info(f"Horizons VECTORS cache hit for command_id={command_id}")
+        return cached
+
+    now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+    stop_utc = now_utc + timedelta(minutes=1)
+    start_str = now_utc.strftime("%Y-%m-%d %H:%M")
+    stop_str = stop_utc.strftime("%Y-%m-%d %H:%M")
+
+    # Quoting convention for Horizons API parameters:
+    #   - Free-string values (dates, coordinates, object IDs, unit specifiers,
+    #     table selectors) must be wrapped in single quotes, e.g. "'AU-D'".
+    #   - Keyword-style enum values (REF_PLANE, REF_SYSTEM) are bare identifiers
+    #     in the Horizons API and must NOT be wrapped in single quotes.
+    params = {
+        "COMMAND": f"'{command_id}'",
+        "EPHEM_TYPE": "VECTORS",
+        "CENTER": "'500@399'",
+        "START_TIME": f"'{start_str}'",
+        "STOP_TIME": f"'{stop_str}'",
+        "STEP_SIZE": "'1 min'",
+        "OUT_UNITS": "'AU-D'",
+        "REF_PLANE": "FRAME",
+        "REF_SYSTEM": "J2000",
+        "VEC_TABLE": "'2'",
+        "CSV_FORMAT": "YES",
+        "OBJ_DATA": "NO",
+        "CAL_FORMAT": "CAL",
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=_HORIZONS_FETCH_TIMEOUT_SECONDS) as client:
+            response = await client.get(_HORIZONS_API_URL, params=params)
+            response.raise_for_status()
+            text = response.text
+    except Exception as exc:
+        logger.warning(
+            f"Horizons VECTORS fetch failed for command_id={command_id}: {exc}"
+        )
+        return None
+
+    if "$$SOE" not in text:
+        logger.debug(
+            "Horizons VECTORS response for command_id=%s contains no ephemeris data",
+            command_id,
+        )
+        return text  # return so the caller/parser can log the failure detail
+
+    await cache.set(cache_key, text, ttl_seconds=_HORIZONS_CACHE_TTL_SECONDS)
+    logger.info(
+        f"Horizons VECTORS response fetched and cached for command_id={command_id}"
+    )
+    return text
+
+
 # ---------------------------------------------------------------------------
 # Parse
 # ---------------------------------------------------------------------------
+
+
+def _parse_horizons_vectors(raw_text: str) -> Optional[Tuple[float, float, float]]:
+    """
+    Parse X, Y, Z position components (in AU) from a Horizons VECTORS response.
+
+    Horizons CSV VECTORS format (VEC_TABLE=2) includes a $$SOE/$$EOE block.
+    With CSV_FORMAT=YES the columns are:
+        JDTDB, Calendar Date (TDB), X, Y, Z, VX, VY, VZ
+
+    The header line just before $$SOE contains 'X' and 'Y' and 'Z' column names.
+
+    Returns:
+        (x_au, y_au, z_au) tuple, or None on any parse failure or if any value
+        is 'n.a.' (which Horizons returns when data is unavailable).
+    """
+    soe_marker = "$$SOE"
+    eoe_marker = "$$EOE"
+
+    soe_idx = raw_text.find(soe_marker)
+    eoe_idx = raw_text.find(eoe_marker)
+
+    if soe_idx == -1 or eoe_idx == -1:
+        logger.warning("Horizons VECTORS response missing $$SOE or $$EOE markers")
+        return None
+
+    data_block = raw_text[soe_idx + len(soe_marker): eoe_idx]
+    if not data_block.strip():
+        logger.warning("Horizons VECTORS data block is empty")
+        return None
+
+    # Find the header line just before $$SOE that contains X, Y, Z columns.
+    pre_soe_lines = raw_text[:soe_idx].splitlines()
+    header_line = None
+    for line in reversed(pre_soe_lines):
+        # The CSV header for VECTORS contains column names like
+        # "JDTDB, Calendar Date (TDB), X, Y, Z, VX, VY, VZ,"
+        if re.search(r"\bX\b", line) and re.search(r"\bY\b", line) and re.search(r"\bZ\b", line):
+            header_line = line
+            break
+
+    if header_line is None:
+        logger.warning("Horizons VECTORS CSV header line with X/Y/Z columns not found")
+        return None
+
+    header_reader = csv.reader(io.StringIO(header_line))
+    try:
+        header_cols = [col.strip() for col in next(header_reader)]
+    except StopIteration:
+        logger.warning("Horizons VECTORS CSV header line could not be parsed")
+        return None
+
+    try:
+        x_col = header_cols.index("X")
+        y_col = header_cols.index("Y")
+        z_col = header_cols.index("Z")
+    except ValueError:
+        logger.warning(
+            f"Horizons VECTORS CSV header missing X/Y/Z column(s): {header_cols}"
+        )
+        return None
+
+    data_lines = [line for line in data_block.splitlines() if line.strip()]
+    if not data_lines:
+        logger.warning("Horizons VECTORS data block has no non-empty lines")
+        return None
+
+    data_reader = csv.reader(io.StringIO(data_lines[0]))
+    try:
+        data_cols = [col.strip() for col in next(data_reader)]
+    except StopIteration:
+        logger.warning("Horizons VECTORS CSV first data row could not be parsed")
+        return None
+
+    # Check for Horizons 'n.a.' sentinel — returned when data is unavailable.
+    for col_idx in (x_col, y_col, z_col):
+        if col_idx >= len(data_cols):
+            logger.warning(
+                "Horizons VECTORS data row has fewer columns than expected"
+            )
+            return None
+        if data_cols[col_idx].lower() == "n.a.":
+            logger.warning(
+                "Horizons VECTORS data contains 'n.a.' — position unavailable"
+            )
+            return None
+
+    try:
+        x_au = float(data_cols[x_col])
+        y_au = float(data_cols[y_col])
+        z_au = float(data_cols[z_col])
+    except (IndexError, ValueError) as exc:
+        logger.warning(f"Horizons VECTORS CSV float conversion failed: {exc}")
+        return None
+
+    return (x_au, y_au, z_au)
 
 
 def _parse_horizons_csv(raw_text: str) -> Optional[Tuple[float, float]]:
@@ -219,6 +403,65 @@ def _parse_horizons_csv(raw_text: str) -> Optional[Tuple[float, float]]:
 
 
 # ---------------------------------------------------------------------------
+# Earth-detail position helper
+# ---------------------------------------------------------------------------
+
+
+async def _compute_earth_detail_position(
+    command_id: str, label_sv: str
+) -> Optional[EarthDetailPosition]:
+    """
+    Fetch geocentric VECTORS data and convert to EarthDetailPosition.
+
+    Coordinate convention (matches earth_system.py):
+        x_offset — J2000 equatorial X axis (toward vernal equinox)
+        y_offset — J2000 equatorial Y axis (90° east in equatorial plane)
+
+    Returns None on any fetch or parse failure so the caller can safely
+    ignore the result without disrupting the sky-map response.
+    """
+    try:
+        vectors_text = await _fetch_horizons_vectors(command_id)
+        if vectors_text is None:
+            logger.warning(
+                f"Earth-detail VECTORS fetch returned None for command_id={command_id}"
+            )
+            return None
+
+        xyz = _parse_horizons_vectors(vectors_text)
+        if xyz is None:
+            logger.warning(
+                f"Earth-detail VECTORS parse failed for command_id={command_id}"
+            )
+            return None
+
+        x_au, y_au, z_au = xyz
+
+        distance_km = math.sqrt(x_au ** 2 + y_au ** 2 + z_au ** 2) * _AU_TO_KM
+        x_offset_er = x_au * _AU_TO_KM / _EARTH_RADIUS_KM
+        y_offset_er = y_au * _AU_TO_KM / _EARTH_RADIUS_KM
+
+        logger.info(
+            f"Earth-detail position for command_id={command_id}: "
+            f"x={x_offset_er:.2f} ER  y={y_offset_er:.2f} ER  "
+            f"dist={distance_km:.0f} km"
+        )
+
+        return EarthDetailPosition(
+            x_offset_earth_radii=round(x_offset_er, 3),
+            y_offset_earth_radii=round(y_offset_er, 3),
+            distance_km=round(distance_km, 1),
+            label_sv=label_sv,
+        )
+    except Exception as exc:
+        logger.warning(
+            f"Unexpected error computing Earth-detail position for "
+            f"command_id={command_id}: {exc}"
+        )
+        return None
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -261,6 +504,17 @@ async def get_horizons_objects(lat: float, lon: float) -> List[ArtificialObject]
                     f"direction={direction} above_horizon={is_above_horizon}"
                 )
 
+                # ------------------------------------------------------------------
+                # Earth-detail position (geocentric VECTORS call, optional).
+                # Failure here never prevents the sky-map object from being returned.
+                # ------------------------------------------------------------------
+                earth_detail_position = None
+                if entry.get("earth_detail"):
+                    earth_detail_position = await _compute_earth_detail_position(
+                        command_id=command_id,
+                        label_sv=entry.get("label_sv", entry["name"]),
+                    )
+
                 return ArtificialObject(
                     name=entry["name"],
                     category=entry["category"],
@@ -271,6 +525,7 @@ async def get_horizons_objects(lat: float, lon: float) -> List[ArtificialObject]
                     data_source=entry["data_source"],
                     colour=entry.get("colour"),
                     label_sv=entry.get("label_sv"),
+                    earth_detail_position=earth_detail_position,
                 )
             except Exception as exc:
                 logger.warning(

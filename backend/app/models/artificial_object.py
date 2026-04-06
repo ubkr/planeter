@@ -6,6 +6,23 @@ from typing import List, Optional
 from .planet import LocationInfo
 
 
+class EarthDetailPosition(BaseModel):
+    """Position of an artificial object relative to Earth for the Earth/Moon detail diagram."""
+
+    x_offset_earth_radii: float = Field(
+        ..., description="Horizontal offset from Earth centre in Earth radii"
+    )
+    y_offset_earth_radii: float = Field(
+        ..., description="Vertical offset from Earth centre in Earth radii"
+    )
+    distance_km: float = Field(
+        ..., description="Distance from Earth centre in km"
+    )
+    label_sv: str = Field(
+        ..., description="Swedish label for the diagram (e.g. 'Artemis II')"
+    )
+
+
 class ArtificialObject(BaseModel):
     """Position data for a single tracked artificial object (satellite)."""
 
@@ -18,6 +35,10 @@ class ArtificialObject(BaseModel):
     data_source: str = Field(..., description="Data source identifier (e.g. 'celestrak_tle')")
     colour: Optional[str] = Field(None, description="CSS hex colour string for the object's dot/sprite (e.g. '#ffffff')")
     label_sv: Optional[str] = Field(None, description="Swedish display label for tooltips and UI (e.g. 'ISS')")
+    earth_detail_position: Optional[EarthDetailPosition] = Field(
+        None,
+        description="Position relative to Earth for the Earth/Moon detail diagram. Null for objects without Earth-proximity data.",
+    )
 
 
 class ArtificialObjectsResponse(BaseModel):

@@ -1442,7 +1442,7 @@ Clicking `Jorden` in the solar system view opens the same integrated detail layo
 
 ---
 
-#### Phase F6: Generic Tracked Spacecraft in Earth Detail View
+#### Phase F6: Generic Tracked Spacecraft in Earth Detail View — ✅ 2026-04-06
 
 **Depends on:** Phase F5, Phase G2
 **Parallelisable with:** None
@@ -1452,13 +1452,13 @@ Clicking `Jorden` in the solar system view opens the same integrated detail layo
 The Earth detail view becomes a reusable host for tracked spacecraft and future Earth-system satellites, using the existing artificial-objects backend as its data source. The first object rendered in this view is `Artemis II`, but the payload and rendering flow are made generic so additional spacecraft or satellites can be added later without redesigning the Earth detail UI. Only objects explicitly marked for the Earth-system detail view are rendered there, so unrelated tracked objects such as ISS remain excluded for now.
 
 **Definition of Done**
-- [ ] `GET /api/v1/artificial-objects?lat=55.7&lon=13.4` returns a schema where an object can optionally include an `earth_detail_position` payload for Earth-system rendering; in mocked tests, `Artemis II` includes this payload
-- [ ] Clicking `Jorden` in the Solsystemet view renders `Artemis II` in the Earth detail diagram using the current artificial-objects response, with a Swedish visible label `Artemis II`
-- [ ] Objects without `earth_detail_position` or without an explicit Earth-detail flag are not rendered in the Earth/Moon diagram, so `ISS` is excluded from this view at this stage
-- [ ] Hovering or tapping the `Artemis II` marker in the Earth detail view shows a Swedish tooltip with concrete fields such as `Avstånd från jorden` and `Datakälla`
-- [ ] The Earth detail renderer can display more than one tracked object without layout breakage; in a mocked frontend test with multiple eligible objects, each object produces its own marker and label
-- [ ] If no object is eligible for the Earth detail view, the Earth/Moon detail still renders and shows a Swedish empty state such as `Inga aktuella rymdfarkoster i jordsystemet`
-- [ ] `backend/tests/test_api_artificial_objects.py` verifies the new Earth-detail payload for `Artemis II` and confirms that the schema supports additional future spacecraft without breaking existing object fields
+- [x] `GET /api/v1/artificial-objects?lat=55.7&lon=13.4` returns a schema where an object can optionally include an `earth_detail_position` payload for Earth-system rendering; in mocked tests, `Artemis II` includes this payload
+- [x] Clicking `Jorden` in the Solsystemet view renders `Artemis II` in the Earth detail diagram using the current artificial-objects response, with a Swedish visible label `Artemis II`
+- [x] Objects without `earth_detail_position` or without an explicit Earth-detail flag are not rendered in the Earth/Moon diagram, so `ISS` is excluded from this view at this stage
+- [x] Hovering or tapping the `Artemis II` marker in the Earth detail view shows a Swedish tooltip with concrete fields such as `Avstånd från jorden` and `Datakälla`
+- [x] The Earth detail renderer can display more than one tracked object without layout breakage; in a mocked frontend test with multiple eligible objects, each object produces its own marker and label
+- [x] If no object is eligible for the Earth detail view, the Earth/Moon detail still renders and shows a Swedish empty state such as `Inga aktuella rymdfarkoster i jordsystemet`
+- [x] `backend/tests/test_api_artificial_objects.py` verifies the new Earth-detail payload for `Artemis II` and confirms that the schema supports additional future spacecraft without breaking existing object fields
 
 **Key files**
 - Modify `backend/app/models/artificial_object.py` — add a generic `EarthDetailPosition` model and an optional `earth_detail_position` field on `ArtificialObject`

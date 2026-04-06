@@ -464,6 +464,44 @@
     line-height: 1;
 }
 
+/* --- Spacecraft dots (Earth/Moon diagram) --- */
+
+.solar-system__spacecraft-dot {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    border-radius: var(--radius-full);
+    /* background-color set inline per object */
+    cursor: help;
+    transition: opacity var(--transition-fast);
+    /* JS positions assume 8px (dotRadius=4); offset by 1px to centre the
+       smaller 6px dot on the same anchor point as moon dots. */
+    transform: translate(1px, 1px);
+    /* Structural shadow: thin ring + ambient shadow so the dot reads against
+       both light and dark diagram areas. Hardcoded — no semantic token needed. */
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.35),
+                0 0 4px rgba(0, 0, 0, 0.6);
+}
+
+.solar-system__spacecraft-dot:hover {
+    opacity: 0.75;
+}
+
+/* --- Spacecraft labels (Earth/Moon diagram) --- */
+
+.solar-system__spacecraft-label {
+    position: absolute;
+    font-size: 9px;
+    font-family: var(--font-family-base);
+    color: var(--color-text-muted);
+    white-space: nowrap;
+    pointer-events: none;
+    line-height: 1;
+    /* Contrast halo so text stays readable over orbit rings and dots */
+    text-shadow: 0 0 3px var(--color-bg-deep),
+                 0 0 6px var(--color-bg-deep);
+}
+
 /* --- Detail fallback message (when earth_system data is unavailable) --- */
 
 .solar-system__detail-fallback {

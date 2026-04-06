@@ -400,6 +400,10 @@ export class SolarSystemView {
         this._overlayEl = null;      // the detail overlay DOM element, or null
         this._isAnimating = false;   // true while a viewBox tween is running
         this._rafId = null;          // pending requestAnimationFrame handle, or null
+
+        // Artificial objects from the /artificial-objects API response.
+        // Stored via setArtificialObjects(); consumed by render() in a later phase.
+        this._artificialObjects = [];
     }
 
     /**
@@ -483,6 +487,20 @@ export class SolarSystemView {
     clear() {
         this._resetZoomInstant();
         this._removeSvg();
+    }
+
+    /**
+     * Store the latest artificial-objects array for use during the next render().
+     *
+     * Does NOT trigger a re-render. Call render() afterwards when the diagram
+     * should reflect the new data.
+     *
+     * @param {Array<Object>|null|undefined} objects - Array of ArtificialObject
+     *   items from the /artificial-objects API response. Null or undefined is
+     *   treated as an empty array.
+     */
+    setArtificialObjects(objects) {
+        this._artificialObjects = Array.isArray(objects) ? objects : [];
     }
 
     /**
@@ -1040,6 +1058,60 @@ export class SolarSystemView {
         }
         label.style.top = `${Math.round(top - 2)}px`;
         diagram.appendChild(label);
+
+        // Render eligible spacecraft markers using the same scale as the Moon
+        const earthDetailObjects = (this._artificialObjects || []).filter(
+            obj => obj.earth_detail_position != null
+        );
+
+        for (const obj of earthDetailObjects) {
+            const edp = obj.earth_detail_position;
+
+            // Fix 3: Guard — skip objects with non-finite offsets or distance
+            if (!isFinite(edp.x_offset_earth_radii) || !isFinite(edp.y_offset_earth_radii) || !isFinite(edp.distance_km)) {
+                continue;
+            }
+
+            const rawScLeft = centerX + edp.x_offset_earth_radii * scale - dotRadius;
+            const rawScTop  = centerY - edp.y_offset_earth_radii * scale - dotRadius;
+
+            // Fix 2: Clamp position to diagram bounds; mark as out-of-range if clamped
+            const scLeft = Math.max(padding, Math.min(diagramWidth  - padding, rawScLeft));
+            const scTop  = Math.max(padding, Math.min(diagramHeight - padding, rawScTop));
+            const wasClamped = rawScLeft !== scLeft || rawScTop !== scTop;
+
+            const scDot = document.createElement('div');
+            scDot.className = 'solar-system__spacecraft-dot';
+            scDot.style.backgroundColor = obj.colour || '#ffffff';
+            scDot.dataset.distanceKm = String(Math.round(edp.distance_km));
+            scDot.setAttribute(
+                'title',
+                `Avstånd från Jorden: ${Math.round(edp.distance_km)} km`
+            );
+            scDot.style.left = `${Math.round(scLeft)}px`;
+            scDot.style.top  = `${Math.round(scTop)}px`;
+            // Fix 2: visually distinguish out-of-range (clamped) spacecraft
+            if (wasClamped) {
+                scDot.style.opacity = '0.5';
+                scDot.style.outlineStyle = 'dashed';
+            }
+            diagram.appendChild(scDot);
+
+            const scLabel = document.createElement('span');
+            scLabel.className = 'solar-system__spacecraft-label';
+            scLabel.textContent = edp.label_sv;
+
+            // Fix 1: Flip label to the left when spacecraft dot is in the right half
+            // (mirrors Moon label logic — uses pixel position, not raw offset sign)
+            if (scLeft > diagramWidth / 2) {
+                scLabel.style.left = `${Math.round(scLeft - 2)}px`;
+                scLabel.style.transform = 'translateX(-100%)';
+            } else {
+                scLabel.style.left = `${Math.round(scLeft + dotRadius * 2 + 2)}px`;
+            }
+            scLabel.style.top = `${Math.round(scTop - 2)}px`;
+            diagram.appendChild(scLabel);
+        }
 
         container.appendChild(diagram);
 

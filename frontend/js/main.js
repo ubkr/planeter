@@ -499,8 +499,17 @@ document.addEventListener('DOMContentLoaded', () => {
             lastArtificialObjectsData = artificialObjectsResult.value;
             skyMap.plotArtificialObjects(artificialObjectsResult.value.objects);
             skyMap3d?.plotArtificialObjects(artificialObjectsResult.value.objects);
+            solarSystemView.setArtificialObjects(artificialObjectsResult.value.objects);
         } else {
             console.warn('Varning: Kunde inte hämta data om artificiella objekt', artificialObjectsResult.reason);
+            solarSystemView.setArtificialObjects([]);
+        }
+
+        // Fix 4: If the Solsystemet tab is already active when loadData completes,
+        // trigger a render now so spacecraft markers appear without needing a tab
+        // switch. Uses the same active-tab check as the tabChanged handler.
+        if (tabNav._activeTabId === 'solarsystem' && lastApiData !== null) {
+            solarSystemView.render(lastApiData.planets || [], lastApiData.earth_heliocentric || null, lastApiData.earth_system ?? null);
         }
     }
 
@@ -582,6 +591,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (tabId === 'solarsystem' && lastApiData !== null) {
+            solarSystemView.setArtificialObjects(lastArtificialObjectsData?.objects ?? []);
             solarSystemView.render(lastApiData.planets || [], lastApiData.earth_heliocentric || null, lastApiData.earth_system ?? null);
         }
 
