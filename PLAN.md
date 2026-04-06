@@ -1415,6 +1415,62 @@ When the user zooms into a planet in the solar system view, the enlarged planet 
 
 ---
 
+#### Phase F5: Earth-Moon System Detail View
+
+**Depends on:** Phase F4
+**Parallelisable with:** None
+
+**Intended Outcome**
+
+Clicking `Jorden` in the solar system view opens the same integrated detail layout already used for Jupiter and Saturn, but the right-hand visualization now shows the current Earth-Moon system instead of a generic planet-only detail state. The backend provides a dedicated `earth_system` payload with the Moon's current position relative to Earth, and the frontend renders a scaled Earth/Moon diagram with Swedish labels inside the existing two-column Solsystemet detail view.
+
+**Definition of Done**
+- [ ] `GET /api/v1/planets/visible?lat=55.7&lon=13.4` returns a top-level `earth_system` object containing a nested `moon` object with at least `name_sv`, `x_offset_earth_radii`, `y_offset_earth_radii`, `distance_km`, and `illumination`
+- [ ] Clicking the Earth dot in the Solsystemet SVG opens the existing detail layout with the title `Jorden` and a right-column Earth/Moon diagram that contains one moon marker labelled `Månen`
+- [ ] The Moon marker position in the Earth detail diagram is derived from `earth_system.moon.x_offset_earth_radii` and `earth_system.moon.y_offset_earth_radii`, not from a hardcoded fixed orbit angle
+- [ ] The Earth detail view remains usable on both 375 px and 1200 px viewports, with the information panel and Earth/Moon diagram visible at the same time and no horizontal overflow
+- [ ] If `earth_system` is missing or null, clicking `Jorden` still opens the detail panel and shows a Swedish fallback message such as `Månens position kunde inte laddas just nu`
+- [ ] `backend/tests/test_api_planets.py` verifies the `earth_system` response shape and that the Moon offset fields are present in `/api/v1/planets/visible`
+
+**Key files**
+- Modify `backend/app/models/planet.py` — add `EarthSystemInfo` / `EarthSystemMoon` models and a top-level `earth_system` field on `PlanetsResponse`
+- Create `backend/app/services/planets/earth_system.py` — compute the Moon's current position relative to Earth for the Solsystemet detail view
+- Modify `backend/app/api/routes/planets.py` — populate `earth_system` in the `/visible` response
+- Modify `backend/tests/test_api_planets.py` — add assertions for the new `earth_system` payload
+- Modify `frontend/js/components/solar-system-view.js` — render the Earth/Moon diagram and Swedish fallback state when `Jorden` is clicked
+- Modify `frontend/css/components/solar-system-view.css` — style the Earth/Moon detail diagram inside the existing two-column detail layout
+
+---
+
+#### Phase F6: Generic Tracked Spacecraft in Earth Detail View
+
+**Depends on:** Phase F5, Phase G2
+**Parallelisable with:** None
+
+**Intended Outcome**
+
+The Earth detail view becomes a reusable host for tracked spacecraft and future Earth-system satellites, using the existing artificial-objects backend as its data source. The first object rendered in this view is `Artemis II`, but the payload and rendering flow are made generic so additional spacecraft or satellites can be added later without redesigning the Earth detail UI. Only objects explicitly marked for the Earth-system detail view are rendered there, so unrelated tracked objects such as ISS remain excluded for now.
+
+**Definition of Done**
+- [ ] `GET /api/v1/artificial-objects?lat=55.7&lon=13.4` returns a schema where an object can optionally include an `earth_detail_position` payload for Earth-system rendering; in mocked tests, `Artemis II` includes this payload
+- [ ] Clicking `Jorden` in the Solsystemet view renders `Artemis II` in the Earth detail diagram using the current artificial-objects response, with a Swedish visible label `Artemis II`
+- [ ] Objects without `earth_detail_position` or without an explicit Earth-detail flag are not rendered in the Earth/Moon diagram, so `ISS` is excluded from this view at this stage
+- [ ] Hovering or tapping the `Artemis II` marker in the Earth detail view shows a Swedish tooltip with concrete fields such as `Avstånd från jorden` and `Datakälla`
+- [ ] The Earth detail renderer can display more than one tracked object without layout breakage; in a mocked frontend test with multiple eligible objects, each object produces its own marker and label
+- [ ] If no object is eligible for the Earth detail view, the Earth/Moon detail still renders and shows a Swedish empty state such as `Inga aktuella rymdfarkoster i jordsystemet`
+- [ ] `backend/tests/test_api_artificial_objects.py` verifies the new Earth-detail payload for `Artemis II` and confirms that the schema supports additional future spacecraft without breaking existing object fields
+
+**Key files**
+- Modify `backend/app/models/artificial_object.py` — add a generic `EarthDetailPosition` model and an optional `earth_detail_position` field on `ArtificialObject`
+- Modify `backend/app/services/artificial_objects/horizons_provider.py` — compute Earth-system-relative detail coordinates for eligible spacecraft, currently `Artemis II`
+- Modify `backend/app/api/routes/artificial_objects.py` — return the enriched artificial-object schema from the existing endpoint
+- Modify `backend/tests/test_api_artificial_objects.py` — add assertions for `earth_detail_position` and future-multi-object compatibility
+- Modify `frontend/js/main.js` — pass the latest artificial-object list into `SolarSystemView`
+- Modify `frontend/js/components/solar-system-view.js` — render Earth-detail spacecraft markers generically from the artificial-object array and filter to eligible objects only
+- Modify `frontend/css/components/solar-system-view.css` — add styling for spacecraft markers, labels, and Earth-detail empty state
+
+---
+
 ### Phase G: Artificial Objects in the Sky Map
 
 This group introduces human-made sky objects as a separate data track in the app, independent from the planets API. G1 establishes a dedicated endpoint, models, and rendering flow for ISS as the first tracked object. G2 extends the same endpoint and sky-map pipeline with Artemis II using a separate mission ephemeris source. This keeps the planets domain clean while allowing future sub-phases to add more satellites, spacecraft, pass forecasts, filtering, and source-specific handling.
