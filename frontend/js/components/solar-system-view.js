@@ -1021,7 +1021,8 @@ export class SolarSystemView {
         const top  = centerY - moon.y_offset_earth_radii * scale - dotRadius;
 
         const dot = document.createElement('div');
-        dot.className = 'solar-system__moon-dot';
+        dot.className = 'solar-system__moon-dot info-icon';
+        dot.setAttribute('title', `${moon.name_sv ?? 'Månen'} — ${Math.round(moon.illumination * 100)}% belyst`);
         dot.style.left = `${Math.round(left)}px`;
         dot.style.top  = `${Math.round(top)}px`;
         diagram.appendChild(dot);
@@ -1039,17 +1040,6 @@ export class SolarSystemView {
         }
         label.style.top = `${Math.round(top - 2)}px`;
         diagram.appendChild(label);
-
-        const illumination = document.createElement('span');
-        illumination.className = 'solar-system__moon-illumination';
-        illumination.textContent = `${Math.round(moon.illumination * 100)}% belyst`;
-        // Position illumination label just below the name label (same left, 14px lower)
-        illumination.style.left = label.style.left;
-        if (label.style.transform) {
-            illumination.style.transform = label.style.transform;
-        }
-        illumination.style.top = `${parseFloat(label.style.top) + 14}px`;
-        diagram.appendChild(illumination);
 
         container.appendChild(diagram);
 

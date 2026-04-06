@@ -464,19 +464,6 @@
     line-height: 1;
 }
 
-/* --- Moon illumination subtitle (e.g. "45% belyst") --- */
-
-.solar-system__moon-illumination {
-    /* left/top are set by JS relative to the moon name label */
-    position: absolute;
-    font-family: var(--font-family-base);
-    font-size: var(--font-size-xs);
-    color: var(--color-text-muted);
-    white-space: nowrap;
-    pointer-events: none;
-    line-height: 1;
-}
-
 /* --- Detail fallback message (when earth_system data is unavailable) --- */
 
 .solar-system__detail-fallback {
