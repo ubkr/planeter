@@ -572,8 +572,11 @@ export default class SkyMap3D {
         // Clear previous sprites and labels before rebuilding.
         this._clearArtificialObjects();
 
+        const BELOW_HORIZON_CLAMP_ALT = -4.5;
+
         for (const obj of objects) {
-            if (!obj.is_above_horizon) continue;
+            const belowHorizon = obj.altitude_deg < 0;
+            const plotAltitude = belowHorizon ? BELOW_HORIZON_CLAMP_ALT : obj.altitude_deg;
 
             const displayName = obj.label_sv || obj.name;
 
@@ -593,13 +596,15 @@ export default class SkyMap3D {
                 `Datakälla: ${dataSourceLabel}`;
 
             this._addArtificialSprite(
-                obj.altitude_deg,
+                plotAltitude,
                 obj.azimuth_deg,
                 obj.colour || '#ffffff',
                 -1,
                 displayName,
                 tooltipText,
                 { name_sv: displayName, type: 'artificial_object', category: obj.category || null },
+                1,
+                belowHorizon ? 0.5 : 1,
             );
         }
     }
@@ -1342,13 +1347,13 @@ export default class SkyMap3D {
      * @param {number} [scaleFactor=1] - Multiplier applied on top of the
      *   magnitude-based scale formula.
      */
-    _addArtificialSprite(altitudeDeg, azimuthDeg, color, magnitude, nameSv, tooltipText, userData, scaleFactor = 1) {
+    _addArtificialSprite(altitudeDeg, azimuthDeg, color, magnitude, nameSv, tooltipText, userData, scaleFactor = 1, opacity = 1) {
         const { x, y, z } = altAzToCartesian(altitudeDeg, azimuthDeg, GRID_RADIUS);
         const position = new THREE.Vector3(x, y, z);
 
         // --- Sprite ---
         const texture  = buildBodyTexture(color);
-        const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false });
+        const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false, opacity });
         const sprite   = new THREE.Sprite(material);
 
         const scale = bodyScale(magnitude) * scaleFactor;
@@ -1366,6 +1371,7 @@ export default class SkyMap3D {
             element.dataset.category = userData.category;
         }
         element.textContent = nameSv;
+        element.style.opacity = String(opacity);
         element.style.pointerEvents = 'none';
         element.setAttribute('tabindex', '0');
         element.setAttribute('role', 'button');

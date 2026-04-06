@@ -1066,7 +1066,7 @@ export class SkyMap {
                 HORIZON_RADIUS,
             );
 
-            const opacityAttr = belowHorizon ? '0.3' : '1';
+            const opacityAttr = belowHorizon ? '0.5' : '1';
 
             const dataSourceMap = {
                 'celestrak_tle': 'Celestrak TLE',

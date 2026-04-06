@@ -116,6 +116,13 @@ async def _fetch_horizons_observer(
         )
         return None
 
+    if "$$SOE" not in text:
+        logger.debug(
+            "Horizons response for command_id=%s contains no ephemeris data; not caching",
+            command_id,
+        )
+        return text  # still return for the caller/parser to handle
+
     await cache.set(cache_key, text, ttl_seconds=_HORIZONS_CACHE_TTL_SECONDS)
     logger.info(f"Horizons response fetched and cached for command_id={command_id}")
     return text
