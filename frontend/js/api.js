@@ -157,3 +157,22 @@ export async function fetchPlanet(name, lat, lon) {
 
     return parseJson(response);
 }
+
+/**
+ * Fetch currently visible artificial objects (satellites, ISS, etc.) from the given coordinates.
+ *
+ * @param {number} lat - Latitude in decimal degrees.
+ * @param {number} lon - Longitude in decimal degrees.
+ * @returns {Promise<Object>} Artificial objects response JSON object.
+ * @throws {Error} Swedish-language error on network, HTTP, or parse failure.
+ */
+export async function fetchArtificialObjects(lat, lon) {
+    const url = `${BASE_URL}/api/v1/artificial-objects?lat=${lat}&lon=${lon}`;
+    const response = await fetchWithTimeout(url);
+
+    if (!response.ok) {
+        throw new Error(`Serverfel (${response.status}): Kunde inte hämta data om artificiella objekt.`);
+    }
+
+    return parseJson(response);
+}

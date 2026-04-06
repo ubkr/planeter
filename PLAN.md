@@ -1370,14 +1370,14 @@ When the user zooms into Jupiter or Saturn in the solar system detail view, the 
 When the user zooms into Saturn in the solar system detail view, the planet's ring system is rendered as a tilted ellipse matching the ring opening angle as seen from Earth at the current time. The backend computes the ring tilt using `ephem.Saturn()`'s `earth_tilt` attribute, which gives the inclination of Saturn's rings toward the Earth observer in radians. The frontend renders the rings as an SVG ellipse where the semi-major axis represents the ring's physical extent and the semi-minor axis is scaled by `sin(earth_tilt)`, producing the correct apparent foreshortening. When the rings are nearly edge-on (`earth_tilt` close to 0°), the ellipse collapses to a thin line, faithfully representing the real-world view.
 
 **Definition of Done**
-- [ ] `PlanetPosition` model includes a new optional field `ring_tilt_deg: Optional[float]` populated only for Saturn, representing the ring tilt toward Earth in degrees (positive = southern face visible (pyephem convention), negative = northern face visible)
-- [ ] `GET /api/v1/planets/visible?lat=55.7&lon=13.4` returns a non-null `ring_tilt_deg` value for Saturn; all other planets return `ring_tilt_deg: null`
-- [ ] The zoomed-in detail view for Saturn renders an SVG ellipse around the planet circle; the ellipse's semi-minor axis is proportional to `|sin(ring_tilt_deg)|`, correctly representing the apparent ring opening
-- [ ] At the current epoch (2025–2026, ring tilt near 0°), Saturn's rings render as a very thin ellipse nearly edge-on — matching the real-world near-edge-on passage expected in 2025
-- [ ] The ring ellipse uses Saturn's gold colour token (`--color-planet-saturn`) at reduced opacity (e.g. 0.4) so moons from Phase F2 remain visible through the ring
-- [ ] The ring rendering does not obscure the Saturn planet circle or its label
-- [ ] Planets other than Saturn show no ring rendering in their zoomed-in detail view
-- [ ] No regression in existing solar system overview rendering; ring data is only visible in the zoomed-in state
+- [x] `PlanetPosition` model includes a new optional field `ring_tilt_deg: Optional[float]` populated only for Saturn, representing the ring tilt toward Earth in degrees (positive = southern face visible (pyephem convention), negative = northern face visible)
+- [x] `GET /api/v1/planets/visible?lat=55.7&lon=13.4` returns a non-null `ring_tilt_deg` value for Saturn; all other planets return `ring_tilt_deg: null`
+- [x] The zoomed-in detail view for Saturn renders an SVG ellipse around the planet circle; the ellipse's semi-minor axis is proportional to `|sin(ring_tilt_deg)|`, correctly representing the apparent ring opening
+- [x] At the current epoch (2025–2026, ring tilt near 0°), Saturn's rings render as a very thin ellipse nearly edge-on — matching the real-world near-edge-on passage expected in 2025
+- [x] The ring ellipse uses Saturn's gold colour token (`--color-planet-saturn`) at reduced opacity (e.g. 0.4) so moons from Phase F2 remain visible through the ring
+- [x] The ring rendering does not obscure the Saturn planet circle or its label
+- [x] Planets other than Saturn show no ring rendering in their zoomed-in detail view
+- [x] No regression in existing solar system overview rendering; ring data is only visible in the zoomed-in state
 
 **Key files**
 - Modify `backend/app/services/planets/moons.py` — add `compute_ring_tilt(dt: datetime) -> Optional[float]` that reads `ephem.Saturn().earth_tilt` and converts to degrees
@@ -1429,14 +1429,14 @@ This group introduces human-made sky objects as a separate data track in the app
 The app gains a separate endpoint for artificial sky objects that returns a current sky position for the selected location and time without mixing these objects into the planets API. The first version supports ISS only. The frontend fetches ISS data separately from the planets response and plots it in both the 2D sky map and the 3D dome using the existing refresh and tooltip patterns. The solution keeps models, routes, and tracking logic for artificial objects isolated from the planet stack.
 
 **Definition of Done**
-- [ ] `GET /api/v1/artificial-objects?lat=55.7&lon=13.4` returns HTTP 200 with top-level fields `timestamp`, `location`, and `objects`
-- [ ] In mocked backend tests, the `objects` array contains an entry with `name` = `ISS`
-- [ ] Each object in `objects` contains at minimum `name`, `category`, `altitude_deg`, `azimuth_deg`, `direction`, `is_above_horizon`, and `data_source`, and the schema does not reuse `PlanetPosition`
-- [ ] `frontend/js/main.js` fetches `/api/v1/artificial-objects` separately from `/api/v1/planets/visible`, and the sky map updates without changing planet cards or sky summary behavior
-- [ ] `frontend/js/components/sky-map.js` renders ISS in the 2D view at the correct `altitude_deg` and `azimuth_deg`; if `altitude_deg < 0`, the marker is shown with reduced opacity outside the horizon ring
-- [ ] `frontend/js/components/sky-map-3d.js` renders ISS in the 3D view as a separate sprite/label when `is_above_horizon == true`; if it is below the horizon, it is not rendered in 3D
-- [ ] Hovering or tapping ISS in the 2D or 3D view shows a tooltip with Swedish UI text such as `Höjd`, `Riktning`, and `Datakälla`
-- [ ] `backend/tests/test_api_artificial_objects.py` verifies HTTP 200, schema validation, and mocked ISS-source handling
+- [x] `GET /api/v1/artificial-objects?lat=55.7&lon=13.4` returns HTTP 200 with top-level fields `timestamp`, `location`, and `objects`
+- [x] In mocked backend tests, the `objects` array contains an entry with `name` = `ISS`
+- [x] Each object in `objects` contains at minimum `name`, `category`, `altitude_deg`, `azimuth_deg`, `direction`, `is_above_horizon`, and `data_source`, and the schema does not reuse `PlanetPosition`
+- [x] `frontend/js/main.js` fetches `/api/v1/artificial-objects` separately from `/api/v1/planets/visible`, and the sky map updates without changing planet cards or sky summary behavior
+- [x] `frontend/js/components/sky-map.js` renders ISS in the 2D view at the correct `altitude_deg` and `azimuth_deg`; if `altitude_deg < 0`, the marker is shown with reduced opacity outside the horizon ring
+- [x] `frontend/js/components/sky-map-3d.js` renders ISS in the 3D view as a separate sprite/label when `is_above_horizon == true`; if it is below the horizon, it is not rendered in 3D
+- [x] Hovering or tapping ISS in the 2D or 3D view shows a tooltip with Swedish UI text such as `Höjd`, `Riktning`, and `Datakälla`
+- [x] `backend/tests/test_api_artificial_objects.py` verifies HTTP 200, schema validation, and mocked ISS-source handling
 
 **Key files**
 - Create `backend/app/models/artificial_object.py` — Pydantic models for artificial-object response payloads

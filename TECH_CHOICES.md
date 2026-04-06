@@ -31,6 +31,17 @@
 - Sun and Moon positions
 - Constellation of each planet
 - All calculations are local (no network), fast (~1 ms per planet)
+- ISS orbit propagation via `ephem.readtle()` (TLE-based SGP4/SDP4 propagation built into PyEphem)
+
+### ISS Orbit Propagation
+
+ISS position is computed with `ephem.readtle(name, line1, line2)` using Two-Line Element (TLE) data fetched from CelestrakK. Alternatives considered:
+
+| Library | Verdict | Reason not chosen |
+|---|---|---|
+| **sgp4** (Brandon Rhodes) | Pure SGP4 propagator | Adds a new dependency; `ephem.readtle()` wraps the same propagator and is already installed |
+| **pyorbital** (Pytroll) | Feature-rich | Heavy dependency; far more than needed for a single topocentric alt/az calculation |
+| **ephem.readtle()** | **Chosen** | Already installed; accepts standard 3-line TLE format; returns an `ephem.Body`-compatible object so the existing `ephem.Observer` pattern is reused without changes |
 
 ## Weather and Cloud Cover
 
@@ -39,6 +50,14 @@
 | **Met.no** (Norwegian Meteorological Institute) | Primary | Free, no API key, excellent Nordic coverage. Provides `cloud_area_fraction`. |
 | **Open-Meteo** | Fallback | Free, global, no API key. |
 | SMHI | Not included | Can be added as a second fallback in the future |
+
+## Satellite TLE Data
+
+| Source | Role | Rationale |
+|---|---|---|
+| **CelestrakK** (`celestrak.org`) | ISS TLE provider | Free, no API key required, authoritative NORAD-sourced TLE data. Endpoint: `https://celestrak.org/NORAD/elements/gp.php?CATNR=25544&FORMAT=TLE` |
+
+TLE data is cached in-memory for 2 hours (key: `tle_iss`, TTL: 7200 s). The 2-hour TTL aligns with CelestrakK's acceptable-use policy, which discourages fetching the same element set more frequently than once per two hours. TLE accuracy degrades on the order of days, so a 2-hour cache does not introduce meaningful positional error for a visual-tracking use case.
 
 ## Geolocation and Location Picker
 
@@ -114,6 +133,7 @@ No scheduled tasks or file I/O are needed, so heavier dependencies like `apsched
 | `GET /api/v1/planets/tonight` | Tonight's window summary per planet |
 | `GET /api/v1/planets/{name}` | Single-planet detail |
 | `GET /api/v1/events` | Upcoming astronomical events (conjunctions, oppositions, etc.) for the next 60 days |
+| `GET /api/v1/artificial-objects` | Current position of tracked artificial objects (ISS); TLE cached 2 h |
 | `GET /api/v1/geocode/reverse` | Nominatim proxy for reverse geocoding |
 | `GET /api/v1/health` | Health check |
 

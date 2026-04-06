@@ -425,3 +425,18 @@
 .sky-map-body--opposition {
     filter: drop-shadow(0 0 6px var(--color-accent-primary, #f5c842));
 }
+
+/* --- Artificial satellite (ISS) dot --- */
+
+/* White dot distinguishes ISS from all planet bodies. */
+.sky-map-body--iss {
+    fill: var(--color-text-primary);
+    animation: iss-pulse 2s ease-in-out infinite;
+}
+
+/* Subtle brightness pulse to indicate a moving satellite. */
+@keyframes iss-pulse {
+    0%   { filter: brightness(1); }
+    50%  { filter: brightness(1.5); }
+    100% { filter: brightness(1); }
+}

@@ -251,6 +251,7 @@ export class SkyMap {
         this._pendingPlanets = null;
         this._pendingConstellations = null;
         this._pendingStars = null;
+        this._pendingArtificialObjects = null;
 
         // Zoom state. The SVG coordinate space is always 500×500; the viewBox
         // shrinks or grows around the centre to implement zoom. Min 200, max 500.
@@ -485,6 +486,11 @@ export class SkyMap {
         // If plotBodies() was called before render() completed, replay it now.
         if (this._pendingPlanets !== null) {
             this.plotBodies(this._pendingPlanets, this._pendingSun, this._pendingMoon, this._pendingEvents || []);
+        }
+
+        // If plotArtificialObjects() was called before render() completed, replay it now.
+        if (this._pendingArtificialObjects !== null) {
+            this.plotArtificialObjects(this._pendingArtificialObjects);
         }
     }
 
@@ -996,6 +1002,102 @@ export class SkyMap {
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * Plot artificial objects (e.g. ISS) onto the sky map as small fixed-radius
+     * circles with tooltip and label.
+     *
+     * Safe to call before render() — arguments are stored and replayed once the
+     * SVG grid is ready. Safe to call multiple times — the layer is fully rebuilt
+     * on every call so stale dots are never left behind.
+     *
+     * The artificial-objects group is appended after the main bodies group so
+     * satellite dots render on top of planets, the Sun, and the Moon.
+     *
+     * @param {Object[]} objects - Array of artificial-object entries. Each must have:
+     *   altitude_deg  {number} - Altitude above horizon in degrees.
+     *   azimuth_deg   {number} - Azimuth clockwise from North in degrees.
+     *   direction     {string} - Human-readable compass direction (e.g. 'NNO').
+     *   data_source   {string} - Identifier for the data source (e.g. 'celestrak_tle').
+     */
+    plotArtificialObjects(objects) {
+        // Defer if the SVG grid has not been rendered yet.
+        if (!this._rendered || !this.container.querySelector('svg')) {
+            this._pendingArtificialObjects = objects;
+            return;
+        }
+
+        if (!Array.isArray(objects)) return;
+
+        // Clear pending state — we are rendering now.
+        this._pendingArtificialObjects = null;
+
+        const svg = this.container.querySelector('svg');
+
+        // Reuse or create the artificial-objects layer group. Clear it so each
+        // call is idempotent: old dots and labels are removed before rebuilding.
+        let artificialGroup = svg.querySelector('.sky-map-artificial-objects');
+        if (!artificialGroup) {
+            artificialGroup = svgEl('g');
+            artificialGroup.setAttribute('class', 'sky-map-artificial-objects');
+            // Append after the bodies group so satellites render above planets.
+            svg.appendChild(artificialGroup);
+        } else {
+            while (artificialGroup.firstChild) {
+                artificialGroup.removeChild(artificialGroup.firstChild);
+            }
+        }
+
+        const RADIUS = 5;
+
+        for (const obj of objects) {
+            const { x, y } = altAzToXY(
+                obj.altitude_deg,
+                obj.azimuth_deg,
+                CENTER_X,
+                CENTER_Y,
+                HORIZON_RADIUS,
+            );
+
+            const belowHorizon = obj.altitude_deg < 0;
+            const opacityAttr = belowHorizon ? '0.3' : '1';
+
+            const dataSource = obj.data_source === 'celestrak_tle'
+                ? 'CelestTrack TLE'
+                : (obj.data_source || 'okänd');
+
+            const tooltipText =
+                `ISS\n` +
+                `Höjd: ${obj.altitude_deg.toFixed(1)}°\n` +
+                `Riktning: ${obj.direction}\n` +
+                `Datakälla: ${dataSource}`;
+
+            const dot = svgEl('circle');
+            setAttrs(dot, {
+                cx: x,
+                cy: y,
+                r: RADIUS,
+                class: 'sky-map-body sky-map-body--iss info-icon',
+                opacity: opacityAttr,
+                'aria-label': 'ISS',
+                tabindex: '0',
+                role: 'img',
+            });
+            dot.dataset.tooltipTitle = tooltipText;
+            artificialGroup.appendChild(dot);
+
+            const label = svgEl('text');
+            setAttrs(label, {
+                x: x + RADIUS + 3,
+                y: y - RADIUS,
+                class: 'sky-map-body-label',
+                opacity: opacityAttr,
+                'pointer-events': 'none',
+            });
+            label.textContent = 'ISS';
+            artificialGroup.appendChild(label);
         }
     }
 }

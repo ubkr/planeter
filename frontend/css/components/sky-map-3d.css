@@ -177,3 +177,8 @@
         0 0 6px rgba(0, 0, 0, 0.6);
 }
 
+/* --- ISS / artificial satellite labels ---
+   ISS labels intentionally reuse the .sky-map-3d-label class defined above.
+   No dedicated ISS label style is needed because the styling (font, colour,
+   text-shadow, pointer-events) is identical to planet body labels. */
+

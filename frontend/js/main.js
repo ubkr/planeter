@@ -17,7 +17,7 @@ import { EventAlerts } from './components/event-alerts.js';
 import { EventsTimeline } from './components/events-timeline.js';
 import { SolarSystemView } from './components/solar-system-view.js';
 import { AltitudeTimeline } from './components/altitude-timeline.js';
-import { fetchVisiblePlanets, fetchEvents, fetchPlanetTimeline } from './api.js';
+import { fetchVisiblePlanets, fetchEvents, fetchPlanetTimeline, fetchArtificialObjects } from './api.js';
 import { formatLocation } from './utils.js';
 
 /** Auto-refresh interval in milliseconds. */
@@ -56,6 +56,15 @@ let starCatalog = null;
  * @type {Object|null}
  */
 let lastApiData = null;
+
+/**
+ * Most recent successful artificial-objects API response. Retained so the
+ * 3D view activation can replay artificial-object rendering when switching
+ * to 3D after data has already been loaded.
+ *
+ * @type {Object|null}
+ */
+let lastArtificialObjectsData = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     // --- DOM references ---
@@ -223,6 +232,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Fallback to daylight threshold (-5.0) prevents spurious stars if API field missing
                     const limitingMag = lastApiData.sun?.limiting_magnitude ?? -5.0;
                     skyMap3d.plotStars(starCatalog, limitingMag, currentLocation.lat, currentLocation.lon, new Date(lastApiData.timestamp));
+                }
+                if (lastArtificialObjectsData !== null) {
+                    skyMap3d.plotArtificialObjects(lastArtificialObjectsData.objects);
                 }
                 localStorage.setItem(VIEW_MODE_KEY, '3d');
             } catch (err) {
@@ -414,8 +426,22 @@ document.addEventListener('DOMContentLoaded', () => {
         skySummary.showLoading();
         solarSystemView.clear();
 
+        const [planetsResult, artificialObjectsResult] = await Promise.allSettled([
+            fetchVisiblePlanets(location.lat, location.lon),
+            fetchArtificialObjects(location.lat, location.lon),
+        ]);
+
+        if (planetsResult.status === 'rejected') {
+            planetCards.clear();
+            skySummary.clear();
+            eventAlerts.clear();
+            solarSystemView.clear();
+            showError(planetsResult.reason.message);
+            return;
+        }
+
         try {
-            const data = await fetchVisiblePlanets(location.lat, location.lon);
+            const data = planetsResult.value;
 
             lastApiData = data;
 
@@ -466,6 +492,15 @@ document.addEventListener('DOMContentLoaded', () => {
             eventAlerts.clear();
             solarSystemView.clear();
             showError(error.message);
+            return;
+        }
+
+        if (artificialObjectsResult.status === 'fulfilled') {
+            lastArtificialObjectsData = artificialObjectsResult.value;
+            skyMap.plotArtificialObjects(artificialObjectsResult.value.objects);
+            skyMap3d?.plotArtificialObjects(artificialObjectsResult.value.objects);
+        } else {
+            console.warn('Varning: Kunde inte hämta data om artificiella objekt', artificialObjectsResult.reason);
         }
     }
 
@@ -587,6 +622,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Reset lazy-load flags so each tab refreshes for the new location.
         eventsLoaded = false;
         timelineLoaded = false;
+        lastArtificialObjectsData = null;
         loadData(currentLocation);
     });
 
