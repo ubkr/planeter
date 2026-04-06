@@ -582,7 +582,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (tabId === 'solarsystem' && lastApiData !== null) {
-            solarSystemView.render(lastApiData.planets || [], lastApiData.earth_heliocentric || null);
+            solarSystemView.render(lastApiData.planets || [], lastApiData.earth_heliocentric || null, lastApiData.earth_system ?? null);
         }
 
         // If the user leaves the solar system tab, reset any active planet zoom

@@ -9,6 +9,8 @@ from fastapi import APIRouter, HTTPException, Query
 
 from ...models.planet import (
     EarthHeliocentric,
+    EarthSystemInfo,
+    EarthSystemMoon,
     LocationInfo,
     MoonInfo,
     MoonPosition,
@@ -26,6 +28,7 @@ from ...services.cache_service import cache
 from ...services.planets import compute_altitude_timeline
 from ...services.planets.calculator import calculate_planet_positions
 from ...services.planets.events import detect_events
+from ...services.planets.earth_system import compute_earth_system
 from ...services.planets.forecast import compute_next_good_observation
 from ...services.planets.heliocentric import compute_earth_heliocentric, compute_heliocentric_positions
 from ...services.planets.moons import compute_moon_positions, compute_ring_tilt
@@ -595,6 +598,16 @@ async def get_visible_planets(
     except Exception as exc:
         logger.warning(f"compute_ring_tilt failed for /visible ({lat}, {lon}): {exc}")
 
+    earth_system = None
+    try:
+        earth_system_dict = compute_earth_system(now_utc)
+        if earth_system_dict is not None:
+            earth_system = EarthSystemInfo(
+                moon=EarthSystemMoon(**earth_system_dict["moon"])
+            )
+    except Exception as exc:
+        logger.warning("Failed to build EarthSystemInfo: %s", exc)
+
     sun_info = _build_sun_info(sun_data, sun_times)
     moon_info = _build_moon_info(moon_data, moon_times)
 
@@ -615,6 +628,7 @@ async def get_visible_planets(
         planets=planets,
         events=events,
         earth_heliocentric=earth_heliocentric,
+        earth_system=earth_system,
     )
 
 
@@ -752,6 +766,16 @@ async def get_tonight_planets(
     except Exception as exc:
         logger.warning(f"compute_ring_tilt failed for /tonight ({lat}, {lon}): {exc}")
 
+    earth_system = None
+    try:
+        earth_system_dict = compute_earth_system(helio_dt)
+        if earth_system_dict is not None:
+            earth_system = EarthSystemInfo(
+                moon=EarthSystemMoon(**earth_system_dict["moon"])
+            )
+    except Exception as exc:
+        logger.warning("Failed to build EarthSystemInfo: %s", exc)
+
     # Use the pre-computed sun/moon data so metadata reflects the same moment
     # used for scoring, not the wall-clock time of the HTTP request.
     # Rise/set times always use now_utc so they reflect today's actual events.
@@ -771,6 +795,7 @@ async def get_tonight_planets(
         tonight_score=tonight,
         events=events,
         earth_heliocentric=earth_heliocentric,
+        earth_system=earth_system,
     )
 
 

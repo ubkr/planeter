@@ -1415,7 +1415,7 @@ When the user zooms into a planet in the solar system view, the enlarged planet 
 
 ---
 
-#### Phase F5: Earth-Moon System Detail View
+#### Phase F5: Earth-Moon System Detail View — ✅
 
 **Depends on:** Phase F4
 **Parallelisable with:** None
@@ -1425,12 +1425,12 @@ When the user zooms into a planet in the solar system view, the enlarged planet 
 Clicking `Jorden` in the solar system view opens the same integrated detail layout already used for Jupiter and Saturn, but the right-hand visualization now shows the current Earth-Moon system instead of a generic planet-only detail state. The backend provides a dedicated `earth_system` payload with the Moon's current position relative to Earth, and the frontend renders a scaled Earth/Moon diagram with Swedish labels inside the existing two-column Solsystemet detail view.
 
 **Definition of Done**
-- [ ] `GET /api/v1/planets/visible?lat=55.7&lon=13.4` returns a top-level `earth_system` object containing a nested `moon` object with at least `name_sv`, `x_offset_earth_radii`, `y_offset_earth_radii`, `distance_km`, and `illumination`
-- [ ] Clicking the Earth dot in the Solsystemet SVG opens the existing detail layout with the title `Jorden` and a right-column Earth/Moon diagram that contains one moon marker labelled `Månen`
-- [ ] The Moon marker position in the Earth detail diagram is derived from `earth_system.moon.x_offset_earth_radii` and `earth_system.moon.y_offset_earth_radii`, not from a hardcoded fixed orbit angle
-- [ ] The Earth detail view remains usable on both 375 px and 1200 px viewports, with the information panel and Earth/Moon diagram visible at the same time and no horizontal overflow
-- [ ] If `earth_system` is missing or null, clicking `Jorden` still opens the detail panel and shows a Swedish fallback message such as `Månens position kunde inte laddas just nu`
-- [ ] `backend/tests/test_api_planets.py` verifies the `earth_system` response shape and that the Moon offset fields are present in `/api/v1/planets/visible`
+- [x] `GET /api/v1/planets/visible?lat=55.7&lon=13.4` returns a top-level `earth_system` object containing a nested `moon` object with at least `name_sv`, `x_offset_earth_radii`, `y_offset_earth_radii`, `distance_km`, and `illumination`
+- [x] Clicking the Earth dot in the Solsystemet SVG opens the existing detail layout with the title `Jorden` and a right-column Earth/Moon diagram that contains one moon marker labelled `Månen`
+- [x] The Moon marker position in the Earth detail diagram is derived from `earth_system.moon.x_offset_earth_radii` and `earth_system.moon.y_offset_earth_radii`, not from a hardcoded fixed orbit angle
+- [x] The Earth detail view remains usable on both 375 px and 1200 px viewports, with the information panel and Earth/Moon diagram visible at the same time and no horizontal overflow
+- [x] If `earth_system` is missing or null, clicking `Jorden` still opens the detail panel and shows a Swedish fallback message such as `Månens position kunde inte laddas just nu`
+- [x] `backend/tests/test_api_planets.py` verifies the `earth_system` response shape and that the Moon offset fields are present in `/api/v1/planets/visible`
 
 **Key files**
 - Modify `backend/app/models/planet.py` — add `EarthSystemInfo` / `EarthSystemMoon` models and a top-level `earth_system` field on `PlanetsResponse`

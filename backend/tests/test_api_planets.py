@@ -408,3 +408,57 @@ async def test_timeline_series_names_and_coverage(async_client):
         for sample in series["samples"]:
             if sample["altitude_deg"] is not None:
                 assert -90 <= sample["altitude_deg"] <= 90
+
+
+# ---------------------------------------------------------------------------
+# Phase F5 — earth_system payload in /visible response
+# ---------------------------------------------------------------------------
+
+async def test_visible_response_has_earth_system_payload(async_client, mock_weather, mock_forecast):
+    # Malmö, Sweden — standard temperate coordinates that always produce a
+    # valid earth_system calculation.
+    response = await async_client.get(
+        "/api/v1/planets/visible",
+        params={"lat": 55.7, "lon": 13.4},
+    )
+    assert response.status_code == 200
+    data = response.json()
+
+    # earth_system key must be present at the top level.
+    assert "earth_system" in data
+
+    # earth_system must not be null for standard coordinates.
+    assert data["earth_system"] is not None
+
+    moon = data["earth_system"]["moon"]
+
+    # Required fields on EarthSystemMoon.
+    assert "name_sv" in moon
+    assert "x_offset_earth_radii" in moon
+    assert "y_offset_earth_radii" in moon
+    assert "distance_km" in moon
+    assert "illumination" in moon
+
+    # name_sv is the Swedish name for the Moon.
+    assert moon["name_sv"] == "Månen"
+
+    # illumination is a fraction between 0 and 1.
+    assert 0.0 <= moon["illumination"] <= 1.0
+
+    # distance is in the realistic Earth-Moon range (km).
+    assert 350_000 <= moon["distance_km"] <= 410_000
+
+    # offsets are floats with realistic magnitude (~55–65 Earth radii).
+    total_distance = (
+        moon["x_offset_earth_radii"] ** 2 + moon["y_offset_earth_radii"] ** 2
+    ) ** 0.5
+    assert 50 <= total_distance <= 70
+
+
+async def test_tonight_response_has_earth_system_key(async_client, mock_weather, mock_forecast):
+    response = await async_client.get(
+        "/api/v1/planets/tonight", params={"lat": 55.7, "lon": 13.4}
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "earth_system" in data

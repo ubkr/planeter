@@ -202,6 +202,28 @@ class MoonInfo(BaseModel):
     next_set_time: Optional[str] = Field(None, description="UTC ISO 8601 string or null")
 
 
+class EarthSystemMoon(BaseModel):
+    """Position and illumination of Earth's Moon expressed in Earth-radii offsets."""
+
+    name_sv: str = Field(..., description="Swedish name of the moon")
+    x_offset_earth_radii: float = Field(
+        ...,
+        description="Horizontal offset from Earth centre in Earth radii (geocentric, cos(hlat)*cos(hlon) projection)",
+    )
+    y_offset_earth_radii: float = Field(
+        ...,
+        description="Vertical offset from Earth centre in Earth radii (geocentric, cos(hlat)*sin(hlon) projection)",
+    )
+    distance_km: float = Field(..., description="Distance from Earth centre in kilometres")
+    illumination: float = Field(..., description="Illuminated fraction 0.0 (new) to 1.0 (full)")
+
+
+class EarthSystemInfo(BaseModel):
+    """Container for Earth-system bodies (currently only the Moon)."""
+
+    moon: EarthSystemMoon = Field(..., description="Moon position and illumination data")
+
+
 class WeatherInfo(BaseModel):
     """Cloud cover summary used for visibility scoring."""
 
@@ -301,6 +323,9 @@ class PlanetsResponse(BaseModel):
     earth_heliocentric: Optional[EarthHeliocentric] = Field(
         None, description="Earth's current heliocentric position and Sun distance"
     )
+    earth_system: Optional[EarthSystemInfo] = Field(
+        None, description="Earth-system data including the Moon's sky position and illumination"
+    )
 
     class Config:
         json_schema_extra = {
@@ -334,6 +359,15 @@ class PlanetsResponse(BaseModel):
                     "heliocentric_y_au": 0.15,
                     "heliocentric_z_au": 0.0,
                     "distance_au": 0.99,
+                },
+                "earth_system": {
+                    "moon": {
+                        "name_sv": "Månen",
+                        "x_offset_earth_radii": 1.2,
+                        "y_offset_earth_radii": -0.4,
+                        "distance_km": 384400.0,
+                        "illumination": 0.45,
+                    }
                 },
             }
         }

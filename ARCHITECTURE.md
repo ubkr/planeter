@@ -41,6 +41,7 @@ backend/
         forecast.py               -- 6-month next-good-observation scanner (per-night dark-window sampling)
         heliocentric.py           -- Heliocentric XYZ coordinates for planets and Earth (via ephem.Sun())
         moons.py                  -- Galilean moon (Jupiter) and major moon (Saturn) X/Y offsets via ephem satellite classes
+        earth_system.py           -- computes Moon position relative to Earth for the Solsystemet detail view
         timeline.py               -- 24-hour altitude-above-horizon series for all bodies in 15-minute steps
       weather/
         base.py                   -- WeatherSourceBase ABC
@@ -103,7 +104,7 @@ frontend/
       settings-modal.js           -- Location picker modal (Leaflet)
       map-selector.js             -- Leaflet map widget
       tooltip.js                  -- Tooltip utility
-      solar-system-view.js        -- Heliocentric SVG top-down solar system diagram (Solsystemet tab)
+      solar-system-view.js        -- Heliocentric SVG top-down solar system diagram (Solsystemet tab); clicking Jorden opens a detail panel showing the Earth/Moon system diagram driven by earth_system API data
       altitude-timeline.js        -- 24-hour SVG altitude chart for planets, Sun, and Moon (Höjdkurva tab)
   lib/
     three.module.min.js           -- Three.js r170 (vendored, ES module)
@@ -357,6 +358,26 @@ The `ring_tilt_deg` field is populated only for Saturn; it is `null` for all oth
 
 ```
 PlanetPosition.ring_tilt_deg: Optional[float]
+```
+
+The top-level `earth_system` field is an optional `EarthSystemInfo` object populated by `earth_system.py`. It is present in `/api/v1/planets/visible` responses and drives the Earth/Moon diagram in the Solsystemet detail view.
+
+```
+PlanetsResponse.earth_system: Optional[EarthSystemInfo]
+```
+
+```
+EarthSystemInfo {
+  moon: EarthSystemMoon
+}
+
+EarthSystemMoon {
+  name_sv: str              # Swedish name ("Månen")
+  x_offset_earth_radii: float  # geocentric x offset in Earth radii
+  y_offset_earth_radii: float  # geocentric y offset in Earth radii
+  distance_km: float        # distance from Earth in km
+  illumination: float       # illuminated fraction 0.0–1.0 (float fraction, not a percentage)
+}
 ```
 
 ### `GET /api/v1/planets/tonight`

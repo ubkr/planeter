@@ -412,10 +412,12 @@ export class SolarSystemView {
      *   Each object should have: name, name_sv, heliocentric_x_au, heliocentric_y_au.
      * @param {Object|null} [earthHeliocentric=null] - earth_heliocentric API object.
      */
-    render(planets, earthHeliocentric = null) {
+    render(planets, earthHeliocentric = null, earthSystem = null) {
         if (!this.containerEl) {
             return;
         }
+
+        this._earthSystem = earthSystem;
 
         // Instantly reset any active zoom before re-rendering — no animation.
         this._resetZoomInstant();
@@ -845,6 +847,11 @@ export class SolarSystemView {
             });
         }
 
+        // Earth Moon diagram — rendered only for the Earth detail view
+        if (planetKey === 'earth') {
+            this._buildEarthMoonDiagram(svgArea);
+        }
+
         // Saturn ring diagram — rendered only when ring tilt data is available
         if (planetKey === 'saturn' && planetData?.ring_tilt_deg != null) {
             const ringTiltDeg = planetData.ring_tilt_deg;
@@ -937,6 +944,132 @@ export class SolarSystemView {
         // Move focus to the back button after the layout is in the DOM
         requestAnimationFrame(() => {
             backBtn.focus();
+        });
+    }
+
+    /**
+     * Build the Earth Moon diagram and append it to the given container element.
+     *
+     * Renders a single Moon dot positioned relative to Earth using
+     * x_offset_earth_radii / y_offset_earth_radii from the earth_system API data.
+     * Also shows the Moon's illumination percentage.
+     *
+     * Falls back to a text message if this._earthSystem is null.
+     *
+     * @param {HTMLElement} container - The svgArea div to append the diagram into
+     */
+    _buildEarthMoonDiagram(container) {
+        if (!this._earthSystem) {
+            const fallback = document.createElement('p');
+            fallback.className = 'solar-system__detail-fallback';
+            fallback.textContent = 'Månens position kunde inte laddas just nu';
+            container.appendChild(fallback);
+            return;
+        }
+
+        const moon = this._earthSystem.moon;
+        if (!moon) {
+            const fallback = document.createElement('p');
+            fallback.className = 'solar-system__detail-fallback';
+            fallback.textContent = 'Månens position kunde inte laddas just nu';
+            container.appendChild(fallback);
+            return;
+        }
+
+        // Diagram dimensions — match the CSS class dimensions used by Jupiter/Saturn diagrams
+        const diagramWidth  = 344;
+        const diagramHeight = 246;
+        const centerX = diagramWidth  / 2;  // 172
+        const centerY = diagramHeight / 2;  // 123
+        const dotRadius = 4;
+        const padding   = 15;
+
+        const diagram = document.createElement('div');
+        diagram.className = 'solar-system__moon-diagram';
+
+        const moonHeading = document.createElement('h4');
+        moonHeading.className = 'solar-system__moon-heading';
+        moonHeading.textContent = 'Månen';
+        diagram.appendChild(moonHeading);
+
+        // Central Earth circle
+        const planetCircle = document.createElement('div');
+        planetCircle.className = 'solar-system__moon-planet-circle';
+        diagram.appendChild(planetCircle);
+
+        // Guard: if offset values are NaN or null the diagram cannot be drawn
+        if (!isFinite(moon.x_offset_earth_radii) || !isFinite(moon.y_offset_earth_radii)) {
+            const fallback = document.createElement('p');
+            fallback.className = 'solar-system__detail-fallback';
+            fallback.textContent = 'Månens position kunde inte laddas just nu';
+            container.appendChild(fallback);
+            return;
+        }
+
+        // Scale: fit the Moon within the diagram with padding
+        const maxOffset = Math.max(
+            Math.abs(moon.x_offset_earth_radii),
+            Math.abs(moon.y_offset_earth_radii)
+        );
+
+        const scale = maxOffset > 0
+            ? (Math.min(centerX, centerY) - padding) / maxOffset
+            : 1;
+
+        // Pixel position from centre; negate y because screen Y axis is inverted
+        const left = centerX + moon.x_offset_earth_radii * scale - dotRadius;
+        const top  = centerY - moon.y_offset_earth_radii * scale - dotRadius;
+
+        const dot = document.createElement('div');
+        dot.className = 'solar-system__moon-dot';
+        dot.style.left = `${Math.round(left)}px`;
+        dot.style.top  = `${Math.round(top)}px`;
+        diagram.appendChild(dot);
+
+        const label = document.createElement('span');
+        label.className = 'solar-system__moon-label';
+        label.textContent = moon.name_sv ?? 'Månen';
+
+        // Flip label to the left when dot is in the right half
+        if (left > diagramWidth / 2) {
+            label.style.left = `${Math.round(left - 2)}px`;
+            label.style.transform = 'translateX(-100%)';
+        } else {
+            label.style.left = `${Math.round(left + dotRadius * 2 + 2)}px`;
+        }
+        label.style.top = `${Math.round(top - 2)}px`;
+        diagram.appendChild(label);
+
+        const illumination = document.createElement('span');
+        illumination.className = 'solar-system__moon-illumination';
+        illumination.textContent = `${Math.round(moon.illumination * 100)}% belyst`;
+        // Position illumination label just below the name label (same left, 14px lower)
+        illumination.style.left = label.style.left;
+        if (label.style.transform) {
+            illumination.style.transform = label.style.transform;
+        }
+        illumination.style.top = `${parseFloat(label.style.top) + 14}px`;
+        diagram.appendChild(illumination);
+
+        container.appendChild(diagram);
+
+        // Hide the zoomed SVG — the Moon diagram is the primary visualization
+        if (this._svg) {
+            this._svg.classList.add('solar-system-svg--detail-hidden');
+        }
+
+        // Scale the diagram to fill the svgArea
+        requestAnimationFrame(() => {
+            const areaW = container.clientWidth;
+            const areaH = container.clientHeight;
+            const DIAGRAM_W = 344;
+            const DIAGRAM_H = 246;
+            const PADDING = 32;
+            const diagramScale = Math.max(0.8, Math.min(
+                (areaW - PADDING) / DIAGRAM_W,
+                (areaH - PADDING) / DIAGRAM_H
+            ));
+            diagram.style.setProperty('--moon-diagram-scale', diagramScale);
         });
     }
 
