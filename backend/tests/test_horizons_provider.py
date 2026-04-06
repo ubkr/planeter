@@ -38,9 +38,9 @@ _LON = 13.4
 _VALID_HORIZONS_CSV = """\
 API VERSION: 1.0
 Generator: Horizons
- Date__(UT)__HR:MN:SC.fff, , Azi_(a-app), Elev_(a-app),
+ Date__(UT)__HR:MN:SC.fff, , , Azi_(a-app), Elev_(a-app),
 $$SOE
- 2026-Apr-06 12:00:00.000, ,     142.1234,    23.4567,
+ 2026-Apr-06 12:00:00.000,*, ,     142.1234,    23.4567,
 $$EOE
 """
 
@@ -102,7 +102,7 @@ def test_parse_missing_eoe_returns_none():
 def test_parse_empty_data_block_returns_none():
     """Test 4: $$SOE and $$EOE present but nothing between them returns None."""
     empty_block_csv = """\
- Date__(UT)__HR:MN:SC.fff, , Azi_(a-app), Elev_(a-app),
+ Date__(UT)__HR:MN:SC.fff, , , Azi_(a-app), Elev_(a-app),
 $$SOE
 $$EOE
 """
@@ -113,9 +113,9 @@ $$EOE
 def test_parse_missing_header_columns_returns_none():
     """Test 5: Header line does not contain Azi_(a-app)/Elev_(a-app) returns None."""
     csv_bad_header = """\
- Date__(UT)__HR:MN:SC.fff, , SomeCol, OtherCol,
+ Date__(UT)__HR:MN:SC.fff, , , SomeCol, OtherCol,
 $$SOE
- 2026-Apr-06 12:00:00.000, ,     142.1234,    23.4567,
+ 2026-Apr-06 12:00:00.000,*, ,     142.1234,    23.4567,
 $$EOE
 """
     result = _parse_horizons_csv(csv_bad_header)
@@ -125,9 +125,9 @@ $$EOE
 def test_parse_non_numeric_data_row_returns_none():
     """Test 6: Non-numeric value in azimuth/elevation column returns None."""
     csv_bad_data = """\
- Date__(UT)__HR:MN:SC.fff, , Azi_(a-app), Elev_(a-app),
+ Date__(UT)__HR:MN:SC.fff, , , Azi_(a-app), Elev_(a-app),
 $$SOE
- 2026-Apr-06 12:00:00.000, ,     N/A,    23.4567,
+ 2026-Apr-06 12:00:00.000,*, ,     N/A,    23.4567,
 $$EOE
 """
     result = _parse_horizons_csv(csv_bad_data)
@@ -174,7 +174,7 @@ async def test_get_horizons_objects_http_500_returns_empty():
 async def test_get_horizons_objects_empty_soe_eoe_returns_empty():
     """Test 9: Valid HTTP response but empty SOE/EOE block returns empty list."""
     empty_block_csv = """\
- Date__(UT)__HR:MN:SC.fff, , Azi_(a-app), Elev_(a-app),
+ Date__(UT)__HR:MN:SC.fff, , , Azi_(a-app), Elev_(a-app),
 $$SOE
 $$EOE
 """
@@ -200,9 +200,9 @@ async def test_get_horizons_objects_timeout_returns_empty():
 _NEGATIVE_ELEV_CSV = """\
 API VERSION: 1.0
 Generator: Horizons
- Date__(UT)__HR:MN:SC.fff, , Azi_(a-app), Elev_(a-app),
+ Date__(UT)__HR:MN:SC.fff, , , Azi_(a-app), Elev_(a-app),
 $$SOE
- 2026-Apr-06 12:00:00.000, ,     210.5000,   -49.8000,
+ 2026-Apr-06 12:00:00.000, , ,     210.5000,   -49.8000,
 $$EOE
 """
 

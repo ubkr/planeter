@@ -116,6 +116,11 @@ async def _fetch_horizons_observer(
         "CSV_FORMAT": "YES",
         "OBJ_DATA": "NO",
         "CAL_FORMAT": "CAL",
+        # "format": "text" instructs the Horizons API to return plain text
+        # instead of the default JSON envelope {"signature":…,"result":"…"}.
+        # This is a top-level API parameter and must NOT be wrapped in single
+        # quotes like the Horizons-engine parameters above.
+        "format": "text",
     }
 
     try:
@@ -189,6 +194,11 @@ async def _fetch_horizons_vectors(command_id: str) -> Optional[str]:
         "CSV_FORMAT": "YES",
         "OBJ_DATA": "NO",
         "CAL_FORMAT": "CAL",
+        # "format": "text" instructs the Horizons API to return plain text
+        # instead of the default JSON envelope {"signature":…,"result":"…"}.
+        # This is a top-level API parameter and must NOT be wrapped in single
+        # quotes like the Horizons-engine parameters above.
+        "format": "text",
     }
 
     try:
