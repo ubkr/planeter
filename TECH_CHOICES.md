@@ -35,7 +35,7 @@
 
 ### ISS Orbit Propagation
 
-ISS position is computed with `ephem.readtle(name, line1, line2)` using Two-Line Element (TLE) data fetched from CelestrakK. Alternatives considered:
+ISS position is computed with `ephem.readtle(name, line1, line2)` using Two-Line Element (TLE) data fetched from CelesTrak. Alternatives considered:
 
 | Library | Verdict | Reason not chosen |
 |---|---|---|
@@ -55,9 +55,42 @@ ISS position is computed with `ephem.readtle(name, line1, line2)` using Two-Line
 
 | Source | Role | Rationale |
 |---|---|---|
-| **CelestrakK** (`celestrak.org`) | ISS TLE provider | Free, no API key required, authoritative NORAD-sourced TLE data. Endpoint: `https://celestrak.org/NORAD/elements/gp.php?CATNR=25544&FORMAT=TLE` |
+| **CelesTrak** (`celestrak.org`) | ISS TLE provider | Free, no API key required, authoritative NORAD-sourced TLE data. Endpoint: `https://celestrak.org/NORAD/elements/gp.php?CATNR=25544&FORMAT=TLE` |
 
-TLE data is cached in-memory for 2 hours (key: `tle_iss`, TTL: 7200 s). The 2-hour TTL aligns with CelestrakK's acceptable-use policy, which discourages fetching the same element set more frequently than once per two hours. TLE accuracy degrades on the order of days, so a 2-hour cache does not introduce meaningful positional error for a visual-tracking use case.
+TLE data is cached in-memory for 2 hours (key: `tle_iss`, TTL: 7200 s). The 2-hour TTL aligns with CelesTrak's acceptable-use policy, which discourages fetching the same element set more frequently than once per two hours. TLE accuracy degrades on the order of days, so a 2-hour cache does not introduce meaningful positional error for a visual-tracking use case.
+
+## JPL Horizons Ephemeris API
+
+| Aspect | Detail |
+|---|---|
+| Purpose | Observer-based ephemeris for cislunar and deep-space objects where TLEs are inappropriate (e.g. Artemis II Orion spacecraft) |
+| Endpoint | `https://ssd.jpl.nasa.gov/api/horizons.api` |
+| Query mode | `EPHEM_TYPE=OBSERVER`, `CENTER=coord@399`, `COORD_TYPE=GEODETIC`, `QUANTITIES=4` (apparent azimuth + elevation) |
+| Cache TTL | 300 seconds; cache key includes `command_id`, `round(lat, 1)`, and `round(lon, 1)` so that observers at different locations receive correctly positioned ephemerides |
+| Concurrency | Capped at 3 simultaneous Horizons requests via `asyncio.Semaphore(3)` |
+
+### Why TLEs Do Not Work for Cislunar Trajectories
+
+SGP4/SDP4 (the propagator used by `ephem.readtle()` and all TLE-based tools) assumes a two-body Earth-centred orbit. Cislunar trajectories such as the Artemis II free-return loop require numerical integration of multiple gravitational bodies (Earth, Moon, Sun). Propagating such a trajectory with SGP4 produces large positional errors within hours. JPL Horizons integrates these trajectories with high-fidelity force models and exposes a REST API for topocentric observer ephemerides, making it the correct source for spacecraft beyond low Earth orbit.
+
+### Adding a New Tracked Object
+
+Add a single dict to `HORIZONS_OBJECTS` in `backend/app/services/artificial_objects/horizons_provider.py`. No other code changes are required:
+
+```python
+{
+    "name": "My Spacecraft",
+    "command_id": "-9999",        # JPL Horizons COMMAND parameter
+    "category": "spacecraft",
+    "label_sv": "Mitt rymdskepp",  # Swedish display label
+    "colour": "#ff9900",           # CSS hex colour for sky-map dot/sprite
+    "data_source": "jpl_horizons",
+}
+```
+
+### Mission Lifetime Handling
+
+When a mission is inactive or the spacecraft has re-entered, the Horizons API returns an empty data block (no rows between `$$SOE` / `$$EOE`). The provider detects this, logs a warning, and omits the object from the response. The endpoint continues to return HTTP 200 with any remaining valid objects.
 
 ## Geolocation and Location Picker
 

@@ -20,11 +20,12 @@ async def get_artificial_objects(
     lon: float = Query(..., ge=-180, le=180, description="Longitude in decimal degrees"),
 ) -> ArtificialObjectsResponse:
     """
-    Return current positions of tracked artificial objects (satellites).
+    Return topocentric positions for tracked artificial objects.
 
-    Fetches live TLE data (cached for 2 hours) and computes topocentric position
-    for the ISS at the given observer coordinates.  Additional objects will be
-    added in a future phase.
+    Sources: CelesTrak TLE for satellites (ISS), JPL Horizons for cislunar
+    spacecraft (Artemis II and future missions).  Both sources are queried
+    concurrently.  Returns HTTP 200 with available objects; if one source
+    fails, remaining objects are still returned.
     """
     logger.info(f"GET /api/v1/artificial-objects lat={lat} lon={lon}")
 

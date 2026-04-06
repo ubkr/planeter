@@ -177,8 +177,28 @@
         0 0 6px rgba(0, 0, 0, 0.6);
 }
 
-/* --- ISS / artificial satellite labels ---
-   ISS labels intentionally reuse the .sky-map-3d-label class defined above.
-   No dedicated ISS label style is needed because the styling (font, colour,
-   text-shadow, pointer-events) is identical to planet body labels. */
+/* --- Artificial object labels (satellites, spacecraft) --- */
+
+/* Default satellite label — brightness pulse matching the 2D map. */
+.sky-map-3d-label.info-icon {
+    animation: artificial-pulse-3d 2s ease-in-out infinite;
+}
+
+@keyframes artificial-pulse-3d {
+    0%   { filter: brightness(1); }
+    50%  { filter: brightness(1.5); }
+    100% { filter: brightness(1); }
+}
+
+/* Spacecraft (cislunar / deep-space) — slower 3s pulse with soft glow,
+   matching the [data-category="spacecraft"] variant in sky-map.css. */
+.sky-map-3d-label.info-icon[data-category="spacecraft"] {
+    animation: artificial-spacecraft-pulse-3d 3s ease-in-out infinite;
+}
+
+@keyframes artificial-spacecraft-pulse-3d {
+    0%   { filter: brightness(1)   drop-shadow(0 0 0   currentColor); }
+    50%  { filter: brightness(1.4) drop-shadow(0 0 4px currentColor); }
+    100% { filter: brightness(1)   drop-shadow(0 0 0   currentColor); }
+}
 

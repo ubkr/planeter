@@ -47,7 +47,8 @@ backend/
         metno_client.py           -- Met.no API client
         openmeteo_client.py       -- Open-Meteo API client
       artificial_objects/
-        tracker.py                -- ISS TLE fetcher (CelestrakK), ephem.readtle() position computation, 2-hour TLE cache
+        tracker.py                -- ISS TLE fetcher (CelesTrak), ephem.readtle() position computation, 2-hour TLE cache
+        horizons_provider.py      -- Generic JPL Horizons observer ephemeris provider. Config-driven HORIZONS_OBJECTS registry; each entry is a dict. New objects require only a new dict.
       scoring.py                  -- Planet visibility scoring algorithm
       aggregator.py               -- Weather aggregation with fallbacks
       cache_service.py            -- In-memory TTL cache
@@ -415,7 +416,7 @@ Seven series are always present, in this order: `Mercury`, `Venus`, `Mars`, `Jup
 
 Query parameters: `lat` (decimal degrees, required), `lon` (decimal degrees, required).
 
-TLE data is fetched from CelestrakK on the first request and then served from cache for up to 2 hours (`tle_iss` key).
+TLE data is fetched from CelesTrak on the first request and then served from cache for up to 2 hours (`tle_iss` key).
 
 ```json
 {
@@ -429,13 +430,40 @@ TLE data is fetched from CelestrakK on the first request and then served from ca
       "azimuth_deg": 47.1,
       "direction": "NE",
       "is_above_horizon": true,
-      "data_source": "celestrak_tle"
+      "data_source": "celestrak_tle",
+      "colour": "#ffffff",
+      "label_sv": "ISS"
+    },
+    {
+      "name": "Artemis II",
+      "category": "spacecraft",
+      "altitude_deg": 18.7,
+      "azimuth_deg": 213.5,
+      "direction": "SSW",
+      "is_above_horizon": true,
+      "data_source": "jpl_horizons",
+      "colour": "#00bfff",
+      "label_sv": "Artemis II"
     }
   ]
 }
 ```
 
-`objects` is an empty array if the TLE fetch fails or no tracked object could be computed. The schema is `ArtificialObjectsResponse`; each entry is an `ArtificialObject`.
+`objects` is an empty array if all sources fail or no tracked object could be computed. The schema is `ArtificialObjectsResponse`; each entry is an `ArtificialObject`.
+
+```
+ArtificialObject {
+  name: str                  # Object name (e.g. "ISS (ZARYA)")
+  category: str              # Object category (e.g. "satellite", "spacecraft")
+  altitude_deg: float        # Altitude above horizon in degrees
+  azimuth_deg: float         # Azimuth from North in degrees, [0, 360)
+  direction: str             # 16-point compass direction derived from azimuth_deg
+  is_above_horizon: bool     # True when altitude_deg > 0
+  data_source: str           # Source identifier (e.g. "celestrak_tle", "jpl_horizons")
+  colour: Optional[str]      # CSS hex colour string for the dot/sprite (e.g. "#ffffff"). Set per-object in the source registry. Frontend uses this for data-driven rendering colour.
+  label_sv: Optional[str]    # Swedish display label (e.g. "ISS"). Frontend uses this for tooltips and labels; falls back to name if absent.
+}
+```
 
 ### `GET /api/v1/geocode/reverse`
 

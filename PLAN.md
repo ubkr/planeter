@@ -1453,25 +1453,23 @@ The app gains a separate endpoint for artificial sky objects that returns a curr
 
 ---
 
-#### Phase G2: Artemis II via Mission Ephemeris Source
+#### Phase G2: Artemis II via Mission Ephemeris Source — ✅
 
 **Depends on:** Phase G1
 **Parallelisable with:** None
-
-> **Note:** Artemis II requires a separate mission ephemeris source that is not currently documented in TECH_CHOICES.md. That documentation update should be handled separately.
 
 **Intended Outcome**
 
 The artificial-objects endpoint is extended with Artemis II using a mission-specific ephemeris source that is separate from ISS tracking data. The frontend continues to use the same endpoint and rendering flow introduced in G1, but now plots both ISS and Artemis II in the 2D sky map and 3D dome. The solution supports partial-source failure so that one source can fail without breaking the rest of the artificial-objects response or the sky-map UI.
 
 **Definition of Done**
-- [ ] `GET /api/v1/artificial-objects?lat=55.7&lon=13.4` still returns HTTP 200 after Artemis II support is added, and in mocked backend tests the `objects` array contains entries for both `ISS` and `Artemis II`
-- [ ] The Artemis II object includes at minimum `name`, `category`, `altitude_deg`, `azimuth_deg`, `direction`, `is_above_horizon`, and `data_source`, using the same response schema introduced in G1
-- [ ] `frontend/js/components/sky-map.js` renders Artemis II in the 2D view at positions matching its `altitude_deg` and `azimuth_deg`; if it is below the horizon, the marker is shown with reduced opacity outside the horizon ring
-- [ ] `frontend/js/components/sky-map-3d.js` renders Artemis II in the 3D view as a separate sprite/label when `is_above_horizon == true`; if it is below the horizon, it is not rendered in 3D
-- [ ] Hovering or tapping Artemis II in the 2D or 3D view shows a tooltip with Swedish UI text such as `Höjd`, `Riktning`, and `Datakälla`
-- [ ] If the Artemis II source is unavailable, `/api/v1/artificial-objects` still returns HTTP 200 with any remaining valid objects, and the frontend sky map continues to function without JavaScript errors
-- [ ] `backend/tests/test_api_artificial_objects.py` verifies mocked Artemis II-source ingestion and partial-failure fallback behavior without regressing ISS support
+- [x] `GET /api/v1/artificial-objects?lat=55.7&lon=13.4` still returns HTTP 200 after Artemis II support is added, and in mocked backend tests the `objects` array contains entries for both `ISS` and `Artemis II`
+- [x] The Artemis II object includes at minimum `name`, `category`, `altitude_deg`, `azimuth_deg`, `direction`, `is_above_horizon`, and `data_source`, using the same response schema introduced in G1
+- [x] `frontend/js/components/sky-map.js` renders Artemis II in the 2D view at positions matching its `altitude_deg` and `azimuth_deg`; if it is below the horizon, the marker is shown with reduced opacity outside the horizon ring
+- [x] `frontend/js/components/sky-map-3d.js` renders Artemis II in the 3D view as a separate sprite/label when `is_above_horizon == true`; if it is below the horizon, it is not rendered in 3D
+- [x] Hovering or tapping Artemis II in the 2D or 3D view shows a tooltip with Swedish UI text such as `Höjd`, `Riktning`, and `Datakälla`
+- [x] If the Artemis II source is unavailable, `/api/v1/artificial-objects` still returns HTTP 200 with any remaining valid objects, and the frontend sky map continues to function without JavaScript errors
+- [x] `backend/tests/test_api_artificial_objects.py` verifies mocked Artemis II-source ingestion and partial-failure fallback behavior without regressing ISS support
 
 **Key files**
 - Modify `backend/app/services/artificial_objects/tracker.py` — add Artemis II mission ephemeris ingestion and normalization into the shared artificial-object model

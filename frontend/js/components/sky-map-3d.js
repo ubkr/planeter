@@ -575,11 +575,19 @@ export default class SkyMap3D {
         for (const obj of objects) {
             if (!obj.is_above_horizon) continue;
 
-            const dataSourceLabel = obj.data_source === 'celestrak_tle'
-                ? 'CelestTrack TLE'
-                : (obj.data_source || 'okänd');
+            const displayName = obj.label_sv || obj.name;
+
+            let dataSourceLabel;
+            if (obj.data_source === 'celestrak_tle') {
+                dataSourceLabel = 'Celestrak TLE';
+            } else if (obj.data_source === 'jpl_horizons') {
+                dataSourceLabel = 'JPL Horizons';
+            } else {
+                dataSourceLabel = 'okänd';
+            }
+
             const tooltipText =
-                `${obj.name}\n` +
+                `${displayName}\n` +
                 `Höjd: ${obj.altitude_deg.toFixed(1)}°\n` +
                 `Riktning: ${obj.direction}\n` +
                 `Datakälla: ${dataSourceLabel}`;
@@ -587,11 +595,11 @@ export default class SkyMap3D {
             this._addArtificialSprite(
                 obj.altitude_deg,
                 obj.azimuth_deg,
-                '#ffffff',
+                obj.colour || '#ffffff',
                 -1,
-                obj.name,
+                displayName,
                 tooltipText,
-                { name_sv: obj.name, type: 'artificial_object' },
+                { name_sv: displayName, type: 'artificial_object', category: obj.category || null },
             );
         }
     }
@@ -1354,6 +1362,9 @@ export default class SkyMap3D {
         const element = document.createElement('div');
         element.className = 'sky-map-3d-label info-icon';
         element.dataset.tooltipTitle = tooltipText;
+        if (userData.category) {
+            element.dataset.category = userData.category;
+        }
         element.textContent = nameSv;
         element.style.pointerEvents = 'none';
         element.setAttribute('tabindex', '0');

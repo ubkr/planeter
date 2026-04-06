@@ -1051,25 +1051,33 @@ export class SkyMap {
         }
 
         const RADIUS = 5;
+        // At -4.5° the projection formula gives r ≈ 1.05 × HORIZON_RADIUS,
+        // placing the dot just outside the ring and inside the SVG viewBox.
+        const BELOW_HORIZON_CLAMP_ALT = -4.5;
 
         for (const obj of objects) {
+            const belowHorizon = obj.altitude_deg < 0;
+            const plotAltitude = belowHorizon ? BELOW_HORIZON_CLAMP_ALT : obj.altitude_deg;
             const { x, y } = altAzToXY(
-                obj.altitude_deg,
+                plotAltitude,
                 obj.azimuth_deg,
                 CENTER_X,
                 CENTER_Y,
                 HORIZON_RADIUS,
             );
 
-            const belowHorizon = obj.altitude_deg < 0;
             const opacityAttr = belowHorizon ? '0.3' : '1';
 
-            const dataSource = obj.data_source === 'celestrak_tle'
-                ? 'CelestTrack TLE'
-                : (obj.data_source || 'okänd');
+            const dataSourceMap = {
+                'celestrak_tle': 'Celestrak TLE',
+                'jpl_horizons': 'JPL Horizons',
+            };
+            const dataSource = dataSourceMap[obj.data_source] || 'okänd';
+
+            const displayName = obj.label_sv || obj.name;
 
             const tooltipText =
-                `ISS\n` +
+                `${displayName}\n` +
                 `Höjd: ${obj.altitude_deg.toFixed(1)}°\n` +
                 `Riktning: ${obj.direction}\n` +
                 `Datakälla: ${dataSource}`;
@@ -1079,12 +1087,14 @@ export class SkyMap {
                 cx: x,
                 cy: y,
                 r: RADIUS,
-                class: 'sky-map-body sky-map-body--iss info-icon',
+                class: 'sky-map-body sky-map-body--artificial info-icon',
                 opacity: opacityAttr,
-                'aria-label': 'ISS',
+                'aria-label': displayName,
+                'data-category': obj.category || '',
                 tabindex: '0',
                 role: 'img',
             });
+            dot.style.fill = obj.colour || '#ffffff';
             dot.dataset.tooltipTitle = tooltipText;
             artificialGroup.appendChild(dot);
 
@@ -1096,7 +1106,7 @@ export class SkyMap {
                 opacity: opacityAttr,
                 'pointer-events': 'none',
             });
-            label.textContent = 'ISS';
+            label.textContent = displayName;
             artificialGroup.appendChild(label);
         }
     }

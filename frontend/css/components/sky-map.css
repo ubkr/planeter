@@ -426,17 +426,28 @@
     filter: drop-shadow(0 0 6px var(--color-accent-primary, #f5c842));
 }
 
-/* --- Artificial satellite (ISS) dot --- */
+/* --- Artificial objects (satellites, spacecraft) --- */
 
-/* White dot distinguishes ISS from all planet bodies. */
-.sky-map-body--iss {
-    fill: var(--color-text-primary);
-    animation: iss-pulse 2s ease-in-out infinite;
+/* Generic dot for all artificial objects; fill colour set inline by JS. */
+.sky-map-body--artificial {
+    animation: artificial-pulse 2s ease-in-out infinite;
 }
 
-/* Subtle brightness pulse to indicate a moving satellite. */
-@keyframes iss-pulse {
+/* Brightness pulse to indicate a moving artificial object. */
+@keyframes artificial-pulse {
     0%   { filter: brightness(1); }
     50%  { filter: brightness(1.5); }
     100% { filter: brightness(1); }
+}
+
+/* Spacecraft (cislunar / deep-space) — slower, wider glow for a more
+   distant, majestic feel compared to low-orbit satellites. */
+.sky-map-body--artificial[data-category="spacecraft"] {
+    animation: artificial-spacecraft-pulse 3s ease-in-out infinite;
+}
+
+@keyframes artificial-spacecraft-pulse {
+    0%   { filter: brightness(1)   drop-shadow(0 0 0   currentColor); }
+    50%  { filter: brightness(1.4) drop-shadow(0 0 4px currentColor); }
+    100% { filter: brightness(1)   drop-shadow(0 0 0   currentColor); }
 }

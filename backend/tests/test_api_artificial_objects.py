@@ -19,6 +19,7 @@ for values outside [-90, 90] and [-180, 180] respectively.
 from unittest.mock import AsyncMock, patch
 
 from app.models.artificial_object import ArtificialObject
+from app.models.planet import azimuth_to_compass
 
 # Coordinates for Malmö, Sweden — well within the valid lat/lon ranges.
 LAT = 55.6
@@ -37,6 +38,8 @@ _ISS_OBJECT = ArtificialObject(
     direction="S",
     is_above_horizon=True,
     data_source="celestrak_tle",
+    colour="#ffffff",
+    label_sv="ISS",
 )
 
 
@@ -160,3 +163,82 @@ async def test_empty_objects_list_on_no_data(async_client):
     assert body["objects"] == [], (
         f"Expected empty objects list, got {body['objects']!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# 8-10. Partial-failure and multi-source tests (tests 11-13 of overall suite)
+#
+# These tests patch get_iss_position and get_horizons_objects at their
+# use locations inside tracker.py so that get_all_artificial_objects calls
+# the real aggregation logic while each source is independently controlled.
+# ---------------------------------------------------------------------------
+
+# Patch targets inside the tracker module (where the names are bound).
+_ISS_TARGET = "app.services.artificial_objects.tracker.get_iss_position"
+_HORIZONS_TARGET = "app.services.artificial_objects.tracker.get_horizons_objects"
+
+# A minimal Artemis II ArtificialObject for use in multi-source tests.
+_ARTEMIS_OBJECT = ArtificialObject(
+    name="Artemis II",
+    category="spacecraft",
+    altitude_deg=23.5,
+    azimuth_deg=142.1,
+    direction=azimuth_to_compass(142.1),
+    is_above_horizon=True,
+    data_source="jpl_horizons",
+    colour="#00bfff",
+    label_sv="Artemis II",
+)
+
+
+async def test_both_sources_succeed_returns_both_objects(async_client):
+    """Test 11: ISS and Artemis II both present when both sources succeed."""
+    with (
+        patch(_ISS_TARGET, new=AsyncMock(return_value=_ISS_OBJECT)),
+        patch(_HORIZONS_TARGET, new=AsyncMock(return_value=[_ARTEMIS_OBJECT])),
+    ):
+        response = await async_client.get(
+            "/api/v1/artificial-objects",
+            params={"lat": 55.7, "lon": 13.4},
+        )
+    assert response.status_code == 200
+    body = response.json()
+    names = {obj["name"] for obj in body["objects"]}
+    assert "ISS" in names, f"ISS missing from objects: {names}"
+    assert "Artemis II" in names, f"Artemis II missing from objects: {names}"
+
+
+async def test_horizons_fails_iss_still_returned(async_client):
+    """Test 12: Horizons raises → endpoint returns HTTP 200 with ISS only."""
+    with (
+        patch(_ISS_TARGET, new=AsyncMock(return_value=_ISS_OBJECT)),
+        patch(_HORIZONS_TARGET, new=AsyncMock(side_effect=RuntimeError("horizons down"))),
+    ):
+        response = await async_client.get(
+            "/api/v1/artificial-objects",
+            params={"lat": 55.7, "lon": 13.4},
+        )
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["objects"]) == 1, (
+        f"Expected 1 object (ISS), got {len(body['objects'])}"
+    )
+    assert body["objects"][0]["name"] == "ISS"
+
+
+async def test_iss_fails_horizons_still_returned(async_client):
+    """Test 13: ISS raises → endpoint returns HTTP 200 with Artemis II only."""
+    with (
+        patch(_ISS_TARGET, new=AsyncMock(side_effect=RuntimeError("iss down"))),
+        patch(_HORIZONS_TARGET, new=AsyncMock(return_value=[_ARTEMIS_OBJECT])),
+    ):
+        response = await async_client.get(
+            "/api/v1/artificial-objects",
+            params={"lat": 55.7, "lon": 13.4},
+        )
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["objects"]) == 1, (
+        f"Expected 1 object (Artemis II), got {len(body['objects'])}"
+    )
+    assert body["objects"][0]["name"] == "Artemis II"
