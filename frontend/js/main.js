@@ -17,7 +17,7 @@ import { EventAlerts } from './components/event-alerts.js';
 import { EventsTimeline } from './components/events-timeline.js';
 import { SolarSystemView } from './components/solar-system-view.js';
 import { AltitudeTimeline } from './components/altitude-timeline.js';
-import { fetchVisiblePlanets, fetchEvents, fetchPlanetTimeline, fetchArtificialObjects } from './api.js';
+import { fetchVisiblePlanets, fetchEvents, fetchPlanetTimeline, fetchArtificialObjects, fetchEarthDetail } from './api.js';
 import { formatLocation } from './utils.js';
 
 /** Auto-refresh interval in milliseconds. */
@@ -91,6 +91,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const eventsTimeline = new EventsTimeline(document.getElementById('eventsTimelineContainer'));
     const solarSystemView = new SolarSystemView(document.getElementById('solarSystemContainer'));
     const altitudeTimeline = new AltitudeTimeline(document.getElementById('altitudeTimelineContainer'));
+
+    // Register the Earth detail fetch callback so the time slider can request
+    // fresh Earth/Moon data for past or future offsets.
+    solarSystemView.setEarthDetailCallback(async (offsetHours) => {
+        if (!currentLocation) return null;
+        return fetchEarthDetail(currentLocation.lat, currentLocation.lon, offsetHours);
+    });
 
     // --- Constellation controls ---
     const constellationToggleEl = document.getElementById('constellationToggle');

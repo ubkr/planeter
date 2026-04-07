@@ -176,3 +176,23 @@ export async function fetchArtificialObjects(lat, lon) {
 
     return parseJson(response);
 }
+
+/**
+ * Fetch Earth/Moon detail data for the given coordinates and optional time offset.
+ *
+ * @param {number} lat - Latitude in decimal degrees.
+ * @param {number} lon - Longitude in decimal degrees.
+ * @param {number} [offsetHours=0] - Hours offset from now (negative = past, positive = future).
+ * @returns {Promise<Object>} Earth detail response JSON object.
+ * @throws {Error} Swedish-language error on network, HTTP, or parse failure.
+ */
+export async function fetchEarthDetail(lat, lon, offsetHours = 0) {
+    const url = `${BASE_URL}/api/v1/earth-detail?lat=${lat}&lon=${lon}&offset_hours=${offsetHours}`;
+    const response = await fetchWithTimeout(url);
+
+    if (!response.ok) {
+        throw new Error(`Serverfel (${response.status}): Kunde inte hämta jorddetaljer.`);
+    }
+
+    return parseJson(response);
+}

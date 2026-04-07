@@ -4,6 +4,7 @@
     --color-bg-surface: #0f1322;
     --color-bg-surface-hover: #161b33;
     --color-bg-overlay: rgba(5, 8, 20, 0.8);
+    --color-bg-detail-panel: rgba(10, 12, 28, 0.92);
 
     /* Planetary Accents */
     --color-accent-primary: #f5c842;    /* Warm Gold */
@@ -83,6 +84,8 @@
     --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.4);
 
     --glow-accent: 0 0 20px rgba(245, 200, 66, 0.15), 0 0 40px rgba(59, 130, 246, 0.1);
+    --glow-slider-thumb: 0 0 6px rgba(245, 200, 66, 0.35);
+    --glow-slider-thumb-hover: 0 0 10px rgba(245, 200, 66, 0.5);
     --glow-text: 0 0 10px rgba(255, 255, 255, 0.3);
 
     /* Transitions */

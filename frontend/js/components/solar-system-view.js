@@ -404,6 +404,30 @@ export class SolarSystemView {
         // Artificial objects from the /artificial-objects API response.
         // Stored via setArtificialObjects(); consumed by render() in a later phase.
         this._artificialObjects = [];
+
+        // Callback set by main.js to fetch Earth detail data for a given hour offset.
+        // Signature: async (offsetHours: number) => EarthDetailResponse
+        this._earthDetailCallback = null;
+
+        // Reference to the time slider <input> element while the Earth detail overlay is open.
+        this._timeSliderEl = null;
+
+        // Debounce timer ID for slider input events.
+        this._sliderDebounceTimer = null;
+
+        // Monotonically-increasing generation counter to discard stale slider responses.
+        this._sliderRequestGen = 0;
+    }
+
+    /**
+     * Register a callback used to fetch Earth/Moon detail data when the time
+     * slider changes.
+     *
+     * @param {function(number): Promise<Object>} fn - Async function that accepts
+     *   an offsetHours number and returns an EarthDetailResponse object.
+     */
+    setEarthDetailCallback(fn) {
+        this._earthDetailCallback = fn;
     }
 
     /**
@@ -524,6 +548,12 @@ export class SolarSystemView {
             this._rafId = null;
             this._isAnimating = false;
         }
+
+        // Reset slider state — DOM is removed with the overlay
+        clearTimeout(this._sliderDebounceTimer);
+        this._sliderDebounceTimer = null;
+        this._timeSliderEl = null;
+        this._sliderRequestGen += 1;
 
         if (!this._zoomedPlanet && !this._overlayEl) {
             return;
@@ -735,16 +765,79 @@ export class SolarSystemView {
         desc.textContent = info.description_sv;
         infoPanel.appendChild(desc);
 
+        // --- Right column: SVG area (transparent overlay over the zoomed SVG) ---
+        // Declared here (before the slider block) so its reference can be captured
+        // in the slider event listener closure.
+        const svgArea = document.createElement('div');
+        svgArea.className = 'solar-system__detail-svgarea';
+
+        // Time slider — only for the Earth detail view
+        if (planetKey === 'earth') {
+            const sliderSection = document.createElement('div');
+            sliderSection.className = 'solar-system__time-slider-section';
+
+            const sliderLabels = document.createElement('div');
+            sliderLabels.className = 'solar-system__time-slider-labels';
+            const labelLeft = document.createElement('span');
+            labelLeft.textContent = '\u22127 dagar';
+            const labelCenter = document.createElement('span');
+            labelCenter.textContent = 'Nu';
+            const labelRight = document.createElement('span');
+            labelRight.textContent = '+7 dagar';
+            sliderLabels.appendChild(labelLeft);
+            sliderLabels.appendChild(labelCenter);
+            sliderLabels.appendChild(labelRight);
+
+            const sliderEl = document.createElement('input');
+            sliderEl.type = 'range';
+            sliderEl.className = 'solar-system__time-slider';
+            sliderEl.min = '-168';
+            sliderEl.max = '168';
+            sliderEl.step = '1';
+            sliderEl.value = '0';
+            this._timeSliderEl = sliderEl;
+
+            const sliderCurrent = document.createElement('div');
+            sliderCurrent.className = 'solar-system__time-slider-current';
+            sliderCurrent.textContent = 'Nu';
+
+            sliderSection.appendChild(sliderLabels);
+            sliderSection.appendChild(sliderEl);
+            sliderSection.appendChild(sliderCurrent);
+            infoPanel.appendChild(sliderSection);
+
+            sliderEl.addEventListener('input', () => {
+                const offsetHours = parseInt(sliderEl.value, 10);
+                sliderCurrent.textContent = this._offsetToLabel(offsetHours);
+
+                clearTimeout(this._sliderDebounceTimer);
+                this._sliderDebounceTimer = setTimeout(async () => {
+                    if (!this._earthDetailCallback) {
+                        return;
+                    }
+                    // Generation counter to discard stale responses
+                    this._sliderRequestGen = (this._sliderRequestGen || 0) + 1;
+                    const gen = this._sliderRequestGen;
+                    try {
+                        const data = await this._earthDetailCallback(offsetHours);
+                        if (gen !== this._sliderRequestGen) {
+                            // A newer request was made; discard this response
+                            return;
+                        }
+                        this._updateEarthMoonDiagram(data, svgArea);
+                    } catch (err) {
+                        console.warn('SolarSystemView: slider fetch failed', err);
+                    }
+                }, 250);
+            });
+        }
+
         // Back button
         const backBtn = document.createElement('button');
         backBtn.className = 'solar-system__detail-back-btn';
         backBtn.textContent = 'Tillbaka';
         backBtn.addEventListener('click', () => this.zoomOut());
         infoPanel.appendChild(backBtn);
-
-        // --- Right column: SVG area (transparent overlay over the zoomed SVG) ---
-        const svgArea = document.createElement('div');
-        svgArea.className = 'solar-system__detail-svgarea';
 
         // Moon diagram — only rendered for planets that have moon data (Jupiter, Saturn)
         const planetData = this._planetData?.get(planetKey);
@@ -867,7 +960,7 @@ export class SolarSystemView {
 
         // Earth Moon diagram — rendered only for the Earth detail view
         if (planetKey === 'earth') {
-            this._buildEarthMoonDiagram(svgArea);
+            this._buildEarthMoonDiagram(svgArea, this._earthSystem, this._artificialObjects);
         }
 
         // Saturn ring diagram — rendered only when ring tilt data is available
@@ -972,24 +1065,30 @@ export class SolarSystemView {
      * x_offset_earth_radii / y_offset_earth_radii from the earth_system API data.
      * Also shows the Moon's illumination percentage.
      *
-     * Falls back to a text message if this._earthSystem is null.
+     * Falls back to a text message if earthSystem is null.
      *
-     * @param {HTMLElement} container - The svgArea div to append the diagram into
+     * @param {HTMLElement} container            - The svgArea div to append the diagram into
+     * @param {Object|null} earthSystem          - earth_system API object (moon + position data)
+     * @param {Array<Object>} artificialObjects  - Array of artificial object items. Each item
+     *   may expose position data either via the nested `earth_detail_position` property (from
+     *   the /artificial-objects endpoint) or directly as flat fields on the object itself
+     *   (from the /earth-detail slider endpoint: x_offset_earth_radii, y_offset_earth_radii,
+     *   distance_km, label_sv).
      */
-    _buildEarthMoonDiagram(container) {
-        if (!this._earthSystem) {
+    _buildEarthMoonDiagram(container, earthSystem, artificialObjects) {
+        if (!earthSystem) {
             const fallback = document.createElement('p');
             fallback.className = 'solar-system__detail-fallback';
-            fallback.textContent = 'Månens position kunde inte laddas just nu';
+            fallback.textContent = 'M\u00e5nens position kunde inte laddas just nu';
             container.appendChild(fallback);
             return;
         }
 
-        const moon = this._earthSystem.moon;
+        const moon = earthSystem.moon;
         if (!moon) {
             const fallback = document.createElement('p');
             fallback.className = 'solar-system__detail-fallback';
-            fallback.textContent = 'Månens position kunde inte laddas just nu';
+            fallback.textContent = 'M\u00e5nens position kunde inte laddas just nu';
             container.appendChild(fallback);
             return;
         }
@@ -1059,15 +1158,29 @@ export class SolarSystemView {
         label.style.top = `${Math.round(top - 2)}px`;
         diagram.appendChild(label);
 
-        // Render eligible spacecraft markers using the same scale as the Moon
-        const earthDetailObjects = (this._artificialObjects || []).filter(
-            obj => obj.earth_detail_position != null
-        );
+        // Render eligible spacecraft markers using the same scale as the Moon.
+        // Each item in artificialObjects may expose position data in one of two shapes:
+        //   • Nested:  obj.earth_detail_position.{ x_offset_earth_radii, y_offset_earth_radii, distance_km, label_sv }
+        //              (from the /artificial-objects endpoint)
+        //   • Flat:    obj.{ x_offset_earth_radii, y_offset_earth_radii, distance_km, label_sv }
+        //              (from the /earth-detail slider endpoint, responseData.objects)
+        const earthDetailObjects = (artificialObjects || []).filter((obj) => {
+            if (obj.earth_detail_position != null) return true;
+            // Accept flat shape: must have finite positional fields
+            return (
+                typeof obj.x_offset_earth_radii === 'number' &&
+                typeof obj.y_offset_earth_radii === 'number' &&
+                typeof obj.distance_km === 'number'
+            );
+        });
 
         for (const obj of earthDetailObjects) {
-            const edp = obj.earth_detail_position;
+            // Normalise to flat position fields regardless of source shape
+            const edp = obj.earth_detail_position != null
+                ? obj.earth_detail_position
+                : obj;
 
-            // Fix 3: Guard — skip objects with non-finite offsets or distance
+            // Guard — skip objects with non-finite offsets or distance
             if (!isFinite(edp.x_offset_earth_radii) || !isFinite(edp.y_offset_earth_radii) || !isFinite(edp.distance_km)) {
                 continue;
             }
@@ -1075,7 +1188,7 @@ export class SolarSystemView {
             const rawScLeft = centerX + edp.x_offset_earth_radii * scale - dotRadius;
             const rawScTop  = centerY - edp.y_offset_earth_radii * scale - dotRadius;
 
-            // Fix 2: Clamp position to diagram bounds; mark as out-of-range if clamped
+            // Clamp position to diagram bounds; mark as out-of-range if clamped
             const scLeft = Math.max(padding, Math.min(diagramWidth  - padding, rawScLeft));
             const scTop  = Math.max(padding, Math.min(diagramHeight - padding, rawScTop));
             const wasClamped = rawScLeft !== scLeft || rawScTop !== scTop;
@@ -1086,11 +1199,11 @@ export class SolarSystemView {
             scDot.dataset.distanceKm = String(Math.round(edp.distance_km));
             scDot.setAttribute(
                 'title',
-                `Avstånd från Jorden: ${Math.round(edp.distance_km)} km`
+                `Avst\u00e5nd fr\u00e5n Jorden: ${Math.round(edp.distance_km)} km`
             );
             scDot.style.left = `${Math.round(scLeft)}px`;
             scDot.style.top  = `${Math.round(scTop)}px`;
-            // Fix 2: visually distinguish out-of-range (clamped) spacecraft
+            // Visually distinguish out-of-range (clamped) spacecraft
             if (wasClamped) {
                 scDot.style.opacity = '0.5';
                 scDot.style.outlineStyle = 'dashed';
@@ -1101,7 +1214,7 @@ export class SolarSystemView {
             scLabel.className = 'solar-system__spacecraft-label';
             scLabel.textContent = edp.label_sv;
 
-            // Fix 1: Flip label to the left when spacecraft dot is in the right half
+            // Flip label to the left when spacecraft dot is in the right half
             // (mirrors Moon label logic — uses pixel position, not raw offset sign)
             if (scLeft > diagramWidth / 2) {
                 scLabel.style.left = `${Math.round(scLeft - 2)}px`;
@@ -1136,6 +1249,60 @@ export class SolarSystemView {
     }
 
     /**
+     * Clear the existing Earth/Moon diagram from svgArea and rebuild it with
+     * fresh data received from the time slider.
+     *
+     * @param {Object} responseData   - Full response from fetchEarthDetail():
+     *   { earth_system: {...}, objects: [...] }
+     * @param {HTMLElement} svgArea   - The right-column svgArea div.
+     */
+    _updateEarthMoonDiagram(responseData, svgArea) {
+        // Remove the existing diagram
+        const existing = svgArea.querySelector('.solar-system__moon-diagram');
+        if (existing) {
+            existing.parentNode.removeChild(existing);
+        }
+
+        // Also remove any fallback message left by a previous failed build
+        const existingFallback = svgArea.querySelector('.solar-system__detail-fallback');
+        if (existingFallback) {
+            existingFallback.parentNode.removeChild(existingFallback);
+        }
+
+        this._buildEarthMoonDiagram(svgArea, responseData.earth_system, responseData.objects || []);
+    }
+
+    /**
+     * Convert a slider hour offset to a Swedish-language human-readable label.
+     *
+     * @param {number} offsetHours - Integer hours offset from now.
+     * @returns {string}
+     */
+    _offsetToLabel(offsetHours) {
+        const abs = Math.abs(offsetHours);
+
+        if (abs < 1) {
+            return 'Nu';
+        }
+
+        if (abs < 24) {
+            const rounded = Math.round(abs);
+            const unit = rounded === 1 ? 'timme' : 'timmar';
+            if (offsetHours < 0) {
+                return `${rounded}\u00a0${unit} sedan`;
+            }
+            return `om ${rounded}\u00a0${unit}`;
+        }
+
+        const days = Math.round(abs / 24);
+        const unit = days === 1 ? 'dag' : 'dagar';
+        if (offsetHours < 0) {
+            return `${days}\u00a0${unit} sedan`;
+        }
+        return `om ${days}\u00a0${unit}`;
+    }
+
+    /**
      * Instantly reset zoom and remove overlay without animation.
      * Used at the start of render() and in clear().
      */
@@ -1144,6 +1311,12 @@ export class SolarSystemView {
             cancelAnimationFrame(this._rafId);
             this._rafId = null;
         }
+
+        // Reset slider state — DOM is removed with the overlay
+        clearTimeout(this._sliderDebounceTimer);
+        this._sliderDebounceTimer = null;
+        this._timeSliderEl = null;
+        this._sliderRequestGen += 1;
 
         this._removeOverlay();
 

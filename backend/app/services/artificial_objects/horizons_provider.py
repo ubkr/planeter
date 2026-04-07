@@ -19,7 +19,7 @@ import io
 import math
 import re
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import httpx
 
@@ -558,5 +558,190 @@ async def get_horizons_objects(lat: float, lon: float) -> List[ArtificialObject]
 
     logger.info(
         f"Horizons objects computed for ({lat}, {lon}): {len(objects)} returned"
+    )
+    return objects
+
+
+# ---------------------------------------------------------------------------
+# Time-aware geocentric fetch (for the Earth/Moon detail time slider)
+# ---------------------------------------------------------------------------
+
+
+async def _fetch_horizons_vectors_at(
+    command_id: str, target_dt: datetime
+) -> Optional[str]:
+    """
+    Fetch a geocentric VECTORS ephemeris for *command_id* at a specific UTC time.
+
+    Identical in structure to _fetch_horizons_vectors but accepts an explicit
+    *target_dt* so it can be called for any point in time (±7 days) rather than
+    always using datetime.now().
+
+    Cache key is keyed on command_id + the target time rounded to the nearest
+    5-minute boundary, so that slider positions close together share the same
+    cached response.
+
+    Args:
+        command_id: Horizons COMMAND parameter (e.g. '-1024').
+        target_dt:  Target UTC datetime (timezone-aware).
+
+    Returns:
+        Raw response text, or None on any network/HTTP failure.
+    """
+    # Round to nearest 5-minute boundary for the cache key only.
+    rounded = target_dt.replace(
+        minute=(target_dt.minute // 5) * 5, second=0, microsecond=0
+    )
+    cache_key = f"horizons_vectors_{command_id}_{rounded.isoformat()}"
+
+    cached = await cache.get(cache_key)
+    if cached is not None:
+        logger.info(
+            f"Horizons VECTORS (at) cache hit for command_id={command_id} "
+            f"target={rounded.isoformat()}"
+        )
+        return cached
+
+    # Strip tzinfo — Horizons API expects naive UTC strings.
+    start_naive = target_dt.replace(tzinfo=None)
+    stop_naive = start_naive + timedelta(minutes=1)
+    start_str = start_naive.strftime("%Y-%m-%d %H:%M")
+    stop_str = stop_naive.strftime("%Y-%m-%d %H:%M")
+
+    params = {
+        "COMMAND": f"'{command_id}'",
+        "EPHEM_TYPE": "VECTORS",
+        "CENTER": "'500@399'",
+        "START_TIME": f"'{start_str}'",
+        "STOP_TIME": f"'{stop_str}'",
+        "STEP_SIZE": "'1 min'",
+        "OUT_UNITS": "'AU-D'",
+        "REF_PLANE": "FRAME",
+        "REF_SYSTEM": "J2000",
+        "VEC_TABLE": "'2'",
+        "CSV_FORMAT": "YES",
+        "OBJ_DATA": "NO",
+        "CAL_FORMAT": "CAL",
+        # Return plain text, not the default JSON envelope.
+        "format": "text",
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=_HORIZONS_FETCH_TIMEOUT_SECONDS) as client:
+            response = await client.get(_HORIZONS_API_URL, params=params)
+            response.raise_for_status()
+            text = response.text
+    except Exception as exc:
+        logger.warning(
+            f"Horizons VECTORS (at) fetch failed for command_id={command_id} "
+            f"target={start_str}: {exc}"
+        )
+        return None
+
+    if "$$SOE" not in text:
+        logger.debug(
+            "Horizons VECTORS (at) response for command_id=%s at %s contains no "
+            "ephemeris data; not caching",
+            command_id,
+            start_str,
+        )
+        return text  # return so the caller/parser can log the failure detail
+
+    await cache.set(cache_key, text, ttl_seconds=_HORIZONS_CACHE_TTL_SECONDS)
+    logger.info(
+        f"Horizons VECTORS (at) response fetched and cached for "
+        f"command_id={command_id} target={start_str}"
+    )
+    return text
+
+
+async def compute_horizons_earth_detail(target_dt: datetime) -> List[Dict]:
+    """
+    Return Earth-detail position dicts for all HORIZONS_OBJECTS entries that
+    have ``earth_detail: True``, computed at *target_dt*.
+
+    Each returned dict is compatible with EarthDetailObjectInfo and includes:
+        name, label_sv, colour, x_offset_earth_radii, y_offset_earth_radii,
+        distance_km.
+
+    Objects that fail to fetch or parse are skipped (a warning is logged).
+    No hardcoded datetime.now() — only *target_dt* is used for the Horizons
+    request times.
+
+    Args:
+        target_dt: Target UTC datetime (timezone-aware).
+
+    Returns:
+        List of dicts for objects that were successfully computed.
+    """
+
+    async def _fetch_one_at_time(entry: Dict) -> Optional[Dict]:
+        """Fetch one registry entry at target_dt; return dict or None on failure."""
+        command_id = entry["command_id"]
+        label_sv = entry.get("label_sv", entry["name"])
+
+        async with _HORIZONS_SEMAPHORE:
+            try:
+                vectors_text = await _fetch_horizons_vectors_at(command_id, target_dt)
+                if vectors_text is None:
+                    logger.warning(
+                        f"compute_horizons_earth_detail: VECTORS fetch returned None "
+                        f"for command_id={command_id}"
+                    )
+                    return None
+
+                xyz = _parse_horizons_vectors(vectors_text)
+                if xyz is None:
+                    logger.warning(
+                        f"compute_horizons_earth_detail: VECTORS parse failed "
+                        f"for command_id={command_id}"
+                    )
+                    return None
+
+                x_au, y_au, z_au = xyz
+                distance_km = math.sqrt(x_au ** 2 + y_au ** 2 + z_au ** 2) * _AU_TO_KM
+                x_offset_er = x_au * _AU_TO_KM / _EARTH_RADIUS_KM
+                y_offset_er = y_au * _AU_TO_KM / _EARTH_RADIUS_KM
+
+                logger.info(
+                    f"compute_horizons_earth_detail: {entry['name']} "
+                    f"x={x_offset_er:.2f} ER  y={y_offset_er:.2f} ER  "
+                    f"dist={distance_km:.0f} km  target={target_dt.isoformat()}"
+                )
+
+                return {
+                    "name": entry["name"],
+                    "label_sv": label_sv,
+                    "colour": entry.get("colour"),
+                    "x_offset_earth_radii": round(x_offset_er, 3),
+                    "y_offset_earth_radii": round(y_offset_er, 3),
+                    "distance_km": round(distance_km, 1),
+                }
+
+            except Exception as exc:
+                logger.warning(
+                    f"compute_horizons_earth_detail: unexpected error for "
+                    f"{entry.get('name', command_id)}: {exc}"
+                )
+                return None
+
+    earth_detail_entries = [e for e in HORIZONS_OBJECTS if e.get("earth_detail")]
+
+    tasks = [_fetch_one_at_time(entry) for entry in earth_detail_entries]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    objects: List[Dict] = []
+    for entry, result in zip(earth_detail_entries, results):
+        if isinstance(result, Exception):
+            logger.warning(
+                f"compute_horizons_earth_detail gather exception for "
+                f"{entry.get('name')}: {result}"
+            )
+        elif result is not None:
+            objects.append(result)
+
+    logger.info(
+        f"compute_horizons_earth_detail: {len(objects)} objects returned "
+        f"for target={target_dt.isoformat()}"
     )
     return objects
