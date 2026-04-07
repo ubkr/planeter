@@ -1471,6 +1471,38 @@ The Earth detail view becomes a reusable host for tracked spacecraft and future 
 
 ---
 
+#### Phase F7: Tidsglidare för Jord-Månvyn
+
+**Depends on:** Phase F5, Phase F6, Phase G2
+**Parallelisable with:** None
+
+**Intended Outcome**
+The Earth/Moon detail view in the Solsystemet tab gains a time slider that lets the user scrub ±7 days (168 hours) relative to the current moment. Moving the slider updates the Moon's position in the diagram using the same geocentric `compute_earth_system()` pipeline already used for the live view, and refreshes any tracked spacecraft markers (e.g. Artemis II) using a parameterised Horizons geocentric VECTORS call at the selected time. A dedicated backend endpoint `GET /api/v1/earth-detail?lat=&lon=&offset_hours=` serves these time-offset queries, keeping the existing `/visible` and `/artificial-objects` endpoints unchanged. The backend service functions (`compute_earth_system`, `compute_horizons_earth_detail`, and the existing `compute_moon_positions`) are all parameterised on a target `datetime`, so a future phase can reuse them for a similar slider on Jupiter or Saturn without redesigning the service layer. The slider UI itself is limited to the Earth detail view in this phase. The current offset is shown as a Swedish label — "Nu" at the centre position, "X dagar sedan" to the left, and "om X dagar" to the right.
+
+> **Note:** Spacecraft marker positions depend on the published JPL Horizons trajectory window. For Artemis II, positions outside the published trajectory window cause the spacecraft marker to disappear silently; the provider already handles empty Horizons responses with the existing Swedish empty-state message.
+
+**Definition of Done**
+- [ ] `GET /api/v1/earth-detail?lat=55.7&lon=13.4&offset_hours=0` returns HTTP 200 with `timestamp`, `earth_system`, and `objects`; `earth_system.moon.x_offset_earth_radii` and `earth_system.moon.y_offset_earth_radii` are non-null floats matching the values from `/api/v1/planets/visible` at the same instant
+- [ ] `GET /api/v1/earth-detail?lat=55.7&lon=13.4&offset_hours=-48` returns a `earth_system.moon` with different x/y offsets than the `offset_hours=0` call, confirming the Moon is computed at 2 days in the past
+- [ ] `GET /api/v1/earth-detail?lat=55.7&lon=13.4&offset_hours=999` returns HTTP 422 (offset_hours is outside the allowed range of −168 to 168)
+- [ ] The Earth detail panel shows a `<input type="range">` slider with endpoint labels "−7 dagar" and "+7 dagar" and a centre tick "Nu"; the slider default position is 0
+- [ ] A Swedish label adjacent to the slider reflects the selected offset: "Nu" at 0, "3 dagar sedan" for −72 h, "om 2 dagar" for +48 h (rounding to the nearest day)
+- [ ] Moving the slider updates the Moon marker position within 500 ms after debounce (250 ms debounce), without requiring a tab switch or page reload
+- [ ] If the Artemis II `earth_detail_position` is present in the response, the spacecraft marker moves to its position at the selected time; if absent (outside trajectory window), the Swedish empty-state "Inga aktuella rymdfarkoster i jordsystemet" is shown without throwing a JavaScript error
+- [ ] The slider and labels are visible and usable on both 375 px and 1200 px viewports without horizontal overflow
+- [ ] Clicking "Tillbaka" resets the slider state so the next entry into the Earth detail view starts at "Nu"
+- [ ] The service functions `compute_earth_system(dt)` and `compute_horizons_earth_detail(dt)` each accept an explicit `datetime` parameter with no hardcoded "now" reference, confirmed by unit-test-style inspection of the function signatures in their respective files
+
+**Key files**
+- Create `backend/app/api/routes/earth_detail.py` — `GET /api/v1/earth-detail`; validates `offset_hours` via `Query(ge=-168, le=168, default=0)`; computes `target_dt = datetime.now(UTC) + timedelta(hours=offset_hours)`; calls `compute_earth_system(target_dt)` and a new `compute_horizons_earth_detail(target_dt)` helper; returns `EarthDetailResponse` Pydantic model with `timestamp`, `location`, `earth_system`, and `objects` fields
+- Modify `backend/app/services/artificial_objects/horizons_provider.py` — add `compute_horizons_earth_detail(target_dt: datetime) -> List[dict]` that executes a geocentric VECTORS call (`CENTER='500@399'`) at `target_dt` for each `earth_detail: True` registry entry; cache key includes `command_id` and `target_dt` rounded to the nearest 5 minutes; individual object failures are caught and skipped rather than raised; this function is intentionally kept generic so any `earth_detail: True` Horizons object (current or future) is included automatically
+- Modify `backend/app/main.py` — import and register `earth_detail.router`
+- Modify `frontend/js/api.js` — add `fetchEarthDetail(lat, lon, offsetHours)` calling `GET /api/v1/earth-detail`
+- Modify `frontend/js/components/solar-system-view.js` — in `_showDetailOverlay('earth')`, inject a `.solar-system__time-slider-section` block into the left info panel (between the facts grid and the "Tillbaka" button) containing a `<input type="range" min="-168" max="168" step="1" value="0">`, endpoint labels, a "Nu" centre tick, and a dynamic offset label; wire the `input` event (debounced 250 ms) to call an injected callback supplied via `setEarthDetailCallback(fn)` and re-render only the Earth/Moon diagram portion of `svgArea` with the returned data; expose `setEarthDetailCallback(fn)` so `main.js` can wire `fetchEarthDetail()` without coupling the component to the API module
+- Modify `frontend/css/components/solar-system-view.css` — add styles for `.solar-system__time-slider-section`, `.solar-system__time-slider-labels` (space-between flex for endpoint labels), `.solar-system__time-slider-current` (centred offset label), and the range input itself; use existing CSS design tokens; ensure the block does not overflow on 375 px viewports
+
+---
+
 ### Phase G: Artificial Objects in the Sky Map
 
 This group introduces human-made sky objects as a separate data track in the app, independent from the planets API. G1 establishes a dedicated endpoint, models, and rendering flow for ISS as the first tracked object. G2 extends the same endpoint and sky-map pipeline with Artemis II using a separate mission ephemeris source. This keeps the planets domain clean while allowing future sub-phases to add more satellites, spacecraft, pass forecasts, filtering, and source-specific handling.
