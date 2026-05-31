@@ -12,9 +12,20 @@ A Swedish-language web app showing which naked-eye planets (Mercury, Venus, Mars
 
 ## Documentation
 
-- **`PLAN.md`** — Phased implementation plan and future roadmap.
+- **`development_plan/`** — Phased implementation plan split into thematic files. Completed phases live in `development_plan/completed/`; upcoming and deferred phases live in the root of that directory. See `development_plan/README.md` for the workflow and file template.
 - **`ARCHITECTURE.md`** — Component hierarchy, data flow, calculation pipeline, visibility scoring algorithm, and API response schema.
 - **`TECH_CHOICES.md`** — Rationale for every technology choice: ephem vs alternatives, weather sources, frontend libraries, Python dependencies, and design theme.
+
+## Confirmed Decisions
+
+| Question | Decision |
+|---|---|
+| Planet scope | Naked-eye only: Mercury, Venus, Mars, Jupiter, Saturn |
+| Time selection | Right now + tonight: current positions, plus tonight's visibility windows (sunset → sunrise) |
+| UI language | Swedish: all labels, planet names, and UI text in Swedish |
+| Cloud cover | Affects visibility score: overcast sky reduces or zeroes a planet's score |
+| Default location | Södra Sandby (55.7°N, 13.4°E) |
+| Uranus/Neptune | Not in scope for MVP; planned in Phase C (deferred) |
 
 ## Workflow
 
